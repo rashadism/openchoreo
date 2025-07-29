@@ -18,7 +18,7 @@ HELM_CONTROLLER_IMAGE_PULL_POLICY ?= Always
 # Define the generation targets for the helm charts that are required for the helm package and push.
 # Ex: make helm-generate.cilium, make helm-generate.choreo
 .PHONY: helm-generate.%
-helm-generate.%: ## Generate helm chart for the specified chart name.
+helm-generate.%: yq ## Generate helm chart for the specified chart name.
 	@if [ -z "$(filter $*,$(HELM_CHART_NAMES))" ]; then \
     		$(call log_error, Invalid helm generate target '$*'); \
     		exit 1; \
