@@ -30,3 +30,7 @@ go.work
 
 .DS_Store
 
+*.local.md
+
+# Log files
+*.log

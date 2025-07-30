@@ -1,0 +1,66 @@
+apiVersion: openchoreo.dev/v1alpha1
+kind: Component
+metadata:
+  name: greeting-service
+  namespace: default
+spec:
+  owner:
+    projectName: default
+  type: Service
+  build:
+    repository:
+      appPath: /service-go-greeter
+      revision:
+        branch: main
+      url: https://github.com/openchoreo/sample-workloads
+    templateRef:
+      name: docker
+      parameters:
+        - name: docker-context
+          value: /service-go-greeter
+        - name: dockerfile-path
+          value: /service-go-greeter/Dockerfile
+
+---
+apiVersion: openchoreo.dev/v1alpha1
+kind: Build
+metadata:
+  name: greeting-service-build-01
+  namespace: default
+spec:
+  owner:
+    componentName: greeting-service
+    projectName: default
+  repository:
+    appPath: /service-go-greeter
+    revision:
+      branch: main
+    url: https://github.com/openchoreo/sample-workloads
+  templateRef:
+    name: docker
+    parameters:
+      - name: docker-context
+        value: /greeting-service-go
+      - name: dockerfile-path
+        value: /greeting-service-go/Dockerfile
+
+---
+apiVersion: openchoreo.dev/v1alpha1
+kind: Service
+metadata:
+  name: greeting-service
+spec:
+  owner:
+    componentName: greeting-service
+    projectName: default
+  workloadName: greeting-service
+  className: default
+  apis:
+    greeter-api:
+      type: REST
+      className: default
+      rest:
+        backend:
+          port: 9090
+          basePath: /greeter
+        exposeLevels: [ "Public" ]

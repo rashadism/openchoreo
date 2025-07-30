@@ -6,19 +6,38 @@ package labels
 // This file contains the all the labels that are used to store Choreo specific the metadata in the Kubernetes objects.
 
 const (
-	LabelKeyOrganizationName       = "core.choreo.dev/organization"
-	LabelKeyProjectName            = "core.choreo.dev/project"
-	LabelKeyComponentName          = "core.choreo.dev/component"
-	LabelKeyDeploymentTrackName    = "core.choreo.dev/deployment-track"
-	LabelKeyBuildName              = "core.choreo.dev/build"
-	LabelKeyEnvironmentName        = "core.choreo.dev/environment"
-	LabelKeyName                   = "core.choreo.dev/name"
-	LabelKeyDeployableArtifactName = "core.choreo.dev/deployable-artifact"
-	LabelKeyDeploymentName         = "core.choreo.dev/deployment"
-	LabelKeyDataPlaneName          = "core.choreo.dev/dataplane"
-	LabelKeyBuildPlane             = "core.choreo.dev/build-plane"
+	LabelKeyOrganizationName       = "openchoreo.dev/organization"
+	LabelKeyProjectName            = "openchoreo.dev/project"
+	LabelKeyComponentName          = "openchoreo.dev/component"
+	LabelKeyDeploymentTrackName    = "openchoreo.dev/deployment-track"
+	LabelKeyBuildName              = "openchoreo.dev/build"
+	LabelKeyEnvironmentName        = "openchoreo.dev/environment"
+	LabelKeyName                   = "openchoreo.dev/name"
+	LabelKeyDeployableArtifactName = "openchoreo.dev/deployable-artifact"
+	LabelKeyDeploymentName         = "openchoreo.dev/deployment"
+	LabelKeyDataPlaneName          = "openchoreo.dev/dataplane"
+	LabelKeyBuildPlane             = "openchoreo.dev/build-plane"
 
-	LabelKeyManagedBy = "managed-by"
+	// LabelKeyCreatedBy identifies which controller initially created a resource (audit trail).
+	// Example: A namespace created by release-controller would have created-by=release-controller.
+	// Note: For shared resources like namespaces, the creator and lifecycle manager may differ.
+	LabelKeyCreatedBy = "openchoreo.dev/created-by"
 
-	LabelValueManagedBy = "choreo-control-plane"
+	// LabelKeyManagedBy identifies which controller manages the lifecycle of a resource.
+	// Example: Resources deployed by release-controller have managed-by=release-controller.
+	LabelKeyManagedBy = "openchoreo.dev/managed-by"
+
+	// LabelKeyReleaseResourceID identifies a specific resource within a release.
+	LabelKeyReleaseResourceID = "openchoreo.dev/release-resource-id"
+
+	// LabelKeyReleaseUID tracks which release UID owns/manages a resource.
+	LabelKeyReleaseUID = "openchoreo.dev/release-uid"
+
+	// LabelKeyReleaseName tracks the name of the release that manages a resource.
+	LabelKeyReleaseName = "openchoreo.dev/release-name"
+
+	// LabelKeyReleaseNamespace tracks the namespace of the release that manages a resource.
+	LabelKeyReleaseNamespace = "openchoreo.dev/release-namespace"
+
+	LabelValueManagedBy = "openchoreo-control-plane"
 )

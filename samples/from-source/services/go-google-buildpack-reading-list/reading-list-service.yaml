@@ -1,0 +1,56 @@
+apiVersion: openchoreo.dev/v1alpha1
+kind: Component
+metadata:
+  name: reading-list-service
+  namespace: default
+spec:
+  owner:
+    projectName: default
+  type: Service
+  build:
+    repository:
+      appPath: /service-go-reading-list
+      revision:
+        branch: main
+      url: https://github.com/openchoreo/sample-workloads
+    templateRef:
+      name: google-cloud-buildpacks
+
+---
+apiVersion: openchoreo.dev/v1alpha1
+kind: Build
+metadata:
+  name: reading-list-service-build-01
+  namespace: default
+spec:
+  owner:
+    componentName: reading-list-service
+    projectName: default
+  repository:
+    appPath: /service-go-reading-list
+    revision:
+      branch: main
+    url: https://github.com/openchoreo/sample-workloads
+  templateRef:
+    name: google-cloud-buildpacks
+---
+apiVersion: openchoreo.dev/v1alpha1
+kind: Service
+metadata:
+  name: reading-list-service-service
+  namespace: default
+spec:
+  owner:
+    componentName: reading-list-service
+    projectName: default
+  workloadName: reading-list-service-workload
+  className: default
+  apis:
+    reading-list-api: 
+      type: REST
+      className: default
+      rest:
+        backend:
+          port: 8080
+          basePath: /api/v1/reading-list
+        exposeLevels: [ "Public" ]

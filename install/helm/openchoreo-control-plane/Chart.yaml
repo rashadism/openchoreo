@@ -1,0 +1,30 @@
+apiVersion: v2
+name: openchoreo-control-plane
+description: A Helm chart for OpenChoreo Control Plane
+type: application
+
+# Version strategy: latest-dev for development, replaced by CI for releases
+version: 0.0.0-latest-dev
+appVersion: "latest-dev"
+
+home: https://github.com/openchoreo/openchoreo
+icon: https://openchoreo.github.io/img/openchoreo_logo.png
+sources:
+  - https://github.com/openchoreo/openchoreo
+keywords:
+  - openchoreo
+  - internal-developer-platform
+  - idp
+  - kubernetes
+  - developer-experience
+  - devops
+  - platform-engineering
+maintainers:
+  - name: OpenChoreo Team
+    url: https://github.com/openchoreo/openchoreo
+
+dependencies:
+  - name: cert-manager
+    repository: https://charts.jetstack.io
+    condition: cert-manager.enabled
+    version: "v1.16.2"

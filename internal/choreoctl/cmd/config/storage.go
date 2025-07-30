@@ -23,13 +23,13 @@ func IsConfigFileExists() bool {
 	return err == nil
 }
 
-// getConfigFilePath returns the path to the choreoctl config file
+// getConfigFilePath returns the path to the openchoreo config file
 func getConfigFilePath() (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("failed to get home directory: %w", err)
 	}
-	return filepath.Join(homeDir, ".choreoctl", "config"), nil
+	return filepath.Join(homeDir, ".openchoreo", "config"), nil
 }
 
 // LoadStoredConfig loads the configuration from disk
@@ -43,7 +43,6 @@ func LoadStoredConfig() (*configContext.StoredConfig, error) {
 	if os.IsNotExist(err) {
 		return &configContext.StoredConfig{
 			Contexts: []configContext.Context{},
-			Clusters: []configContext.KubernetesCluster{},
 		}, nil
 	} else if err != nil {
 		return nil, fmt.Errorf("failed to read config file: %w", err)

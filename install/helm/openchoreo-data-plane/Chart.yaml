@@ -1,0 +1,45 @@
+apiVersion: v2
+name: openchoreo-data-plane
+description: A Helm chart for OpenChoreo Data Plane
+type: application
+
+# Version strategy: latest-dev for development, replaced by CI for releases
+version: 0.0.0-latest-dev
+appVersion: "latest-dev"
+
+home: https://github.com/openchoreo/openchoreo
+icon: https://openchoreo.github.io/img/openchoreo_logo.png
+sources:
+  - https://github.com/openchoreo/openchoreo
+keywords:
+  - openchoreo
+  - internal-developer-platform
+  - idp
+  - kubernetes
+  - developer-experience
+  - devops
+  - platform-engineering
+  - data-plane
+  - vault
+  - gateway
+  - observability
+maintainers:
+  - name: OpenChoreo Team
+    url: https://github.com/openchoreo/openchoreo
+dependencies:
+  - name: vault
+    version: 0.29.1
+    repository: "https://helm.releases.hashicorp.com"
+    condition: vault.enabled
+  - name: secrets-store-csi-driver
+    repository: "https://kubernetes-sigs.github.io/secrets-store-csi-driver/charts"
+    version: "1.4.0"
+    condition: secrets-store-csi-driver.enabled
+  - name: gateway-helm
+    repository: "oci://registry-1.docker.io/envoyproxy"
+    version: 1.2.3
+  - name: cert-manager
+    repository: https://charts.jetstack.io
+    condition: cert-manager.enabled
+    version: "v1.16.2"
+

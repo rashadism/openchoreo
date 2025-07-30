@@ -31,8 +31,8 @@ var (
 
 	Version = Command{
 		Use:   "version",
-		Short: "Show the version information",
-		Long:  "Show the version information of the Choreo CLI.",
+		Short: "Print version information",
+		Long:  "Print version information.",
 	}
 
 	Create = Command{
@@ -75,8 +75,8 @@ Examples:
 
 	Apply = Command{
 		Use:   "apply",
-		Short: "Apply Choreo resource configurations",
-		Long: fmt.Sprintf(`Apply a configuration file to create or update Choreo resources.
+		Short: "Apply OpenChoreo resources by file name",
+		Long: fmt.Sprintf(`Apply a configuration file to create or update OpenChoreo resources.
 
 	Examples:
 	  # Apply an organization configuration
@@ -132,6 +132,26 @@ Examples:
 
   # Create an organization with specific details
   %[1]s create organization --name acme-corp --display-name "ACME" --description "ACME Corporation"`,
+			messages.DefaultCLIName),
+	}
+
+	CreateWorkload = Command{
+		Use:     "workload",
+		Aliases: []string{"wl"},
+		Short:   "Create a workload from a descriptor file",
+		Long: fmt.Sprintf(`Create a workload from a workload descriptor file.
+
+The workload descriptor (workload.yaml) should be located alongside your source code
+and describes the endpoints and configuration for your workload.
+
+Examples:
+  # Create workload from descriptor
+  %[1]s create workload workload.yaml --organization acme-corp --project online-store \
+    --component product-catalog --image myimage:latest
+
+  # Create workload and save to file
+  %[1]s create workload workload.yaml -o acme-corp -p online-store -c product-catalog \
+    --image myimage:latest --output workload-cr.yaml`,
 			messages.DefaultCLIName),
 	}
 
@@ -480,7 +500,7 @@ If no organization is specified, you will be prompted to select one interactivel
   choreoctl get deploymentpipeline --organization acme-corp
 
   # List a specific deployment pipeline
-  choreoctl get deploymentpipeline default-pipeline --organization acme-corp
+  choreoctl get deploymentpipeline default --organization acme-corp
 
   # Output deployment pipeline details in YAML format
   choreoctl get deploymentpipeline --organization acme-corp -o yaml`,
@@ -562,6 +582,18 @@ If no organization is specified, you will be prompted to select one interactivel
   %[1]s config current-context`, messages.DefaultCLIName),
 	}
 
+	// ConfigSetControlPlane holds usage and help texts for "config set-control-plane" command.
+	ConfigSetControlPlane = Command{
+		Use:   "set-control-plane",
+		Short: "Configure OpenChoreo API server connection",
+		Long:  "Set the OpenChoreo API server endpoint and authentication details for remote connections.",
+		Example: fmt.Sprintf(`  # Set remote control plane endpoint
+  %[1]s config set-control-plane --endpoint https://api.choreo.example.com --token <your-token>
+
+  # Set local control plane (for development)
+  %[1]s config set-control-plane --endpoint http://localhost:8080`, messages.DefaultCLIName),
+	}
+
 	// ------------------------------------------------------------------------
 	// Flag Descriptions (Used in config commands)
 	// ------------------------------------------------------------------------
@@ -600,8 +632,8 @@ If no organization is specified, you will be prompted to select one interactivel
 	// Delete command definitions
 	Delete = Command{
 		Use:   "delete",
-		Short: "Delete Choreo resources",
-		Long:  "Delete resources in Choreo platform such as organizations, projects, components, etc.",
+		Short: "Delete OpenChoreo resources by file names",
+		Long:  "Delete resources in OpenChoreo platform such as organizations, projects, components, etc.",
 		Example: `  # Delete resources from a YAML file
   choreoctl delete -f resources.yaml`,
 	}

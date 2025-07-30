@@ -27,10 +27,12 @@ BUILDX_TARGET_PLATFORMS := $(subst $(space),$(comma),$(IMAGE_TARGET_PLATFORMS))
 # NOTE: If the `controller` image is updated, make sure to update the `HELM_CONTROLLER_IMAGE` in helm.mk
 DOCKER_BUILD_IMAGES := \
 	controller:$(PROJECT_DIR)/Dockerfile:$(PROJECT_DIR) \
-	quick-start:$(PROJECT_DIR)/install/quick-start/Dockerfile:$(PROJECT_DIR)
+	quick-start:$(PROJECT_DIR)/install/quick-start/Dockerfile:$(PROJECT_DIR) \
+	openchoreo-api:$(PROJECT_DIR)/cmd/openchoreo-api/Dockerfile:$(PROJECT_DIR) \
+	observer:$(PROJECT_DIR)/cmd/observer/Dockerfile:$(PROJECT_DIR) \
+	openchoreo-cli:$(PROJECT_DIR)/cmd/choreoctl/Dockerfile:$(PROJECT_DIR)
 
 DOCKER_BUILD_IMAGE_NAMES := $(foreach b,$(DOCKER_BUILD_IMAGES),$(word 1,$(subst :, ,$(b))))
-
 
 # Helper functions
 get_dockerfile_path = $(word 2, $(subst :, ,$(filter $(1):%, $(DOCKER_BUILD_IMAGES))))
@@ -67,6 +69,8 @@ docker.build.%:  ## Build a docker image for the current platform. Ex: make dock
 # Set dependent go build target for the docker images that are built for the current platform's architecture
 docker.build.controller: go.build-multiarch.manager
 docker.build.quick-start: go.build-multiarch.choreoctl
+docker.build.openchoreo-api: go.build-multiarch.openchoreo-api
+docker.build.observer: go.build-multiarch.observer
 
 # Set target architecture for the go build that is required for the docker image
 docker.build.%: GO_TARGET_PLATFORMS:=$(IMAGE_CURRENT_PLATFORM)

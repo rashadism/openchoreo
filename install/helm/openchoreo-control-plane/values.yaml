@@ -1,0 +1,136 @@
+# Global values shared across all components
+global:
+  # Common labels to add to all resources
+  commonLabels: {}
+  # Default OpenChoreo resources created during installation
+  defaultResources:
+    enabled: true
+    organization:
+      displayName: Default Organization
+      description: Getting started with your first organization
+    environments:
+      - name: development
+        displayName: Development
+        description: Development environment for testing
+        dnsPrefix: dev
+        isCritical: false
+      - name: staging
+        displayName: Staging
+        description: Staging environment for pre-production testing
+        dnsPrefix: staging
+        isCritical: false
+      - name: production
+        displayName: Production
+        description: Production environment
+        dnsPrefix: prod
+        isCritical: true
+    deploymentPipeline:
+      displayName: Default Pipeline
+      description: Standard deployment pipeline with dev, staging, and prod environments
+      promotionOrder:
+        - sourceEnvironmentRef: development
+          targetEnvironmentRefs:
+            - name: staging
+              requiresApproval: false
+        - sourceEnvironmentRef: staging
+          targetEnvironmentRefs:
+            - name: production
+              requiresApproval: false
+    project:
+      displayName: Default Project
+      description: Your first project to get started
+controllerManager:
+  name: controller-manager
+  manager:
+    args:
+      - --metrics-bind-address=:8443
+      - --leader-elect
+      - --health-probe-bind-address=:8081
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+    env:
+      enableWebhooks: "false"
+    image:
+      repository: ghcr.io/openchoreo/controller
+      tag: latest-dev
+    imagePullPolicy: Always
+    resources:
+      limits:
+        cpu: 500m
+        memory: 128Mi
+      requests:
+        cpu: 10m
+        memory: 64Mi
+  podSecurityContext:
+    runAsNonRoot: true
+  replicas: 1
+  serviceAccount:
+    annotations: {}
+kubernetesClusterDomain: cluster.local
+metricsService:
+  ports:
+    - name: https
+      port: 8443
+      protocol: TCP
+      targetPort: 8443
+  type: ClusterIP
+webhookService:
+  ports:
+    - port: 443
+      protocol: TCP
+      targetPort: 9443
+  type: ClusterIP
+waitJob:
+  image: bitnami/kubectl:latest
+metricsServer:
+  enabled: false
+  kubeletInsecureTlsEnabled: true
+openchoreoApi:
+  name: api-server
+  enabled: true
+  image: "ghcr.io/openchoreo/openchoreo-api"
+  imagePullPolicy: Always
+  tag: "latest-dev"
+  replicas: 1
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+# Dependency configurations
+
+# Cert-Manager configuration
+cert-manager:
+  enabled: true
+  fullnameOverride: cert-manager
+  nameOverride: cert-manager
+  crds:
+    enabled: true
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 50m
+      memory: 64Mi
+  cainjector:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 50m
+        memory: 64Mi
+  webhook:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 50m
+        memory: 64Mi

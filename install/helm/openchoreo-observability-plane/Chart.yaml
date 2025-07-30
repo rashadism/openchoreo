@@ -1,0 +1,28 @@
+apiVersion: v2
+name: openchoreo-observability-plane
+description: A Helm chart for OpenChoreo Observability Plane
+type: application
+
+# Version strategy: latest-dev for development, replaced by CI for releases
+version: 0.0.0-latest-dev
+appVersion: "latest-dev"
+
+home: https://github.com/openchoreo/openchoreo
+icon: https://openchoreo.github.io/img/openchoreo_logo.png
+sources:
+  - https://github.com/openchoreo/openchoreo
+keywords:
+  - openchoreo
+  - internal-developer-platform
+  - idp
+  - kubernetes
+  - observability
+  - logging
+  - monitoring
+  - opensearch
+  - developer-experience
+  - devops
+  - platform-engineering
+maintainers:
+  - name: OpenChoreo Team
+    url: https://github.com/openchoreo/openchoreo

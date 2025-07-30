@@ -20,7 +20,7 @@ terraform -chdir=terraform init -upgrade
 terraform -chdir=terraform apply -auto-approve
 
 echo "Finding external gateway nodeport..."
-NODEPORT=$(kubectl get svc -n choreo-system -l gateway.envoyproxy.io/owning-gateway-name=gateway-external \
+NODEPORT=$(kubectl get svc -n openchoreo-data-plane -l gateway.envoyproxy.io/owning-gateway-name=gateway-external \
   -o jsonpath='{.items[0].spec.ports[0].nodePort}')
 
 if [[ -z "$NODEPORT" ]]; then
@@ -40,9 +40,12 @@ if [ -f /state/kube/config-internal.yaml ]; then
   echo "source /usr/local/bin/choreoctl-completion" >> /etc/profile
 fi
 
-bash ./check-status.sh --single-cluster
+bash ./check-status.sh
 
 # add default dataplane
 bash ./add-default-dataplane.sh --single-cluster
+
+# add default BuildPlane
+bash ./add-build-plane.sh
 
 exec /bin/bash -l

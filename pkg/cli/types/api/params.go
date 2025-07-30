@@ -4,7 +4,7 @@
 package api
 
 import (
-	choreov1 "github.com/openchoreo/openchoreo/api/v1"
+	openchoreov1alpha1 "github.com/openchoreo/openchoreo/api/v1alpha1"
 )
 
 // GetParams defines common parameters for listing resources
@@ -52,7 +52,7 @@ type CreateProjectParams struct {
 type CreateComponentParams struct {
 	Name             string
 	DisplayName      string
-	Type             choreov1.ComponentType
+	Type             openchoreov1alpha1.ComponentType
 	Organization     string
 	Project          string
 	Description      string
@@ -112,8 +112,8 @@ type CreateBuildParams struct {
 	DeploymentTrack string
 	Interactive     bool
 	// Build configuration
-	Docker    *choreov1.DockerConfiguration
-	Buildpack *choreov1.BuildpackConfiguration
+	Docker    *openchoreov1alpha1.DockerConfiguration
+	Buildpack *openchoreov1alpha1.BuildpackConfiguration
 	// Build spec
 	Branch    string
 	Path      string
@@ -141,9 +141,9 @@ type CreateDeployableArtifactParams struct {
 	DeploymentTrack string
 	DisplayName     string
 	Description     string
-	FromBuildRef    *choreov1.FromBuildRef
-	FromImageRef    *choreov1.FromImageRef
-	Configuration   *choreov1.Configuration
+	FromBuildRef    *openchoreov1alpha1.FromBuildRef
+	FromImageRef    *openchoreov1alpha1.FromImageRef
+	Configuration   *openchoreov1alpha1.Configuration
 	Interactive     bool
 }
 
@@ -196,7 +196,7 @@ type CreateDeploymentParams struct {
 	Environment        string
 	DeploymentTrack    string
 	DeployableArtifact string
-	ConfigOverrides    *choreov1.ConfigurationOverrides
+	ConfigOverrides    *openchoreov1alpha1.ConfigurationOverrides
 	Interactive        bool
 }
 
@@ -210,7 +210,7 @@ type CreateDeploymentTrackParams struct {
 	Description       string
 	APIVersion        string
 	AutoDeploy        bool
-	BuildTemplateSpec *choreov1.BuildTemplateSpec
+	BuildTemplateSpec *openchoreov1alpha1.BuildTemplateSpec
 	Interactive       bool
 }
 
@@ -283,15 +283,12 @@ type GetEndpointParams struct {
 }
 
 type SetContextParams struct {
-	Name           string
-	Organization   string
-	Project        string
-	Component      string
-	Environment    string
-	DataPlane      string
-	ClusterRef     string
-	KubeconfigPath string
-	KubeContext    string
+	Name         string
+	Organization string
+	Project      string
+	Component    string
+	Environment  string
+	DataPlane    string
 }
 
 type UseContextParams struct {
@@ -328,4 +325,21 @@ type GetConfigurationGroupParams struct {
 	Name         string
 	Organization string
 	OutputFormat string
+}
+
+// SetControlPlaneParams defines parameters for setting control plane configuration
+type SetControlPlaneParams struct {
+	Endpoint string
+	Token    string
+}
+
+// CreateWorkloadParams defines parameters for creating a workload from a descriptor
+type CreateWorkloadParams struct {
+	FilePath         string
+	OrganizationName string
+	ProjectName      string
+	ComponentName    string
+	ImageURL         string
+	OutputPath       string
+	Interactive      bool
 }

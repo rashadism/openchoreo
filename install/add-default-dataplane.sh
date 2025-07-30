@@ -6,14 +6,14 @@ GREEN='\033[0;32m'
 DARK_YELLOW='\033[0;33m'
 RESET='\033[0m'
 
-DEFAULT_CONTEXT="kind-choreo-dp"
-DEFAULT_TARGET_CONTEXT="kind-choreo-cp"
+DEFAULT_CONTEXT="kind-openchoreo-dp"
+DEFAULT_TARGET_CONTEXT="kind-openchoreo-cp"
 SERVER_URL=""
-DEFAULT_DATAPLANE_KIND_NAME="default-dataplane"
+DEFAULT_DATAPLANE_KIND_NAME="default"
 
 KUBECONFIG=${KUBECONFIG:-~/.kube/config}
 
-echo -e "\nSetting up Choreo DataPlane\n"
+echo -e "\nSetting up OpenChoreo DataPlane\n"
 
 SINGLE_CLUSTER=true
 
@@ -71,25 +71,24 @@ fi
 echo -e "\nApplying DataPlane to context: $TARGET_CONTEXT"
 
 if kubectl --context="$TARGET_CONTEXT" apply -f - <<EOF
-apiVersion: core.choreo.dev/v1
+apiVersion: openchoreo.dev/v1alpha1
 kind: DataPlane
 metadata:
   annotations:
-    core.choreo.dev/description: DataPlane "$DATAPLANE_KIND_NAME" was created through the script.
-    core.choreo.dev/display-name: DataPlane "$DATAPLANE_KIND_NAME"
+    openchoreo.dev/description: DataPlane "$DATAPLANE_KIND_NAME" was created through the script.
+    openchoreo.dev/display-name: DataPlane "$DATAPLANE_KIND_NAME"
   labels:
-    core.choreo.dev/name: $DATAPLANE_KIND_NAME
-    core.choreo.dev/organization: default-org
-    core.choreo.dev/build-plane: "true"
+    openchoreo.dev/name: $DATAPLANE_KIND_NAME
+    openchoreo.dev/organization: default
+    openchoreo.dev/build-plane: "true"
   name: $DATAPLANE_KIND_NAME
-  namespace: default-org
+  namespace: default
 spec:
   registry:
-    unauthenticated:
-      - registry.choreo-system:5000
+    prefix: registry.openchoreo-data-plane:5000
   gateway:
-    organizationVirtualHost: choreoapis.internal
-    publicVirtualHost: choreoapis.localhost
+    organizationVirtualHost: openchoreoapis.internal
+    publicVirtualHost: openchoreoapis.localhost
   kubernetesCluster:
     name: $CLUSTER_NAME
     credentials:
@@ -99,7 +98,7 @@ spec:
       clientKey: $CLIENT_KEY
 EOF
 then
-    echo -e "\n${GREEN}DataPlane applied to 'default-org' successfully!${RESET}"
+    echo -e "\n${GREEN}DataPlane applied to 'default' successfully!${RESET}"
 else
     echo -e "\n${RED}Failed to apply DataPlane manifest to context: $TARGET_CONTEXT${RESET}"
     exit 1

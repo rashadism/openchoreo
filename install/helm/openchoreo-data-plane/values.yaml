@@ -1,0 +1,214 @@
+# Global values shared across all components
+global:
+  # Common labels to add to all resources
+  commonLabels: {}
+
+kubernetesClusterDomain: cluster.local
+waitJob:
+  image: bitnami/kubectl:latest
+
+# customizing the vault configurations
+vault:
+  fullnameOverride: hashicorp-vault
+  nameOverride: hashicorp-vault
+  server:
+    # -- Resource limits and requests for the vault server
+    resources:
+      requests:
+        memory: 64Mi
+        cpu: 50m
+      limits:
+        memory: 128Mi
+        cpu: 100m
+    dev:
+      enabled: true
+      devRootToken: "root"
+      logLevel: "info"
+    # Add readiness probe configuration
+    readinessProbe:
+      exec:
+        command: ["/bin/sh", "-ec", "vault status -tls-skip-verify"]
+      initialDelaySeconds: 5
+      timeoutSeconds: 10  # Increase from default
+      periodSeconds: 10
+      failureThreshold: 3
+  injector:
+    enabled: false
+    # -- Resource limits and requests for the vault injector
+    resources:
+      requests:
+        memory: 64Mi
+        cpu: 50m
+      limits:
+        memory: 128Mi
+        cpu: 100m
+
+# customizing the secrets-store-csi-driver configurations
+secrets-store-csi-driver:
+  fullnameOverride: secrets-store-csi-driver
+  nameOverride: secrets-store-csi-driver
+  syncSecret:
+    enabled: true
+  enableSecretRotation: true
+  vaultCsiProvider:
+    enabled: true
+
+# customizing the registry configurations
+registry:
+  enabled: true
+  # -- Resource limits and requests for the registry
+  resources:
+    limits:
+      memory: 256Mi
+      cpu: 100m
+    requests:
+      memory: 128Mi
+      cpu: 50m
+  service:
+    # -- NodePort for the registry service
+    nodePort: 30003
+  # -- Persistent volume storage for the registry
+  storage:
+    size: 2Gi
+
+# customizing the envoy gateway configurations
+gateway-helm:
+  config:
+    envoyGateway:
+      rateLimit:
+        backend:
+          type: Redis
+          redis:
+            url: redis:6379
+  # -- Resource limits and requests for the gateway
+  deployment:
+    envoyGateway:
+      resources:
+        limits:
+          cpu: 200m
+          memory: 256Mi
+        requests:
+          cpu: 100m
+          memory: 128Mi
+
+# customizing the cert-manager configurations
+cert-manager:
+  enabled: true
+  fullnameOverride: cert-manager
+  nameOverride: cert-manager
+  crds:
+    enabled: true
+  # -- Resource limits and requests for the cert-manager controller
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 50m
+      memory: 64Mi
+  cainjector:
+    # -- Resource limits and requests for the cert-manager cainjector
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 50m
+        memory: 64Mi
+  webhook:
+    # -- Resource limits and requests for the cert-manager webhook
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 50m
+        memory: 64Mi
+
+# Customizing overall observability configurations
+observability:
+  logging:
+    enabled: false
+    publishers:
+      fluentbit:
+        enabled: true
+
+
+# Customizing Fluent Bit configurations
+fluentBit:
+  image:
+    repository: fluent/fluent-bit
+    tag: "2.1.10"
+    pullPolicy: IfNotPresent
+  
+  config:
+    service:
+      flush: 1
+      logLevel: info
+      daemon: off
+    
+    input:
+      name: tail
+      tag: "kube.*"
+      # TODO: The openchoreo-ci namespace should not be included in the Data Plane by default;
+      # it should be overridden in the single-cluster setup.
+      path: "/var/log/containers/*_openchoreo-*_*.log,/var/log/containers/*_dp-*_*.log,/var/log/containers/*_openchoreo-ci-*_*.log"
+      excludePath: "/var/log/containers/*opensearch*_openchoreo-observability-plane_*.log,/var/log/containers/*fluent-bit*_openchoreo-data-plane_*.log"
+      parser: docker
+      inotifyWatcher: false
+      db: "/var/log/flb_kube.db"
+      memBufLimit: "256MB"
+      skipLongLines: true
+      refreshInterval: 10
+    
+    filter:
+      name: kubernetes
+      match: "kube.*"
+      kubeURL: "https://kubernetes.default.svc:443"
+      kubeCAFile: "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+      kubeTokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token"
+      kubeTagPrefix: "kube.var.log.containers."
+      mergeLog: true
+      mergeLogKey: "log_processed"
+      k8sLoggingParser: true
+      k8sLoggingExclude: false
+    
+    output:
+      name: opensearch
+      match: "kube.*"
+      index: kubernetes_cluster
+      type: flb_type
+      logstashFormat: true
+      logstashPrefix: kubernetes
+      timeKey: "@timestamp"
+      traceError: true
+      suppressTypeName: true
+    
+    # OpenSearch connection configuration
+    opensearch:
+      host: "opensearch.openchoreo-observability-plane.svc.cluster.local"
+      port: "9200"
+      authentication:
+        basicauth:
+          username: "admin"
+          password: "admin"
+      tls: false
+      tlsVerify: false
+    
+    parser:
+      name: docker
+      format: json
+      timeKey: time
+      timeFormat: "%Y-%m-%dT%H:%M:%S.%L"
+      timeKeep: true
+  
+  rbac:
+    create: true
+    serviceAccountName: fluent-bit
+  
+  hostPaths:
+    varLog: /var/log
+    dockerContainers: /var/lib/docker/containers
+
+
+

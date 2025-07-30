@@ -7,208 +7,227 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	choreov1 "github.com/openchoreo/openchoreo/api/v1"
+	openchoreov1alpha1 "github.com/openchoreo/openchoreo/api/v1alpha1"
 	"github.com/openchoreo/openchoreo/internal/controller"
 )
 
-// Constants for condition types
-
+// Build condition types
 const (
-	// ConditionCloneStepSucceeded represents whether the source code clone step is succeeded
-	ConditionCloneStepSucceeded controller.ConditionType = "StepCloneSucceeded"
-	// ConditionBuildStepSucceeded represents whether the build step is succeeded
-	ConditionBuildStepSucceeded controller.ConditionType = "StepBuildSucceeded"
-	// ConditionPushStepSucceeded represents whether the push step is succeeded
-	ConditionPushStepSucceeded controller.ConditionType = "StepPushSucceeded"
-
-	// ConditionDeployableArtifactCreated represents whether the deployable artifact is created after a successful build
-	ConditionDeployableArtifactCreated controller.ConditionType = "DeployableArtifactCreated"
-	// ConditionDeploymentApplied represents whether the deployment is created/updated when auto deploy is enabled
-	ConditionDeploymentApplied controller.ConditionType = "DeploymentApplied"
-	// ConditionCompleted represents whether the build is completed
-	ConditionCompleted controller.ConditionType = "Completed"
-	// ConditionBuildFinalizing represents the build resource is being deleted
-	ConditionBuildFinalizing controller.ConditionType = "Finalizing"
-	// ConditionDeployableArtifactReferencesRemaining indicates that the build deletion is blocked due to existing DeployableArtifact references
-	ConditionDeployableArtifactReferencesRemaining controller.ConditionType = "DeployableArtifactReferencesRemaining"
+	ConditionBuildInitiated  controller.ConditionType = "BuildInitiated"
+	ConditionBuildTriggered  controller.ConditionType = "BuildTriggered"
+	ConditionBuildCompleted  controller.ConditionType = "BuildCompleted"
+	ConditionWorkloadUpdated controller.ConditionType = "WorkloadUpdated"
 )
 
-// Constants for condition reasons
-
+// Build condition reasons
 const (
-	// Reasons for ci workflow/pipeline related steps
-
-	ReasonStepQueued     controller.ConditionReason = "Queued"
-	ReasonStepInProgress controller.ConditionReason = "Progressing"
-	ReasonStepSucceeded  controller.ConditionReason = "Succeeded"
-	ReasonStepFailed     controller.ConditionReason = "Failed"
-
-	// ReasonWorkflowCreatedSuccessfully represents the workflow has been created successfully
-	ReasonWorkflowCreatedSuccessfully controller.ConditionReason = "WorkflowCreated"
-
-	// ReasonArtifactCreatedSuccessfully represents the reason for DeployableArtifactCreated condition type
-	ReasonArtifactCreatedSuccessfully controller.ConditionReason = "ArtifactCreationSuccessful"
-
-	// Reasons for auto deployment related conditions
-
-	ReasonAutoDeploymentFailed  controller.ConditionReason = "DeploymentFailed"
-	ReasonAutoDeploymentApplied controller.ConditionReason = "DeploymentAppliedSuccessfully"
-
-	ReasonBuildInProgress controller.ConditionReason = "BuildProgressing"
-	ReasonBuildFailed     controller.ConditionReason = "BuildFailed"
-	ReasonBuildCompleted  controller.ConditionReason = "BuildCompleted"
-
-	// Reasons for build finalizing
-
-	ReasonBuildFinalizing                  controller.ConditionReason = "BuildCleanupOngoing"
-	ReasonDeployableArtifactDeletionFailed controller.ConditionReason = "DeployableArtifactRemain"
+	ReasonBuildInitiated          controller.ConditionReason = "BuildInitiated"
+	ReasonBuildTriggered          controller.ConditionReason = "BuildTriggered"
+	ReasonBuildCompleted          controller.ConditionReason = "BuildCompleted"
+	ReasonBuildFailed             controller.ConditionReason = "BuildFailed"
+	ReasonBuildInProgress         controller.ConditionReason = "BuildInProgress"
+	ReasonWorkflowCreated         controller.ConditionReason = "WorkflowCreated"
+	ReasonWorkflowCreationFailed  controller.ConditionReason = "WorkflowCreationFailed"
+	ReasonNamespaceCreationFailed controller.ConditionReason = "NamespaceCreationFailed"
+	ReasonRBACCreationFailed      controller.ConditionReason = "RBACCreationFailed"
+	ReasonWorkloadUpdated         controller.ConditionReason = "WorkloadUpdated"
+	ReasonWorkloadUpdateFailed    controller.ConditionReason = "WorkloadUpdateFailed"
 )
 
-func setInitialBuildConditions(build *choreov1.Build) {
-	steps := []struct {
-		conditionType controller.ConditionType
-		reason        controller.ConditionReason
-		message       string
-	}{
-		{ConditionCloneStepSucceeded, ReasonStepQueued, "Clone source code step is queued for execution."},
-		{ConditionBuildStepSucceeded, ReasonStepQueued, "Image build step is queued for execution."},
-		{ConditionPushStepSucceeded, ReasonStepQueued, "Image push step is queued for execution."},
-		{ConditionCompleted, ReasonBuildInProgress, "Build process is in progress."},
-	}
-
-	for _, step := range steps {
-		meta.SetStatusCondition(&build.Status.Conditions, controller.NewCondition(
-			step.conditionType,
-			metav1.ConditionFalse,
-			step.reason,
-			step.message,
-			build.Generation,
-		))
+// NewBuildInitiatedCondition creates a new BuildInitiated condition
+func NewBuildInitiatedCondition(generation int64) metav1.Condition {
+	return metav1.Condition{
+		Type:               string(ConditionBuildInitiated),
+		Status:             metav1.ConditionTrue,
+		Reason:             string(ReasonBuildInitiated),
+		Message:            "Build initialization started",
+		ObservedGeneration: generation,
 	}
 }
 
-func markStepInProgress(build *choreov1.Build, conditionType controller.ConditionType) {
-	messageMap := map[controller.ConditionType]string{
-		ConditionCloneStepSucceeded: "Clone source code step is executing.",
-		ConditionBuildStepSucceeded: "Image build step is executing.",
-		ConditionPushStepSucceeded:  "Image push step is executing.",
+// NewBuildTriggeredCondition creates a new BuildTriggered condition
+func NewBuildTriggeredCondition(generation int64) metav1.Condition {
+	return metav1.Condition{
+		Type:               string(ConditionBuildTriggered),
+		Status:             metav1.ConditionTrue,
+		Reason:             string(ReasonBuildTriggered),
+		Message:            "Build has been triggered",
+		ObservedGeneration: generation,
 	}
-
-	meta.SetStatusCondition(&build.Status.Conditions, controller.NewCondition(
-		conditionType,
-		metav1.ConditionFalse,
-		ReasonStepInProgress,
-		messageMap[conditionType],
-		build.Generation,
-	))
 }
 
-func markStepSucceeded(build *choreov1.Build, conditionType controller.ConditionType) {
-	successMessages := map[controller.ConditionType]string{
-		ConditionCloneStepSucceeded: "Source code clone step completed successfully.",
-		ConditionBuildStepSucceeded: "Image build step completed successfully.",
-		ConditionPushStepSucceeded:  "Image push step completed successfully.",
-	}
-	meta.SetStatusCondition(&build.Status.Conditions, controller.NewCondition(
-		conditionType,
-		metav1.ConditionTrue,
-		ReasonStepSucceeded,
-		successMessages[conditionType],
-		build.Generation,
-	))
-}
-
-func markStepFailed(build *choreov1.Build, conditionType controller.ConditionType) {
-	failureMessages := map[controller.ConditionType]string{
-		ConditionCloneStepSucceeded: "Source code cloning failed.",
-		ConditionBuildStepSucceeded: "Building the image from the source code failed.",
-		ConditionPushStepSucceeded:  "Pushing the built image to the registry failed.",
-	}
-	meta.SetStatusCondition(&build.Status.Conditions, controller.NewCondition(
-		conditionType,
-		metav1.ConditionFalse,
-		ReasonStepFailed,
-		failureMessages[conditionType],
-		build.Generation,
-	))
-}
-
-func NewDeployableArtifactCreatedCondition(generation int64) metav1.Condition {
-	return controller.NewCondition(
-		ConditionDeployableArtifactCreated,
-		metav1.ConditionTrue,
-		ReasonArtifactCreatedSuccessfully,
-		"Successfully created a deployable artifact for the build.",
-		generation,
-	)
-}
-
-func NewBuildFailedCondition(generation int64) metav1.Condition {
-	return controller.NewCondition(
-		ConditionCompleted,
-		metav1.ConditionFalse,
-		ReasonBuildFailed,
-		"Build completed with a failure status.",
-		generation,
-	)
-}
-
+// NewBuildCompletedCondition creates a new BuildCompleted condition
 func NewBuildCompletedCondition(generation int64) metav1.Condition {
-	return controller.NewCondition(
-		ConditionCompleted,
-		metav1.ConditionTrue,
-		ReasonBuildCompleted,
-		"Build completed successfully.",
-		generation,
-	)
+	return metav1.Condition{
+		Type:               string(ConditionBuildCompleted),
+		Status:             metav1.ConditionTrue,
+		Reason:             string(ReasonBuildCompleted),
+		Message:            "Build completed successfully",
+		ObservedGeneration: generation,
+	}
 }
 
-func NewImageMissingBuildFailedCondition(generation int64) metav1.Condition {
-	return controller.NewCondition(
-		ConditionCompleted,
-		metav1.ConditionFalse,
-		ReasonBuildFailed,
-		"Image name is not found in the ci workflow.",
-		generation,
-	)
+// NewBuildFailedCondition creates a new BuildFailed condition
+func NewBuildFailedCondition(generation int64) metav1.Condition {
+	return metav1.Condition{
+		Type:               string(ConditionBuildCompleted),
+		Status:             metav1.ConditionFalse,
+		Reason:             string(ReasonBuildFailed),
+		Message:            "Build failed",
+		ObservedGeneration: generation,
+	}
 }
 
-func NewAutoDeploymentFailedCondition(generation int64) metav1.Condition {
-	return controller.NewCondition(
-		ConditionDeploymentApplied,
-		metav1.ConditionFalse,
-		ReasonAutoDeploymentFailed,
-		"Auto deployment failed.",
-		generation,
-	)
+// NewBuildInProgressCondition creates a new BuildInProgress condition
+func NewBuildInProgressCondition(generation int64) metav1.Condition {
+	return metav1.Condition{
+		Type:               string(ConditionBuildCompleted),
+		Status:             metav1.ConditionFalse,
+		Reason:             string(ReasonBuildInProgress),
+		Message:            "Build is in progress",
+		ObservedGeneration: generation,
+	}
 }
 
-func NewAutoDeploymentSuccessfulCondition(generation int64) metav1.Condition {
-	return controller.NewCondition(
-		ConditionDeploymentApplied,
-		metav1.ConditionTrue,
-		ReasonAutoDeploymentApplied,
-		"Successfully applied the deployment.",
-		generation,
-	)
+// NewWorkloadUpdatedCondition creates a new WorkloadUpdated condition
+func NewWorkloadUpdatedCondition(generation int64) metav1.Condition {
+	return metav1.Condition{
+		Type:               string(ConditionWorkloadUpdated),
+		Status:             metav1.ConditionTrue,
+		Reason:             string(ReasonWorkloadUpdated),
+		Message:            "Workload updated successfully",
+		ObservedGeneration: generation,
+	}
 }
 
-func NewBuildFinalizingCondition(generation int64) metav1.Condition {
-	return controller.NewCondition(
-		ConditionBuildFinalizing,
-		metav1.ConditionTrue,
-		ReasonBuildFinalizing,
-		"Build resource is being finalized.",
-		generation,
-	)
+// NewWorkloadUpdateFailedCondition creates a new WorkloadUpdateFailed condition
+func NewWorkloadUpdateFailedCondition(generation int64) metav1.Condition {
+	return metav1.Condition{
+		Type:               string(ConditionWorkloadUpdated),
+		Status:             metav1.ConditionFalse,
+		Reason:             string(ReasonWorkloadUpdateFailed),
+		Message:            "Failed to update workload with the new built image",
+		ObservedGeneration: generation,
+	}
 }
 
-func NewArtifactRemainingCondition(generation int64) metav1.Condition {
-	return controller.NewCondition(
-		ConditionDeployableArtifactReferencesRemaining,
-		metav1.ConditionTrue,
-		ReasonDeployableArtifactDeletionFailed,
-		"Deployable artifact resource is remaining.",
-		generation,
-	)
+// NewWorkflowCreatedCondition creates a new WorkflowCreated condition
+func NewWorkflowCreatedCondition(generation int64) metav1.Condition {
+	return metav1.Condition{
+		Type:               string(ConditionBuildTriggered),
+		Status:             metav1.ConditionTrue,
+		Reason:             string(ReasonWorkflowCreated),
+		Message:            "Build workflow created successfully",
+		ObservedGeneration: generation,
+	}
+}
+
+// NewWorkflowCreationFailedCondition creates a new WorkflowCreationFailed condition
+func NewWorkflowCreationFailedCondition(generation int64, message string) metav1.Condition {
+	return metav1.Condition{
+		Type:               string(ConditionBuildCompleted),
+		Status:             metav1.ConditionFalse,
+		Reason:             string(ReasonWorkflowCreationFailed),
+		Message:            message,
+		ObservedGeneration: generation,
+	}
+}
+
+// NewNamespaceCreationFailedCondition creates a new NamespaceCreationFailed condition
+func NewNamespaceCreationFailedCondition(generation int64, message string) metav1.Condition {
+	return metav1.Condition{
+		Type:               string(ConditionBuildCompleted),
+		Status:             metav1.ConditionFalse,
+		Reason:             string(ReasonNamespaceCreationFailed),
+		Message:            message,
+		ObservedGeneration: generation,
+	}
+}
+
+// NewRBACCreationFailedCondition creates a new RBACCreationFailed condition
+func NewRBACCreationFailedCondition(generation int64, message string) metav1.Condition {
+	return metav1.Condition{
+		Type:               string(ConditionBuildCompleted),
+		Status:             metav1.ConditionFalse,
+		Reason:             string(ReasonRBACCreationFailed),
+		Message:            message,
+		ObservedGeneration: generation,
+	}
+}
+
+// setBuildInitiatedCondition sets the BuildInitiated condition
+func setBuildInitiatedCondition(build *openchoreov1alpha1.Build) {
+	meta.SetStatusCondition(&build.Status.Conditions, NewBuildInitiatedCondition(build.Generation))
+}
+
+// setBuildTriggeredCondition sets the BuildTriggered condition
+func setBuildTriggeredCondition(build *openchoreov1alpha1.Build) {
+	meta.SetStatusCondition(&build.Status.Conditions, NewBuildTriggeredCondition(build.Generation))
+}
+
+// setBuildCompletedCondition sets the BuildCompleted condition
+func setBuildCompletedCondition(build *openchoreov1alpha1.Build, message string) {
+	condition := NewBuildCompletedCondition(build.Generation)
+	if message != "" {
+		condition.Message = message
+	}
+	meta.SetStatusCondition(&build.Status.Conditions, condition)
+}
+
+// setBuildFailedCondition sets the BuildFailed condition
+func setBuildFailedCondition(build *openchoreov1alpha1.Build, reason controller.ConditionReason, message string) {
+	condition := NewBuildFailedCondition(build.Generation)
+	if reason != "" {
+		condition.Reason = string(reason)
+	}
+	if message != "" {
+		condition.Message = message
+	}
+	meta.SetStatusCondition(&build.Status.Conditions, condition)
+}
+
+// setBuildInProgressCondition sets the BuildInProgress condition
+func setBuildInProgressCondition(build *openchoreov1alpha1.Build) {
+	meta.SetStatusCondition(&build.Status.Conditions, NewBuildInProgressCondition(build.Generation))
+}
+
+// isBuildInitiated checks if the build is initiated
+func isBuildInitiated(build *openchoreov1alpha1.Build) bool {
+	return meta.IsStatusConditionTrue(build.Status.Conditions, string(ConditionBuildInitiated))
+}
+
+// isBuildCompleted returns true when the Build has **reached a terminal state**
+// (either Succeeded or Failed).  Any “in-progress” or unknown condition returns false.
+func isBuildCompleted(build *openchoreov1alpha1.Build) bool {
+	cond := meta.FindStatusCondition(build.Status.Conditions, string(ConditionWorkloadUpdated))
+	if cond == nil {
+		return false
+	}
+
+	if cond.Reason == string(ReasonWorkloadUpdated) {
+		return cond.Status == metav1.ConditionTrue
+	}
+
+	return false
+}
+
+func isBuildWorkflowSucceeded(build *openchoreov1alpha1.Build) bool {
+	cond := meta.FindStatusCondition(build.Status.Conditions, string(ConditionBuildCompleted))
+	if cond == nil {
+		return false
+	}
+
+	if cond.Reason == string(ReasonBuildCompleted) {
+		return cond.Status == metav1.ConditionTrue
+	}
+	return false
+}
+
+// shouldIgnoreReconcile checks whether the reconcile loop should be continued
+func shouldIgnoreReconcile(build *openchoreov1alpha1.Build) bool {
+	// Skip reconciliation if build is already completed (success or failure)
+	if isBuildCompleted(build) {
+		return true
+	}
+	return false
 }

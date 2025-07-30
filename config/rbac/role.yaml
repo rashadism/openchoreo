@@ -28,7 +28,6 @@ rules:
   - ""
   resources:
   - namespaces
-  - serviceaccounts
   - services
   verbs:
   - create
@@ -42,19 +41,6 @@ rules:
   - apps
   resources:
   - deployments
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - argoproj.io
-  resources:
-  - workflows
-  - workflowtaskresults
   verbs:
   - create
   - delete
@@ -88,72 +74,10 @@ rules:
   - update
   - watch
 - apiGroups:
-  - core.choreo.dev
-  resources:
-  - builds
-  - components
-  - dataplanes
-  - deployableartifacts
-  - deploymentpipelines
-  - deployments
-  - deploymenttracks
-  - endpoints
-  - environments
-  - organizations
-  - projects
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - core.choreo.dev
-  resources:
-  - builds/finalizers
-  - components/finalizers
-  - dataplanes/finalizers
-  - deployableartifacts/finalizers
-  - deploymentpipelines/finalizers
-  - deployments/finalizers
-  - deploymenttracks/finalizers
-  - endpoints/finalizers
-  - environments/finalizers
-  - organizations/finalizers
-  - projects/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - core.choreo.dev
-  resources:
-  - builds/status
-  - components/status
-  - dataplanes/status
-  - deployableartifacts/status
-  - deploymentpipelines/status
-  - deployments/status
-  - deploymenttracks/status
-  - endpoints/status
-  - environments/status
-  - organizations/status
-  - projects/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - core.choreo.dev
-  resources:
-  - configurationgroups
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
   - gateway.envoyproxy.io
   resources:
+  - backendtrafficpolicies
+  - httproutefilters
   - securitypolicies
   verbs:
   - create
@@ -176,10 +100,35 @@ rules:
   - update
   - watch
 - apiGroups:
-  - rbac.authorization.k8s.io
+  - openchoreo.dev
   resources:
-  - rolebindings
-  - roles
+  - apibindings
+  - apiclasses
+  - apis
+  - buildplanes
+  - builds
+  - components
+  - dataplanes
+  - deployableartifacts
+  - deploymentpipelines
+  - deployments
+  - deploymenttracks
+  - endpoints
+  - environments
+  - gitcommitrequests
+  - organizations
+  - projects
+  - releases
+  - scheduledtaskbindings
+  - scheduledtaskclasses
+  - scheduledtasks
+  - servicebindings
+  - serviceclasses
+  - services
+  - webapplicationbindings
+  - webapplicationclasses
+  - webapplications
+  - workloads
   verbs:
   - create
   - delete
@@ -187,6 +136,80 @@ rules:
   - list
   - patch
   - update
+  - watch
+- apiGroups:
+  - openchoreo.dev
+  resources:
+  - apibindings/finalizers
+  - apiclasses/finalizers
+  - apis/finalizers
+  - buildplanes/finalizers
+  - builds/finalizers
+  - components/finalizers
+  - dataplanes/finalizers
+  - deployableartifacts/finalizers
+  - deploymentpipelines/finalizers
+  - deployments/finalizers
+  - deploymenttracks/finalizers
+  - endpoints/finalizers
+  - environments/finalizers
+  - gitcommitrequests/finalizers
+  - organizations/finalizers
+  - projects/finalizers
+  - releases/finalizers
+  - scheduledtaskbindings/finalizers
+  - scheduledtaskclasses/finalizers
+  - scheduledtasks/finalizers
+  - servicebindings/finalizers
+  - serviceclasses/finalizers
+  - services/finalizers
+  - webapplicationbindings/finalizers
+  - webapplicationclasses/finalizers
+  - webapplications/finalizers
+  - workloads/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - openchoreo.dev
+  resources:
+  - apibindings/status
+  - apiclasses/status
+  - apis/status
+  - buildplanes/status
+  - builds/status
+  - components/status
+  - dataplanes/status
+  - deployableartifacts/status
+  - deploymentpipelines/status
+  - deployments/status
+  - deploymenttracks/status
+  - endpoints/status
+  - environments/status
+  - gitcommitrequests/status
+  - organizations/status
+  - projects/status
+  - releases/status
+  - scheduledtaskbindings/status
+  - scheduledtaskclasses/status
+  - scheduledtasks/status
+  - servicebindings/status
+  - serviceclasses/status
+  - services/status
+  - webapplicationbindings/status
+  - webapplicationclasses/status
+  - webapplications/status
+  - workloads/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - openchoreo.dev
+  resources:
+  - configurationgroups
+  verbs:
+  - get
+  - list
   - watch
 - apiGroups:
   - secrets-store.csi.x-k8s.io

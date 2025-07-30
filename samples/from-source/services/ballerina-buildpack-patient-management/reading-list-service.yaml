@@ -1,0 +1,57 @@
+apiVersion: openchoreo.dev/v1alpha1
+kind: Component
+metadata:
+  name: patient-management-service
+  namespace: default
+spec:
+  owner:
+    projectName: default
+  type: Service
+  build:
+    repository:
+      appPath: /service-ballerina-patient-management
+      revision:
+        branch: main
+      url: https://github.com/openchoreo/sample-workloads
+    templateRef:
+      name: ballerina-buildpack
+
+---
+apiVersion: openchoreo.dev/v1alpha1
+kind: Build
+metadata:
+  name: patient-management-service-build-01
+  namespace: default
+spec:
+  owner:
+    componentName: patient-management-service
+    projectName: default
+  repository:
+    appPath: /service-ballerina-patient-management
+    revision:
+      branch: main
+    url: https://github.com/openchoreo/sample-workloads
+  templateRef:
+    name: ballerina-buildpack
+
+---
+apiVersion: openchoreo.dev/v1alpha1
+kind: Service
+metadata:
+  name: patient-management-service-service
+  namespace: default
+spec:
+  owner:
+    componentName: patient-management-service
+    projectName: default
+  workloadName: patient-management-service-workload
+  className: default
+  apis:
+    reading-list-api: 
+      type: REST
+      className: default
+      rest:
+        backend:
+          port: 9090
+          basePath: /mediflow
+        exposeLevels: [ "Public" ]

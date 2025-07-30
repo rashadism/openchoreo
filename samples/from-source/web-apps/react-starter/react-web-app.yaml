@@ -1,0 +1,52 @@
+apiVersion: openchoreo.dev/v1alpha1
+kind: Component
+metadata:
+  name: react-starter
+  namespace: default
+spec:
+  owner:
+    projectName: default
+  type: WebApplication
+  build:
+    repository:
+      appPath: /webapp-react-nginx
+      revision:
+        branch: master
+      url: https://github.com/openchoreo/sample-workloads
+    templateRef:
+      name: react
+
+---
+apiVersion: openchoreo.dev/v1alpha1
+kind: Build
+metadata:
+  name: react-starter-build-01
+  namespace: default
+spec:
+  owner:
+    componentName: react-starter
+    projectName: default
+  repository:
+    appPath: /webapp-react-nginx
+    revision:
+      branch: master
+    url: https://github.com/openchoreo/sample-workloads
+  templateRef:
+    name: react
+    parameters:
+      - name: node-version
+        value: "18"
+
+---
+# WebApplication that specify runtime configuration for the component.
+# This can be either managed by the component controller or manually created by the user.
+apiVersion: openchoreo.dev/v1alpha1
+kind: WebApplication
+metadata:
+  name: react-starter
+spec:
+  owner:
+    componentName: react-starter
+    projectName: default
+  workloadName: react-starter
+  overrides: { }

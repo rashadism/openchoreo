@@ -8,7 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	v1api "github.com/openchoreo/openchoreo/api/v1"
+	openchoreov1alpha1 "github.com/openchoreo/openchoreo/api/v1alpha1"
 	"github.com/openchoreo/openchoreo/pkg/cli/common/builder"
 	"github.com/openchoreo/openchoreo/pkg/cli/common/constants"
 	"github.com/openchoreo/openchoreo/pkg/cli/flags"
@@ -41,7 +41,7 @@ func getComponentLevelFlags() []flags.Flag {
 	)
 }
 
-func getMetadataFlags() []flags.Flag {
+func getMetadataFlags() []flags.Flag { //nolint:unused // Used by temporarily disabled create commands
 	return append(getBasicFlags(),
 		flags.DisplayName,
 		flags.Description,
@@ -56,21 +56,23 @@ func NewCreateCmd(impl api.CommandImplementationInterface) *cobra.Command {
 	}
 
 	createCmd.AddCommand(
-		newCreateOrganizationCmd(impl),
-		newCreateProjectCmd(impl),
-		newCreateComponentCmd(impl),
-		newCreateBuildCmd(impl),
-		newCreateDeploymentCmd(impl),
-		newCreateDataPlaneCmd(impl),
-		newCreateDeploymentTrackCmd(impl),
-		newCreateEnvironmentCmd(impl),
-		newCreateDeployableArtifactCmd(impl),
-		newCreateDeploymentPipelineCmd(impl),
+		// newCreateOrganizationCmd(impl),
+		// newCreateProjectCmd(impl),
+		// newCreateComponentCmd(impl),
+		// newCreateBuildCmd(impl),
+		// newCreateDeploymentCmd(impl),
+		// newCreateDataPlaneCmd(impl),
+		// newCreateDeploymentTrackCmd(impl),
+		// newCreateEnvironmentCmd(impl),
+		// newCreateDeployableArtifactCmd(impl),
+		// newCreateDeploymentPipelineCmd(impl),
+		newCreateWorkloadCmd(impl),
 	)
 
 	return createCmd
 }
 
+//nolint:unused // Temporarily disabled
 func newCreateOrganizationCmd(impl api.CommandImplementationInterface) *cobra.Command {
 	return (&builder.CommandBuilder{
 		Command: constants.CreateOrganization,
@@ -86,6 +88,7 @@ func newCreateOrganizationCmd(impl api.CommandImplementationInterface) *cobra.Co
 	}).Build()
 }
 
+//nolint:unused // Temporarily disabled
 func newCreateProjectCmd(impl api.CommandImplementationInterface) *cobra.Command {
 	projectFlags := append(getOrgScopedFlags(),
 		flags.DisplayName,
@@ -107,6 +110,7 @@ func newCreateProjectCmd(impl api.CommandImplementationInterface) *cobra.Command
 	}).Build()
 }
 
+//nolint:unused // Temporarily disabled
 func newCreateComponentCmd(impl api.CommandImplementationInterface) *cobra.Command {
 	componentFlags := append(getProjectLevelFlags(),
 		flags.DisplayName,
@@ -129,7 +133,7 @@ func newCreateComponentCmd(impl api.CommandImplementationInterface) *cobra.Comma
 				Project:          fg.GetString(flags.Project),
 				DisplayName:      fg.GetString(flags.DisplayName),
 				GitRepositoryURL: fg.GetString(flags.GitRepositoryURL),
-				Type:             v1api.ComponentType(fg.GetString(flags.ComponentType)),
+				Type:             openchoreov1alpha1.ComponentType(fg.GetString(flags.ComponentType)),
 				Interactive:      fg.GetBool(flags.Interactive),
 				Branch:           fg.GetString(flags.Branch),
 				Path:             fg.GetString(flags.Path),
@@ -142,6 +146,31 @@ func newCreateComponentCmd(impl api.CommandImplementationInterface) *cobra.Comma
 	}).Build()
 }
 
+func newCreateWorkloadCmd(impl api.CommandImplementationInterface) *cobra.Command {
+	workloadFlags := append(getComponentLevelFlags(),
+		flags.Image,
+		flags.Output,
+		flags.WorkloadDescriptor,
+	)
+
+	return (&builder.CommandBuilder{
+		Command: constants.CreateWorkload,
+		Flags:   workloadFlags,
+		RunE: func(fg *builder.FlagGetter) error {
+			return impl.CreateWorkload(api.CreateWorkloadParams{
+				FilePath:         fg.GetString(flags.WorkloadDescriptor),
+				OrganizationName: fg.GetString(flags.Organization),
+				ProjectName:      fg.GetString(flags.Project),
+				ComponentName:    fg.GetString(flags.Component),
+				ImageURL:         fg.GetString(flags.Image),
+				OutputPath:       fg.GetString(flags.Output),
+				Interactive:      fg.GetBool(flags.Interactive),
+			})
+		},
+	}).Build()
+}
+
+//nolint:unused // Temporarily disabled
 func newCreateBuildCmd(impl api.CommandImplementationInterface) *cobra.Command {
 	buildFlags := append(getComponentLevelFlags(),
 		flags.DockerContext,
@@ -169,12 +198,12 @@ func newCreateBuildCmd(impl api.CommandImplementationInterface) *cobra.Command {
 				Revision:     fg.GetString(flags.Revision),
 				AutoBuild:    fg.GetBool(flags.AutoBuild),
 				Interactive:  fg.GetBool(flags.Interactive),
-				Docker: &v1api.DockerConfiguration{
+				Docker: &openchoreov1alpha1.DockerConfiguration{
 					Context:        fg.GetString(flags.DockerContext),
 					DockerfilePath: fg.GetString(flags.DockerfilePath),
 				},
-				Buildpack: &v1api.BuildpackConfiguration{
-					Name:    v1api.BuildpackName(fg.GetString(flags.BuildpackName)),
+				Buildpack: &openchoreov1alpha1.BuildpackConfiguration{
+					Name:    openchoreov1alpha1.BuildpackName(fg.GetString(flags.BuildpackName)),
 					Version: fg.GetString(flags.BuildpackVersion),
 				},
 				DeploymentTrack: fg.GetString(flags.DeploymentTrack),
@@ -183,6 +212,7 @@ func newCreateBuildCmd(impl api.CommandImplementationInterface) *cobra.Command {
 	}).Build()
 }
 
+//nolint:unused // Temporarily disabled
 func newCreateDeploymentCmd(impl api.CommandImplementationInterface) *cobra.Command {
 	deployFlags := append(getComponentLevelFlags(),
 		flags.Environment,
@@ -207,6 +237,7 @@ func newCreateDeploymentCmd(impl api.CommandImplementationInterface) *cobra.Comm
 	}).Build()
 }
 
+//nolint:unused // Temporarily disabled
 func newCreateDataPlaneCmd(impl api.CommandImplementationInterface) *cobra.Command {
 	dpFlags := append(getMetadataFlags(),
 		flags.KubernetesClusterName,
@@ -244,6 +275,7 @@ func newCreateDataPlaneCmd(impl api.CommandImplementationInterface) *cobra.Comma
 	}).Build()
 }
 
+//nolint:unused // Temporarily disabled
 func newCreateDeploymentTrackCmd(impl api.CommandImplementationInterface) *cobra.Command {
 	trackFlags := append(getComponentLevelFlags(),
 		flags.APIVersion,
@@ -266,6 +298,7 @@ func newCreateDeploymentTrackCmd(impl api.CommandImplementationInterface) *cobra
 	}).Build()
 }
 
+//nolint:unused // Temporarily disabled
 func newCreateEnvironmentCmd(impl api.CommandImplementationInterface) *cobra.Command {
 	envFlags := append(getOrgScopedFlags(),
 		flags.DisplayName,
@@ -292,6 +325,7 @@ func newCreateEnvironmentCmd(impl api.CommandImplementationInterface) *cobra.Com
 	}).Build()
 }
 
+//nolint:unused // Temporarily disabled
 func newCreateDeployableArtifactCmd(impl api.CommandImplementationInterface) *cobra.Command {
 	artifactFlags := append(getComponentLevelFlags(),
 		flags.DeploymentTrack,
@@ -313,6 +347,7 @@ func newCreateDeployableArtifactCmd(impl api.CommandImplementationInterface) *co
 	}).Build()
 }
 
+//nolint:unused // Temporarily disabled
 func newCreateDeploymentPipelineCmd(impl api.CommandImplementationInterface) *cobra.Command {
 	dpFlags := []flags.Flag{
 		flags.Organization,
