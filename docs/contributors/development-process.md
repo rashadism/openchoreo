@@ -20,11 +20,6 @@ This document outlines the issue triage process for contributors. Goal in issue 
 
 ## Definitions
 
-### Release Cycle
-
-OpenChoreo is currently doing two major release cycles per year targeting mainly WSO2Con and KubeCon. These release cycles are recognized by product version(v1.0.0, v1.1.0)
-
-
 ### Priority Labels
 
 Priority labels are to be assigned by leads based on the severity and complexity of the issues. As an example, less severe but also less complex issues will have a high priority. Priority is also tied to the ETA as described below. Priority can change in between triaging sessions and is affected by other external reasons.
@@ -58,8 +53,7 @@ Issue triaging should be done using Github issues. Maintainers and contributors 
 
 * Belongs to your Area label  
 * Belongs to New Feature, Impprovement, Bug issue types
-* Not in ‘Choreo Development’ project board  
-* Not in ‘Choreo Ice Box’ project board
+* Not in ‘OpenChoreo Release Management’ project board
 
 Then for each issue type follow below sections
 
