@@ -5,31 +5,31 @@ This document describes the development process used by the OpenChoreo project.
 The OpenChoreo project uses an agile development process. We go through one week long development 
 sprints to design and implement the roadmap items. 
 
-Each Monday maintainers and contributors are expected to to the retrospective and planning and then continue with week's assigned tasks.
+Each Monday maintainers and contributors are expected to do the retrospective and planning and then continue with the week's assigned tasks.
 
 # Issue Tracking
 We use two GitHub boards to track issues.
 - [OpenChoreo Release Management](https://github.com/orgs/openchoreo/projects/5) - Tracks higher level 
-feature requirements, improvements and bugs. Features will be representes with type/epic issues. 
+feature requirements, improvements and bugs. Features will be represented with type/epic issues. 
 - [OpenChoreo Development](https://github.com/orgs/openchoreo/projects/7) - Development teams track 
 tasks that will deliver new product features, bug fixes, improvements to the product. Only type/task issues will be added to this board.
 
 # Issue Triage Process
 
-This document outlines the issue triage process for contributors. Goal in issue triaging is to go through newly logged issues and incorporate them into the development process appropriately. Issue triaging will help to keep the open issue count and backlog healthy.
+This document outlines the issue triage process for contributors. The goal in issue triaging is to go through newly logged issues and incorporate them into the development process appropriately. Issue triaging will help to keep the open issue count and backlog healthy.
 
 ## Definitions
 
 ### Priority Labels
 
-Priority labels are to be assigned by leads based on the severity and complexity of the issues. As an example, less severe but also less complex issues will have a high priority. Priority is also tied to the ETA as described below. Priority can change in between triaging sessions and is affected by other external reasons.
+Priority labels are to be assigned by leads based on the severity and complexity of the issues. As an example, less severe but also less complex issues will have a high priority. Priority is also tied to the ETA as described below. Priority can change between triaging sessions and is affected by other external reasons.
 
 * Priority/Highest  
   Issue should be dealt with immediately and added to the current sprint  
 * Priority/High  
   Issue should be dealt with immediately and added to the next sprint  
 * Priority/Normal  
-  Issue should be dealt within the current release  
+  Issue should be dealt with within the current release  
 * Priority/Low  
   It is ok to fix the issue in the next release
 
@@ -45,33 +45,33 @@ Priority labels are to be assigned by leads based on the severity and complexity
 
 ## Issue triage frequency
 
-Issue triage process should happen at least once a week. If issue count is not manageable, maintainers and contributors should plan to do several triage sessions to bring the issue countdown.
+The issue triage process should happen at least once a week. If the issue count is not manageable, maintainers and contributors should plan to do several triage sessions to bring the issue count down.
 
 ## Issue triage process
 
-Issue triaging should be done using Github issues. Maintainers and contributors should first filter issues based on below criteria.
+Issue triaging should be done using Github issues. Maintainers and contributors should first filter issues based on the below criteria.
 
 * Belongs to your Area label  
-* Belongs to New Feature, Impprovement, Bug issue types
-* Not in ‘OpenChoreo Release Management’ project board
+* Belongs to New Feature, Improvement, Bug issue types
+* Not in 'OpenChoreo Release Management' project board
 
-Then for each issue type follow below sections
+Then for each issue type follow the below sections
 
 ### Feature triage process
 
-Type Feature represent feature requests opened by community. These request should be first taken through the approval process according to this(./../proposals/README.md) document. If approval is not granted then issue should be closed off with the reason. If approval is granted
-* Open a Type/Epic issue representing new feature
+Type/Feature represents feature requests opened by the community. These requests should be first taken through the approval process according to this (./../proposals/README.md) document. If approval is not granted then the issue should be closed off with the reason. If approval is granted:
+* Open a Type/Epic issue representing the new feature
 * Add relevant details to the epic
 * Add the epic to the [OpenChoreo Release Management](https://github.com/orgs/openchoreo/projects/5) project board and assign the milestone, area and priority.
 * Close off the New Feature issue pointing to the epic
 
 ### Improvement triage process
-* Initiate a discussion within the issue to decide validity of the requirement
-* If improvement request is valid then assign the relevant milestone, area and priority.
+* Initiate a discussion within the issue to decide the validity of the requirement
+* If the improvement request is valid then assign the relevant milestone, area and priority.
 * Add the improvement to the [OpenChoreo Release Management](https://github.com/orgs/openchoreo/projects/5) project board
 
 ### Bug Triage Process
-* Initiate a discussion within the issue to decide validity of the bug
+* Initiate a discussion within the issue to decide the validity of the bug
 * If the bug is valid then assign the relevant milestone, area and priority.
 * 
 * Add the bug to the [OpenChoreo Release Management](https://github.com/orgs/openchoreo/projects/5) project board
@@ -86,11 +86,11 @@ Type Feature represent feature requests opened by community. These request shoul
 >
 > *Time and Date*: First Monday of the sprint
 
-Each team get together and retrospect the last sprint
+Each team gets together and retrospects the last sprint
 
 #### Key Tasks
 - Review issues in PR Sent / In Review status and try to close them off
-- Review issues still in progress and include a comment why we could not finish them as planned and change the sprint to the current sprint
+- Review issues still in progress and include a comment explaining why we could not finish them as planned and change the sprint to the current sprint
 - Send updates to Discord with screencast when applicable for finished tasks
 
 ## Milestone Planning Meeting
@@ -99,7 +99,7 @@ Each team get together and retrospect the last sprint
 >
 > *Time and Date*: First Monday of the sprint
 
-Each team/contributors get together and plan for the current sprint by picking tasks from the [OpenChoreo Development](https://github.com/orgs/openchoreo/projects/7) board backlog and move to the current iteration.
+Each team/contributor gets together and plans for the current sprint by picking tasks from the [OpenChoreo Development](https://github.com/orgs/openchoreo/projects/7) board backlog and moving them to the current iteration.
 
 #### Key Tasks
 - Pick tasks from backlog for the current sprint
@@ -108,4 +108,3 @@ Each team/contributors get together and plan for the current sprint by picking t
 - Add issues to the current iteration
 - Add Area labels if not present
 - Assign issues to contributors accordingly
-
