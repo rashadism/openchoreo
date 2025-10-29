@@ -4,11 +4,13 @@
 package handlers
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/openchoreo/openchoreo/internal/observer/httputil"
+	"github.com/openchoreo/openchoreo/internal/observer/k8s"
 	"github.com/openchoreo/openchoreo/internal/observer/opensearch"
 	"github.com/openchoreo/openchoreo/internal/observer/service"
 )
@@ -25,16 +27,22 @@ const (
 	ErrorTypeInternalError    = "internalError"
 
 	// Error codes
-	ErrorCodeMissingParameter = "OBS-L-10"
-	ErrorCodeInvalidRequest   = "OBS-L-12"
-	ErrorCodeInternalError    = "OBS-L-25"
+	ErrorCodeMissingParameter  = "OBS-L-10"
+	ErrorCodeInvalidRequest    = "OBS-L-12"
+	ErrorCodeInternalError     = "OBS-L-25"
+	ErrorCodeFeatureDisabled   = "OBS-RCA-01"
+	ErrorCodeQuotaExceeded     = "OBS-RCA-02"
+	ErrorCodeJobCreationFailed = "OBS-RCA-03"
 
 	// Error messages
-	ErrorMsgComponentIDRequired    = "Component ID is required"
-	ErrorMsgProjectIDRequired      = "Project ID is required"
-	ErrorMsgOrganizationIDRequired = "Organization ID is required"
-	ErrorMsgInvalidRequestFormat   = "Invalid request format"
-	ErrorMsgFailedToRetrieveLogs   = "Failed to retrieve logs"
+	ErrorMsgComponentIDRequired      = "Component ID is required"
+	ErrorMsgProjectIDRequired        = "Project ID is required"
+	ErrorMsgOrganizationIDRequired   = "Organization ID is required"
+	ErrorMsgInvalidRequestFormat     = "Invalid request format"
+	ErrorMsgFailedToRetrieveLogs     = "Failed to retrieve logs"
+	ErrorMsgRCANotEnabled            = "RCA feature is not enabled"
+	ErrorMsgRCAResourceQuotaExceeded = "RCA resource quota exceeded"
+	ErrorMsgRCAJobCreationFailed     = "Failed to create RCA job"
 )
 
 // Handler contains the HTTP handlers for the logging API
@@ -331,4 +339,50 @@ func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 		"status":    "healthy",
 		"timestamp": time.Now().Format(time.RFC3339),
 	})
+}
+
+// Analyze handles POST /api/analyze
+func (h *Handler) Analyze(w http.ResponseWriter, r *http.Request) {
+	var req service.RCARequest
+	if err := httputil.BindJSON(r, &req); err != nil {
+		h.logger.Error("Failed to bind request", "error", err)
+		h.writeErrorResponse(w, http.StatusBadRequest, ErrorTypeInvalidRequest, ErrorCodeInvalidRequest, ErrorMsgInvalidRequestFormat)
+		return
+	}
+
+	if req.ProjectID == "" {
+		h.writeErrorResponse(w, http.StatusBadRequest, ErrorTypeMissingParameter, ErrorCodeMissingParameter, "project_id is required")
+		return
+	}
+	if req.ComponentID == "" {
+		h.writeErrorResponse(w, http.StatusBadRequest, ErrorTypeMissingParameter, ErrorCodeMissingParameter, "component_id is required")
+		return
+	}
+	if req.Environment == "" {
+		h.writeErrorResponse(w, http.StatusBadRequest, ErrorTypeMissingParameter, ErrorCodeMissingParameter, "environment is required")
+		return
+	}
+	if req.Timestamp == "" {
+		h.writeErrorResponse(w, http.StatusBadRequest, ErrorTypeMissingParameter, ErrorCodeMissingParameter, "timestamp is required")
+		return
+	}
+
+	ctx := r.Context()
+	result, err := h.service.KickoffRCA(ctx, req)
+	if err != nil {
+		h.logger.Error("Failed to perform RCA", "error", err)
+
+		// Use error type checking instead of string comparison
+		switch {
+		case errors.Is(err, k8s.ErrQuotaExceeded):
+			h.writeErrorResponse(w, http.StatusTooManyRequests, ErrorTypeInternalError, ErrorCodeQuotaExceeded, ErrorMsgRCAResourceQuotaExceeded)
+		case err.Error() == "RCA feature is not enabled":
+			h.writeErrorResponse(w, http.StatusServiceUnavailable, ErrorTypeInternalError, ErrorCodeFeatureDisabled, ErrorMsgRCANotEnabled)
+		default:
+			h.writeErrorResponse(w, http.StatusInternalServerError, ErrorTypeInternalError, ErrorCodeJobCreationFailed, ErrorMsgRCAJobCreationFailed)
+		}
+		return
+	}
+
+	h.writeJSON(w, http.StatusCreated, result)
 }

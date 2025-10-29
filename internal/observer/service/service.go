@@ -5,11 +5,14 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
+	"math/rand"
 	"time"
 
 	"github.com/openchoreo/openchoreo/internal/observer/config"
+	"github.com/openchoreo/openchoreo/internal/observer/k8s"
 	"github.com/openchoreo/openchoreo/internal/observer/opensearch"
 )
 
@@ -25,6 +28,7 @@ type LoggingService struct {
 	osClient     OpenSearchClient
 	queryBuilder *opensearch.QueryBuilder
 	config       *config.Config
+	k8sClient    *k8s.Client
 	logger       *slog.Logger
 }
 
@@ -36,11 +40,12 @@ type LogResponse struct {
 }
 
 // NewLoggingService creates a new logging service instance
-func NewLoggingService(osClient OpenSearchClient, cfg *config.Config, logger *slog.Logger) *LoggingService {
+func NewLoggingService(osClient OpenSearchClient, cfg *config.Config, k8sClient *k8s.Client, logger *slog.Logger) *LoggingService {
 	return &LoggingService{
 		osClient:     osClient,
 		queryBuilder: opensearch.NewQueryBuilder(cfg.OpenSearch.IndexPrefix),
 		config:       cfg,
+		k8sClient:    k8sClient,
 		logger:       logger,
 	}
 }
@@ -227,4 +232,83 @@ func (s *LoggingService) HealthCheck(ctx context.Context) error {
 
 	s.logger.Debug("Health check passed")
 	return nil
+}
+
+// RCARequest represents a request to perform root cause analysis
+type RCARequest struct {
+	ProjectID   string          `json:"project_id"`
+	ComponentID string          `json:"component_id"`
+	Environment string          `json:"environment"`
+	Timestamp   string          `json:"timestamp"`
+	Context     json.RawMessage `json:"context"` // Arbitrary JSON object
+}
+
+// RCAResponse represents the response from creating an RCA job
+type RCAResponse struct {
+	JobName      string            `json:"jobName"`
+	JobNamespace string            `json:"jobNamespace"`
+	Status       string            `json:"status"`
+	CreatedAt    string            `json:"createdAt"`
+	Labels       map[string]string `json:"labels"`
+}
+
+// KickoffRCA creates a Kubernetes job to perform root cause analysis
+func (s *LoggingService) KickoffRCA(ctx context.Context, req RCARequest) (*RCAResponse, error) {
+	// Check if RCA is enabled
+	if !s.config.RCA.Enabled {
+		return nil, fmt.Errorf("RCA feature is not enabled")
+	}
+
+	// Check if k8s client is initialized
+	if s.k8sClient == nil {
+		s.logger.Error("Kubernetes client is not initialized")
+		return nil, fmt.Errorf("kubernetes client not available")
+	}
+
+	s.logger.Info("Creating RCA job",
+		"project_id", req.ProjectID,
+		"component_id", req.ComponentID,
+		"environment", req.Environment)
+
+	// TODO: Change this
+	jobName := fmt.Sprintf("rca-%s-%x", req.ProjectID, rand.Intn(0xfffff))
+
+	// Build job spec
+	jobSpec := k8s.JobSpec{
+		Name:                    jobName,
+		Namespace:               s.config.RCA.Namespace,
+		ProjectID:               req.ProjectID,
+		ComponentID:             req.ComponentID,
+		Environment:             req.Environment,
+		Timestamp:               req.Timestamp,
+		ContextJSON:             req.Context,
+		ImageRepository:         s.config.RCA.ImageRepository,
+		ImageTag:                s.config.RCA.ImageTag,
+		ImagePullPolicy:         s.config.RCA.ImagePullPolicy,
+		TTLSecondsAfterFinished: &s.config.RCA.TTLSecondsAfterFinished,
+		ResourceLimitsCPU:       s.config.RCA.Resources.Limits.CPU,
+		ResourceLimitsMemory:    s.config.RCA.Resources.Limits.Memory,
+		ResourceRequestsCPU:     s.config.RCA.Resources.Requests.CPU,
+		ResourceRequestsMemory:  s.config.RCA.Resources.Requests.Memory,
+	}
+
+	// Create the job (with ConfigMap for context)
+	job, err := s.k8sClient.CreateJob(ctx, jobSpec)
+	if err != nil {
+		s.logger.Error("Failed to create RCA job", "error", err)
+		return nil, fmt.Errorf("failed to create job: %w", err)
+	}
+
+	s.logger.Info("RCA job created successfully", "job_name", job.Name, "namespace", job.Namespace)
+
+	// Build response
+	response := &RCAResponse{
+		JobName:      job.Name,
+		JobNamespace: job.Namespace,
+		Status:       "Created",
+		CreatedAt:    job.CreationTimestamp.Format(time.RFC3339),
+		Labels:       job.Labels,
+	}
+
+	return response, nil
 }

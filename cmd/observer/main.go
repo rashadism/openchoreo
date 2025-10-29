@@ -17,6 +17,7 @@ import (
 
 	"github.com/openchoreo/openchoreo/internal/observer/config"
 	"github.com/openchoreo/openchoreo/internal/observer/handlers"
+	"github.com/openchoreo/openchoreo/internal/observer/k8s"
 	"github.com/openchoreo/openchoreo/internal/observer/middleware"
 	"github.com/openchoreo/openchoreo/internal/observer/opensearch"
 	"github.com/openchoreo/openchoreo/internal/observer/service"
@@ -47,8 +48,21 @@ func main() {
 		log.Fatalf("Failed to initialize OpenSearch client: %v", err)
 	}
 
+	// Initialize Kubernetes client if RCA is enabled
+	var k8sClient *k8s.Client
+	logger.Info("RCA enabled:", cfg.RCA.Enabled, "asd")
+	if cfg.RCA.Enabled {
+		k8sClient, err = k8s.NewClient()
+		if err != nil {
+			logger.Warn("Failed to initialize Kubernetes client, RCA features will be unavailable", "error", err)
+			k8sClient = nil
+		} else {
+			logger.Info("Kubernetes client initialized successfully")
+		}
+	}
+
 	// Initialize logging service
-	loggingService := service.NewLoggingService(osClient, cfg, logger)
+	loggingService := service.NewLoggingService(osClient, cfg, k8sClient, logger)
 
 	// Initialize HTTP server
 	mux := http.NewServeMux()
@@ -64,6 +78,12 @@ func main() {
 	mux.HandleFunc("POST /api/logs/project/{projectId}", handler.GetProjectLogs)
 	mux.HandleFunc("POST /api/logs/gateway", handler.GetGatewayLogs)
 	mux.HandleFunc("POST /api/logs/org/{orgId}", handler.GetOrganizationLogs)
+
+	// RCA route (conditional based on configuration)
+	if cfg.RCA.Enabled {
+		mux.HandleFunc("POST /api/analyze", handler.Analyze)
+		logger.Info("RCA endpoint enabled", "path", "/api/analyze")
+	}
 
 	// Apply middleware
 	handlerWithMiddleware := middleware.Chain(
