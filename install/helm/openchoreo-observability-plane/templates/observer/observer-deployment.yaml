@@ -81,6 +81,14 @@ spec:
           value: {{ .Values.observer.rca.image.pullPolicy | quote }}
         - name: RCA_TTL_SECONDS_AFTER_FINISHED
           value: {{ .Values.observer.rca.ttlSecondsAfterFinished | quote }}
+        - name: RCA_RESOURCE_LIMITS_CPU
+          value: {{ .Values.observer.rca.resources.limits.cpu | quote }}
+        - name: RCA_RESOURCE_LIMITS_MEMORY
+          value: {{ .Values.observer.rca.resources.limits.memory | quote }}
+        - name: RCA_RESOURCE_REQUESTS_CPU
+          value: {{ .Values.observer.rca.resources.requests.cpu | quote }}
+        - name: RCA_RESOURCE_REQUESTS_MEMORY
+          value: {{ .Values.observer.rca.resources.requests.memory | quote }}
         {{- end }}
         livenessProbe:
           httpGet:
