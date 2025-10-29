@@ -153,7 +153,7 @@ observer:
   # RCA (Root Cause Analysis) configuration
   rca:
     enabled: false
-    jobsNamespace: openchoreo-observability-rca-jobs # This is used by the ResourceQuota to limit jobs
+    jobsNamespace: openchoreo-rca-jobs # This is used by the ResourceQuota to limit jobs
     image:
       repository: ghcr.io/openchoreo/rca-agent
       tag: latest
@@ -161,6 +161,14 @@ observer:
     ttlSecondsAfterFinished: 600
     resourceQuota:
       maxJobs: 5
+    # Resource limits and requests for RCA job pods
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
 
 # Fluent Bit configuration
 fluentBit:
