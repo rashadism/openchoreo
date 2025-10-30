@@ -60,30 +60,16 @@ type LoggingConfig struct {
 
 // RCAConfig holds AI RCA (Root Cause Analysis) job configuration
 type RCAConfig struct {
-	Enabled   bool          `koanf:"enabled"`
-	Namespace string        `koanf:"namespace"`
-	JobSpec   JobSpecConfig `koanf:"jobspec"`
-}
-
-// JobSpecConfig holds job specification for AI RCA jobs
-type JobSpecConfig struct {
-	ImageRepository         string         `koanf:"image.repository"`
-	ImageTag                string         `koanf:"image.tag"`
-	ImagePullPolicy         string         `koanf:"image.pull.policy"`
-	TTLSecondsAfterFinished int32          `koanf:"ttl.seconds.after.finished"`
-	Resources               ResourceConfig `koanf:"resource"`
-}
-
-// ResourceConfig holds resource limits and requests for AI RCA jobs
-type ResourceConfig struct {
-	Limits   ResourceValues `koanf:"limits"`
-	Requests ResourceValues `koanf:"requests"`
-}
-
-// ResourceValues holds CPU and memory values
-type ResourceValues struct {
-	CPU    string `koanf:"cpu"`
-	Memory string `koanf:"memory"`
+	Enabled                 bool   `koanf:"enabled"`
+	Namespace               string `koanf:"namespace"`
+	ImageRepository         string `koanf:"image.repository"`
+	ImageTag                string `koanf:"image.tag"`
+	ImagePullPolicy         string `koanf:"image.pull.policy"`
+	TTLSecondsAfterFinished int32  `koanf:"ttl.seconds.after.finished"`
+	ResourceLimitsCPU       string `koanf:"resource.limits.cpu"`
+	ResourceLimitsMemory    string `koanf:"resource.limits.memory"`
+	ResourceRequestsCPU     string `koanf:"resource.requests.cpu"`
+	ResourceRequestsMemory  string `koanf:"resource.requests.memory"`
 }
 
 // Load loads configuration from environment variables and defaults
@@ -121,14 +107,14 @@ func Load() (*Config, error) {
 		"LOGGING_MAX_LOG_LINES_PER_FILE":  "logging.max.log.lines.per.file",
 		"RCA_ENABLED":                     "rca.enabled",
 		"RCA_NAMESPACE":                   "rca.namespace",
-		"RCA_IMAGE_REPOSITORY":            "rca.jobspec.image.repository",
-		"RCA_IMAGE_TAG":                   "rca.jobspec.image.tag",
-		"RCA_IMAGE_PULL_POLICY":           "rca.jobspec.image.pull.policy",
-		"RCA_TTL_SECONDS_AFTER_FINISHED":  "rca.jobspec.ttl.seconds.after.finished",
-		"RCA_RESOURCE_LIMITS_CPU":         "rca.jobspec.resource.limits.cpu",
-		"RCA_RESOURCE_LIMITS_MEMORY":      "rca.jobspec.resource.limits.memory",
-		"RCA_RESOURCE_REQUESTS_CPU":       "rca.jobspec.resource.requests.cpu",
-		"RCA_RESOURCE_REQUESTS_MEMORY":    "rca.jobspec.resource.requests.memory",
+		"RCA_IMAGE_REPOSITORY":            "rca.image.repository",
+		"RCA_IMAGE_TAG":                   "rca.image.tag",
+		"RCA_IMAGE_PULL_POLICY":           "rca.image.pull.policy",
+		"RCA_TTL_SECONDS_AFTER_FINISHED":  "rca.ttl.seconds.after.finished",
+		"RCA_RESOURCE_LIMITS_CPU":         "rca.resource.limits.cpu",
+		"RCA_RESOURCE_LIMITS_MEMORY":      "rca.resource.limits.memory",
+		"RCA_RESOURCE_REQUESTS_CPU":       "rca.resource.requests.cpu",
+		"RCA_RESOURCE_REQUESTS_MEMORY":    "rca.resource.requests.memory",
 		"LOG_LEVEL":                       "loglevel",
 		"PORT":                            "server.port",           // Common alias
 		"JWT_SECRET":                      "auth.jwt.secret",       // Common alias
@@ -242,26 +228,26 @@ func (c *Config) validate() error {
 		if c.RCA.Namespace == "" {
 			return fmt.Errorf("rca.namespace is required when RCA is enabled")
 		}
-		if c.RCA.JobSpec.ImageRepository == "" {
-			return fmt.Errorf("rca.jobspec.image.repository is required when RCA is enabled")
+		if c.RCA.ImageRepository == "" {
+			return fmt.Errorf("rca.image.repository is required when RCA is enabled")
 		}
-		if c.RCA.JobSpec.ImageTag == "" {
-			return fmt.Errorf("rca.jobspec.image.tag is required when RCA is enabled")
+		if c.RCA.ImageTag == "" {
+			return fmt.Errorf("rca.image.tag is required when RCA is enabled")
 		}
-		if c.RCA.JobSpec.ImagePullPolicy == "" {
-			return fmt.Errorf("rca.jobspec.image.pull.policy is required when RCA is enabled")
+		if c.RCA.ImagePullPolicy == "" {
+			return fmt.Errorf("rca.image.pull.policy is required when RCA is enabled")
 		}
-		if c.RCA.JobSpec.Resources.Limits.CPU == "" {
-			return fmt.Errorf("rca.jobspec.resource.limits.cpu is required when RCA is enabled")
+		if c.RCA.ResourceLimitsCPU == "" {
+			return fmt.Errorf("rca.resource.limits.cpu is required when RCA is enabled")
 		}
-		if c.RCA.JobSpec.Resources.Limits.Memory == "" {
-			return fmt.Errorf("rca.jobspec.resource.limits.memory is required when RCA is enabled")
+		if c.RCA.ResourceLimitsMemory == "" {
+			return fmt.Errorf("rca.resource.limits.memory is required when RCA is enabled")
 		}
-		if c.RCA.JobSpec.Resources.Requests.CPU == "" {
-			return fmt.Errorf("rca.jobspec.resource.requests.cpu is required when RCA is enabled")
+		if c.RCA.ResourceRequestsCPU == "" {
+			return fmt.Errorf("rca.resource.requests.cpu is required when RCA is enabled")
 		}
-		if c.RCA.JobSpec.Resources.Requests.Memory == "" {
-			return fmt.Errorf("rca.jobspec.resource.requests.memory is required when RCA is enabled")
+		if c.RCA.ResourceRequestsMemory == "" {
+			return fmt.Errorf("rca.resource.requests.memory is required when RCA is enabled")
 		}
 	}
 

@@ -76,7 +76,7 @@ spec:
         - name: RCA_IMAGE_REPOSITORY
           value: {{ .Values.observer.rca.jobSpec.image.repository | quote }}
         - name: RCA_IMAGE_TAG
-          value: {{ .Values.observer.rca.jobSpec.image.tag | quote }}
+          value: {{ .Values.observer.rca.jobSpec.image.tag | default .Chart.AppVersion | quote }}
         - name: RCA_IMAGE_PULL_POLICY
           value: {{ .Values.observer.rca.jobSpec.image.pullPolicy | quote }}
         - name: RCA_TTL_SECONDS_AFTER_FINISHED

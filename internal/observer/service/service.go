@@ -281,14 +281,14 @@ func (s *LoggingService) KickoffRCA(ctx context.Context, req RCARequest) (*RCARe
 		Environment:             req.Environment,
 		Timestamp:               req.Timestamp,
 		ContextJSON:             req.Context,
-		ImageRepository:         s.config.RCA.JobSpec.ImageRepository,
-		ImageTag:                s.config.RCA.JobSpec.ImageTag,
-		ImagePullPolicy:         s.config.RCA.JobSpec.ImagePullPolicy,
-		TTLSecondsAfterFinished: &s.config.RCA.JobSpec.TTLSecondsAfterFinished,
-		ResourceLimitsCPU:       s.config.RCA.JobSpec.Resources.Limits.CPU,
-		ResourceLimitsMemory:    s.config.RCA.JobSpec.Resources.Limits.Memory,
-		ResourceRequestsCPU:     s.config.RCA.JobSpec.Resources.Requests.CPU,
-		ResourceRequestsMemory:  s.config.RCA.JobSpec.Resources.Requests.Memory,
+		ImageRepository:         s.config.RCA.ImageRepository,
+		ImageTag:                s.config.RCA.ImageTag,
+		ImagePullPolicy:         s.config.RCA.ImagePullPolicy,
+		TTLSecondsAfterFinished: &s.config.RCA.TTLSecondsAfterFinished,
+		ResourceLimitsCPU:       s.config.RCA.ResourceLimitsCPU,
+		ResourceLimitsMemory:    s.config.RCA.ResourceLimitsMemory,
+		ResourceRequestsCPU:     s.config.RCA.ResourceRequestsCPU,
+		ResourceRequestsMemory:  s.config.RCA.ResourceRequestsMemory,
 	}
 
 	// Create the job (with ConfigMap for context)

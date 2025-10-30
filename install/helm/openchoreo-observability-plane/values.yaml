@@ -157,7 +157,7 @@ observer:
     jobSpec:
       image:
         repository: ghcr.io/openchoreo/rca-agent
-        tag: latest
+        tag: ""
         pullPolicy: IfNotPresent
       ttlSecondsAfterFinished: 600
       # Resource limits and requests for RCA job pods
