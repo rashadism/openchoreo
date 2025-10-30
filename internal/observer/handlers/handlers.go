@@ -4,13 +4,12 @@
 package handlers
 
 import (
-	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/openchoreo/openchoreo/internal/observer/httputil"
-	"github.com/openchoreo/openchoreo/internal/observer/k8s"
 	"github.com/openchoreo/openchoreo/internal/observer/opensearch"
 	"github.com/openchoreo/openchoreo/internal/observer/service"
 )
@@ -370,13 +369,13 @@ func (h *Handler) Analyze(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	result, err := h.service.KickoffRCA(ctx, req)
 	if err != nil {
-		h.logger.Error("Failed to perform RCA", "error", err)
+		h.logger.Error("Failed to kickoff RCA", "error", err)
 
-		// Use error type checking instead of string comparison
+		errMsg := err.Error()
 		switch {
-		case errors.Is(err, k8s.ErrQuotaExceeded):
+		case strings.Contains(errMsg, "exceeded quota"):
 			h.writeErrorResponse(w, http.StatusTooManyRequests, ErrorTypeInternalError, ErrorCodeQuotaExceeded, ErrorMsgRCAResourceQuotaExceeded)
-		case err.Error() == "RCA feature is not enabled":
+		case strings.Contains(errMsg, "RCA feature is not enabled"):
 			h.writeErrorResponse(w, http.StatusServiceUnavailable, ErrorTypeInternalError, ErrorCodeFeatureDisabled, ErrorMsgRCANotEnabled)
 		default:
 			h.writeErrorResponse(w, http.StatusInternalServerError, ErrorTypeInternalError, ErrorCodeJobCreationFailed, ErrorMsgRCAJobCreationFailed)

@@ -6,7 +6,6 @@ package k8s
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -20,9 +19,6 @@ import (
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
-
-// ErrQuotaExceeded is returned when a ResourceQuota prevents job creation
-var ErrQuotaExceeded = errors.New("resource quota exceeded")
 
 // Client wraps controller-runtime client
 type Client struct {
@@ -89,11 +85,11 @@ func (c *Client) CreateJob(ctx context.Context, spec JobSpec) (*batchv1.Job, err
 			Name:      spec.Name,
 			Namespace: spec.Namespace,
 			Labels: map[string]string{
-				"app":              "rca-agent",
-				"project-id":       spec.ProjectID,
-				"component-id":     spec.ComponentID,
-				"environment":      spec.Environment,
-				"managed-by":       "openchoreo-observer",
+				"app":          "rca-agent",
+				"project-id":   spec.ProjectID,
+				"component-id": spec.ComponentID,
+				"environment":  spec.Environment,
+				"managed-by":   "openchoreo-observer",
 			},
 		},
 		Spec: batchv1.JobSpec{
@@ -102,10 +98,10 @@ func (c *Client) CreateJob(ctx context.Context, spec JobSpec) (*batchv1.Job, err
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						"app":              "rca-agent",
-						"project-id":       spec.ProjectID,
-						"component-id":     spec.ComponentID,
-						"environment":      spec.Environment,
+						"app":          "rca-agent",
+						"project-id":   spec.ProjectID,
+						"component-id": spec.ComponentID,
+						"environment":  spec.Environment,
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -148,11 +144,9 @@ func (c *Client) CreateJob(ctx context.Context, spec JobSpec) (*batchv1.Job, err
 		},
 	}
 
-	// Create the job
 	if err := c.client.Create(ctx, job); err != nil {
-		// Check if it's a quota exceeded error using Kubernetes API error types
 		if apierrors.IsForbidden(err) && strings.Contains(err.Error(), "exceeded quota") {
-			return nil, ErrQuotaExceeded
+			return nil, fmt.Errorf("exceeded quota: %w", err)
 		}
 		return nil, fmt.Errorf("failed to create job: %w", err)
 	}
