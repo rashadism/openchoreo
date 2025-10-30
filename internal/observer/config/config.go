@@ -215,24 +215,7 @@ func getDefaults() map[string]interface{} {
 			"max.log.lines.per.file":  600000,
 		},
 		"rca": map[string]interface{}{
-			"enabled":   false,
-			"namespace": "openchoreo-observability-rca-jobs",
-			"jobspec": map[string]interface{}{
-				"image.repository":           "ghcr.io/openchoreo/rca-agent",
-				"image.tag":                  "latest",
-				"image.pull.policy":          "IfNotPresent",
-				"ttl.seconds.after.finished": 600,
-				"resource": map[string]interface{}{
-					"limits": map[string]interface{}{
-						"cpu":    "500m",
-						"memory": "512Mi",
-					},
-					"requests": map[string]interface{}{
-						"cpu":    "100m",
-						"memory": "128Mi",
-					},
-				},
-			},
+			"enabled": false,
 		},
 		"loglevel": "info",
 	}
@@ -253,6 +236,33 @@ func (c *Config) validate() error {
 
 	if c.Logging.MaxLogLimit <= 0 {
 		return fmt.Errorf("max log limit must be positive")
+	}
+
+	if c.RCA.Enabled {
+		if c.RCA.Namespace == "" {
+			return fmt.Errorf("rca.namespace is required when RCA is enabled")
+		}
+		if c.RCA.JobSpec.ImageRepository == "" {
+			return fmt.Errorf("rca.jobspec.image.repository is required when RCA is enabled")
+		}
+		if c.RCA.JobSpec.ImageTag == "" {
+			return fmt.Errorf("rca.jobspec.image.tag is required when RCA is enabled")
+		}
+		if c.RCA.JobSpec.ImagePullPolicy == "" {
+			return fmt.Errorf("rca.jobspec.image.pull.policy is required when RCA is enabled")
+		}
+		if c.RCA.JobSpec.Resources.Limits.CPU == "" {
+			return fmt.Errorf("rca.jobspec.resource.limits.cpu is required when RCA is enabled")
+		}
+		if c.RCA.JobSpec.Resources.Limits.Memory == "" {
+			return fmt.Errorf("rca.jobspec.resource.limits.memory is required when RCA is enabled")
+		}
+		if c.RCA.JobSpec.Resources.Requests.CPU == "" {
+			return fmt.Errorf("rca.jobspec.resource.requests.cpu is required when RCA is enabled")
+		}
+		if c.RCA.JobSpec.Resources.Requests.Memory == "" {
+			return fmt.Errorf("rca.jobspec.resource.requests.memory is required when RCA is enabled")
+		}
 	}
 
 	return nil
