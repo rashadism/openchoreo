@@ -16,7 +16,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/rest"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -25,11 +25,11 @@ type Client struct {
 	client client.Client
 }
 
-// NewClient creates a new Kubernetes client using in-cluster configuration
+// NewClient creates a new Kubernetes client
 func NewClient() (*Client, error) {
-	config, err := rest.InClusterConfig()
+	config, err := ctrl.GetConfig()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get in-cluster config: %w", err)
+		return nil, fmt.Errorf("failed to get kubernetes config: %w", err)
 	}
 
 	scheme := runtime.NewScheme()
@@ -71,7 +71,6 @@ type JobSpec struct {
 
 // CreateJob creates a Kubernetes job for RCA analysis
 func (c *Client) CreateJob(ctx context.Context, spec JobSpec) (*batchv1.Job, error) {
-	// Create ConfigMap for context if provided
 	configMapName := fmt.Sprintf("%s-context", spec.Name)
 	if len(spec.ContextJSON) > 0 && string(spec.ContextJSON) != "null" {
 		if err := c.createContextConfigMap(ctx, spec.Namespace, configMapName, spec.ContextJSON); err != nil {
@@ -79,13 +78,13 @@ func (c *Client) CreateJob(ctx context.Context, spec JobSpec) (*batchv1.Job, err
 		}
 	}
 
-	// Build the job object
+	// TODO: Update proper labels in resources
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      spec.Name,
 			Namespace: spec.Namespace,
 			Labels: map[string]string{
-				"app":          "rca-agent",
+				"app":          "observability-rca-agent",
 				"project-id":   spec.ProjectID,
 				"component-id": spec.ComponentID,
 				"environment":  spec.Environment,
