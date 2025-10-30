@@ -39,8 +39,8 @@ const (
 	ErrorMsgOrganizationIDRequired   = "Organization ID is required"
 	ErrorMsgInvalidRequestFormat     = "Invalid request format"
 	ErrorMsgFailedToRetrieveLogs     = "Failed to retrieve logs"
-	ErrorMsgRCANotEnabled            = "RCA feature is not enabled"
-	ErrorMsgRCAResourceQuotaExceeded = "RCA resource quota exceeded"
+	ErrorMsgRCANotEnabled            = "AI RCA feature is not enabled"
+	ErrorMsgRCAResourceQuotaExceeded = "AI RCA resource quota exceeded"
 	ErrorMsgRCAJobCreationFailed     = "Failed to create RCA job"
 )
 
@@ -369,13 +369,13 @@ func (h *Handler) Analyze(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	result, err := h.service.KickoffRCA(ctx, req)
 	if err != nil {
-		h.logger.Error("Failed to kickoff RCA", "error", err)
+		h.logger.Error("Failed to kickoff AI RCA", "error", err)
 
 		errMsg := err.Error()
 		switch {
 		case strings.Contains(errMsg, "exceeded quota"):
 			h.writeErrorResponse(w, http.StatusTooManyRequests, ErrorTypeInternalError, ErrorCodeQuotaExceeded, ErrorMsgRCAResourceQuotaExceeded)
-		case strings.Contains(errMsg, "RCA feature is not enabled"):
+		case strings.Contains(errMsg, "AI RCA feature is not enabled"):
 			h.writeErrorResponse(w, http.StatusServiceUnavailable, ErrorTypeInternalError, ErrorCodeFeatureDisabled, ErrorMsgRCANotEnabled)
 		default:
 			h.writeErrorResponse(w, http.StatusInternalServerError, ErrorTypeInternalError, ErrorCodeJobCreationFailed, ErrorMsgRCAJobCreationFailed)

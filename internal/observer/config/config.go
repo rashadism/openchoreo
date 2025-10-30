@@ -58,18 +58,23 @@ type LoggingConfig struct {
 	MaxLogLinesPerFile   int `koanf:"max.log.lines.per.file"`
 }
 
-// RCAConfig holds Root Cause Analysis job configuration
+// RCAConfig holds AI RCA (Root Cause Analysis) job configuration
 type RCAConfig struct {
-	Enabled                 bool            `koanf:"enabled"`
-	Namespace               string          `koanf:"namespace"`
-	ImageRepository         string          `koanf:"image.repository"`
-	ImageTag                string          `koanf:"image.tag"`
-	ImagePullPolicy         string          `koanf:"image.pull.policy"`
-	TTLSecondsAfterFinished int32           `koanf:"ttl.seconds.after.finished"`
-	Resources               ResourceConfig  `koanf:"resource"`
+	Enabled   bool          `koanf:"enabled"`
+	Namespace string        `koanf:"namespace"`
+	JobSpec   JobSpecConfig `koanf:"jobspec"`
 }
 
-// ResourceConfig holds resource limits and requests for RCA jobs
+// JobSpecConfig holds job specification for AI RCA jobs
+type JobSpecConfig struct {
+	ImageRepository         string         `koanf:"image.repository"`
+	ImageTag                string         `koanf:"image.tag"`
+	ImagePullPolicy         string         `koanf:"image.pull.policy"`
+	TTLSecondsAfterFinished int32          `koanf:"ttl.seconds.after.finished"`
+	Resources               ResourceConfig `koanf:"resource"`
+}
+
+// ResourceConfig holds resource limits and requests for AI RCA jobs
 type ResourceConfig struct {
 	Limits   ResourceValues `koanf:"limits"`
 	Requests ResourceValues `koanf:"requests"`
@@ -116,14 +121,14 @@ func Load() (*Config, error) {
 		"LOGGING_MAX_LOG_LINES_PER_FILE":  "logging.max.log.lines.per.file",
 		"RCA_ENABLED":                     "rca.enabled",
 		"RCA_NAMESPACE":                   "rca.namespace",
-		"RCA_IMAGE_REPOSITORY":            "rca.image.repository",
-		"RCA_IMAGE_TAG":                   "rca.image.tag",
-		"RCA_IMAGE_PULL_POLICY":           "rca.image.pull.policy",
-		"RCA_TTL_SECONDS_AFTER_FINISHED":  "rca.ttl.seconds.after.finished",
-		"RCA_RESOURCE_LIMITS_CPU":         "rca.resource.limits.cpu",
-		"RCA_RESOURCE_LIMITS_MEMORY":      "rca.resource.limits.memory",
-		"RCA_RESOURCE_REQUESTS_CPU":       "rca.resource.requests.cpu",
-		"RCA_RESOURCE_REQUESTS_MEMORY":    "rca.resource.requests.memory",
+		"RCA_IMAGE_REPOSITORY":            "rca.jobspec.image.repository",
+		"RCA_IMAGE_TAG":                   "rca.jobspec.image.tag",
+		"RCA_IMAGE_PULL_POLICY":           "rca.jobspec.image.pull.policy",
+		"RCA_TTL_SECONDS_AFTER_FINISHED":  "rca.jobspec.ttl.seconds.after.finished",
+		"RCA_RESOURCE_LIMITS_CPU":         "rca.jobspec.resource.limits.cpu",
+		"RCA_RESOURCE_LIMITS_MEMORY":      "rca.jobspec.resource.limits.memory",
+		"RCA_RESOURCE_REQUESTS_CPU":       "rca.jobspec.resource.requests.cpu",
+		"RCA_RESOURCE_REQUESTS_MEMORY":    "rca.jobspec.resource.requests.memory",
 		"LOG_LEVEL":                       "loglevel",
 		"PORT":                            "server.port",           // Common alias
 		"JWT_SECRET":                      "auth.jwt.secret",       // Common alias
@@ -210,20 +215,22 @@ func getDefaults() map[string]interface{} {
 			"max.log.lines.per.file":  600000,
 		},
 		"rca": map[string]interface{}{
-			"enabled":                    false,
-			"namespace":                  "openchoreo-observability-rca-jobs",
-			"image.repository":           "ghcr.io/openchoreo/rca-agent",
-			"image.tag":                  "latest",
-			"image.pull.policy":          "IfNotPresent",
-			"ttl.seconds.after.finished": 600,
-			"resource": map[string]interface{}{
-				"limits": map[string]interface{}{
-					"cpu":    "500m",
-					"memory": "512Mi",
-				},
-				"requests": map[string]interface{}{
-					"cpu":    "100m",
-					"memory": "128Mi",
+			"enabled":   false,
+			"namespace": "openchoreo-observability-rca-jobs",
+			"jobspec": map[string]interface{}{
+				"image.repository":           "ghcr.io/openchoreo/rca-agent",
+				"image.tag":                  "latest",
+				"image.pull.policy":          "IfNotPresent",
+				"ttl.seconds.after.finished": 600,
+				"resource": map[string]interface{}{
+					"limits": map[string]interface{}{
+						"cpu":    "500m",
+						"memory": "512Mi",
+					},
+					"requests": map[string]interface{}{
+						"cpu":    "100m",
+						"memory": "128Mi",
+					},
 				},
 			},
 		},
