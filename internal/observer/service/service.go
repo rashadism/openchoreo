@@ -234,7 +234,7 @@ func (s *LoggingService) HealthCheck(ctx context.Context) error {
 	return nil
 }
 
-// RCARequest represents a request to perform root cause analysis
+// RCARequest represents a request to perform AI-powered root cause analysis
 type RCARequest struct {
 	ProjectID   string          `json:"project_id"`
 	ComponentID string          `json:"component_id"`
@@ -255,7 +255,7 @@ type RCAResponse struct {
 // KickoffRCA creates a Kubernetes job to perform root cause analysis
 func (s *LoggingService) KickoffRCA(ctx context.Context, req RCARequest) (*RCAResponse, error) {
 	if !s.config.RCA.Enabled {
-		return nil, fmt.Errorf("RCA feature is not enabled")
+		return nil, fmt.Errorf("AI RCA feature is not enabled")
 	}
 
 	// Check if k8s client is initialized
@@ -264,7 +264,7 @@ func (s *LoggingService) KickoffRCA(ctx context.Context, req RCARequest) (*RCARe
 		return nil, fmt.Errorf("kubernetes client not available")
 	}
 
-	s.logger.Info("Creating RCA job",
+	s.logger.Info("Creating AI RCA job",
 		"project_id", req.ProjectID,
 		"component_id", req.ComponentID,
 		"environment", req.Environment)
@@ -281,14 +281,14 @@ func (s *LoggingService) KickoffRCA(ctx context.Context, req RCARequest) (*RCARe
 		Environment:             req.Environment,
 		Timestamp:               req.Timestamp,
 		ContextJSON:             req.Context,
-		ImageRepository:         s.config.RCA.ImageRepository,
-		ImageTag:                s.config.RCA.ImageTag,
-		ImagePullPolicy:         s.config.RCA.ImagePullPolicy,
-		TTLSecondsAfterFinished: &s.config.RCA.TTLSecondsAfterFinished,
-		ResourceLimitsCPU:       s.config.RCA.Resources.Limits.CPU,
-		ResourceLimitsMemory:    s.config.RCA.Resources.Limits.Memory,
-		ResourceRequestsCPU:     s.config.RCA.Resources.Requests.CPU,
-		ResourceRequestsMemory:  s.config.RCA.Resources.Requests.Memory,
+		ImageRepository:         s.config.RCA.JobSpec.ImageRepository,
+		ImageTag:                s.config.RCA.JobSpec.ImageTag,
+		ImagePullPolicy:         s.config.RCA.JobSpec.ImagePullPolicy,
+		TTLSecondsAfterFinished: &s.config.RCA.JobSpec.TTLSecondsAfterFinished,
+		ResourceLimitsCPU:       s.config.RCA.JobSpec.Resources.Limits.CPU,
+		ResourceLimitsMemory:    s.config.RCA.JobSpec.Resources.Limits.Memory,
+		ResourceRequestsCPU:     s.config.RCA.JobSpec.Resources.Requests.CPU,
+		ResourceRequestsMemory:  s.config.RCA.JobSpec.Resources.Requests.Memory,
 	}
 
 	// Create the job (with ConfigMap for context)
