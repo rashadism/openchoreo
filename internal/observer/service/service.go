@@ -254,7 +254,6 @@ type RCAResponse struct {
 
 // KickoffRCA creates a Kubernetes job to perform root cause analysis
 func (s *LoggingService) KickoffRCA(ctx context.Context, req RCARequest) (*RCAResponse, error) {
-	// Check if RCA is enabled
 	if !s.config.RCA.Enabled {
 		return nil, fmt.Errorf("RCA feature is not enabled")
 	}
@@ -301,7 +300,6 @@ func (s *LoggingService) KickoffRCA(ctx context.Context, req RCARequest) (*RCARe
 
 	s.logger.Info("RCA job created successfully", "job_name", job.Name, "namespace", job.Namespace)
 
-	// Build response
 	response := &RCAResponse{
 		JobName:      job.Name,
 		JobNamespace: job.Namespace,

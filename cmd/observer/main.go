@@ -48,9 +48,8 @@ func main() {
 		log.Fatalf("Failed to initialize OpenSearch client: %v", err)
 	}
 
-	// Initialize Kubernetes client if RCA is enabled
+	// Initialize Kubernetes k8sClient if RCA is enabled
 	var k8sClient *k8s.Client
-	logger.Info("RCA enabled:", cfg.RCA.Enabled, "asd")
 	if cfg.RCA.Enabled {
 		k8sClient, err = k8s.NewClient()
 		if err != nil {
@@ -78,12 +77,7 @@ func main() {
 	mux.HandleFunc("POST /api/logs/project/{projectId}", handler.GetProjectLogs)
 	mux.HandleFunc("POST /api/logs/gateway", handler.GetGatewayLogs)
 	mux.HandleFunc("POST /api/logs/org/{orgId}", handler.GetOrganizationLogs)
-
-	// RCA route (conditional based on configuration)
-	if cfg.RCA.Enabled {
-		mux.HandleFunc("POST /api/analyze", handler.Analyze)
-		logger.Info("RCA endpoint enabled", "path", "/api/analyze")
-	}
+	mux.HandleFunc("POST /api/analyze", handler.Analyze)
 
 	// Apply middleware
 	handlerWithMiddleware := middleware.Chain(
