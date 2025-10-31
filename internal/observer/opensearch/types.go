@@ -68,7 +68,7 @@ type LogEntry struct {
 
 // TraceResponse represents the response structure for trace queries
 type TraceResponse struct {
-	Spans     []Span  `json:"spans"`
+	Spans      []Span `json:"spans"`
 	TotalCount int    `json:"totalCount"`
 	Took       int    `json:"tookMs"`
 }
@@ -78,7 +78,7 @@ type Span struct {
 	DurationInNanos int64     `json:"durationInNanos"`
 	EndTime         time.Time `json:"endTime"`
 	Name            string    `json:"name"`
-	SpanId          string    `json:"spanId"`
+	SpanID          string    `json:"spanId"`
 	StartTime       time.Time `json:"startTime"`
 	TraceID         string    `json:"traceId"`
 }

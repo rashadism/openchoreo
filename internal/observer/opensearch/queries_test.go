@@ -490,4 +490,3 @@ func TestQueryBuilder_BuildComponentTracesQuery(t *testing.T) {
 		})
 	}
 }
-

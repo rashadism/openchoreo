@@ -64,7 +64,7 @@ func ParseSpanEntry(hit Hit) Span {
 		EndTime:         endTime,
 		Name:            getString("name"),
 		StartTime:       startTime,
-		SpanId:          getString("spanId"),
+		SpanID:          getString("spanId"),
 		TraceID:         getString("traceId"),
 	}
 

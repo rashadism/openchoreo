@@ -28,7 +28,7 @@ func TestParseSpanEntry(t *testing.T) {
 			},
 			expected: Span{
 				TraceID:         "b72e731db5edfd1df2658bd78f751862",
-				SpanId:          "614f55c7ccbfffdc",
+				SpanID:          "614f55c7ccbfffdc",
 				Name:            "database-query",
 				DurationInNanos: 101018208,
 				StartTime:       mustParseTime("2025-10-28T11:13:56.484388Z"),
@@ -49,7 +49,7 @@ func TestParseSpanEntry(t *testing.T) {
 			},
 			expected: Span{
 				TraceID:         "trace123",
-				SpanId:          "span456",
+				SpanID:          "span456",
 				Name:            "api-call",
 				DurationInNanos: 200084125,
 				StartTime:       mustParseTime("2025-10-28T11:13:56.585424Z"),
@@ -70,7 +70,7 @@ func TestParseSpanEntry(t *testing.T) {
 			},
 			expected: Span{
 				TraceID:         "trace789",
-				SpanId:          "span012",
+				SpanID:          "span012",
 				Name:            "processing",
 				DurationInNanos: 150000000,
 				StartTime:       mustParseTime("2025-10-28T12:00:00Z"),
@@ -89,7 +89,7 @@ func TestParseSpanEntry(t *testing.T) {
 			},
 			expected: Span{
 				TraceID:         "trace-minimal",
-				SpanId:          "span-minimal",
+				SpanID:          "span-minimal",
 				Name:            "minimal-span",
 				DurationInNanos: 0,
 				StartTime:       time.Time{},
@@ -110,7 +110,7 @@ func TestParseSpanEntry(t *testing.T) {
 			},
 			expected: Span{
 				TraceID:         "trace-null",
-				SpanId:          "span-null",
+				SpanID:          "span-null",
 				Name:            "null-span",
 				DurationInNanos: 0,
 				StartTime:       time.Time{},
@@ -131,7 +131,7 @@ func TestParseSpanEntry(t *testing.T) {
 			},
 			expected: Span{
 				TraceID:         "trace-invalid-time",
-				SpanId:          "span-invalid-time",
+				SpanID:          "span-invalid-time",
 				Name:            "invalid-time-span",
 				DurationInNanos: 50000000,
 				StartTime:       time.Time{},
@@ -152,7 +152,7 @@ func TestParseSpanEntry(t *testing.T) {
 			},
 			expected: Span{
 				TraceID:         "trace-non-string-time",
-				SpanId:          "span-non-string-time",
+				SpanID:          "span-non-string-time",
 				Name:            "non-string-time-span",
 				DurationInNanos: 75000000,
 				StartTime:       time.Time{},
@@ -173,7 +173,7 @@ func TestParseSpanEntry(t *testing.T) {
 			},
 			expected: Span{
 				TraceID:         "trace-zero",
-				SpanId:          "span-zero",
+				SpanID:          "span-zero",
 				Name:            "zero-duration-span",
 				DurationInNanos: 0,
 				StartTime:       mustParseTime("2025-10-28T15:00:00Z"),
@@ -194,7 +194,7 @@ func TestParseSpanEntry(t *testing.T) {
 			},
 			expected: Span{
 				TraceID:         "trace-large",
-				SpanId:          "span-large",
+				SpanID:          "span-large",
 				Name:            "large-duration-span",
 				DurationInNanos: 9223372036854775807,
 				StartTime:       mustParseTime("2025-10-28T16:00:00Z"),
@@ -212,8 +212,8 @@ func TestParseSpanEntry(t *testing.T) {
 				t.Errorf("TraceID: expected '%s', got '%s'", tt.expected.TraceID, result.TraceID)
 			}
 
-			if result.SpanId != tt.expected.SpanId {
-				t.Errorf("SpanId: expected '%s', got '%s'", tt.expected.SpanId, result.SpanId)
+			if result.SpanID != tt.expected.SpanID {
+				t.Errorf("SpanId: expected '%s', got '%s'", tt.expected.SpanID, result.SpanID)
 			}
 
 			if result.Name != tt.expected.Name {
@@ -252,7 +252,7 @@ func TestParseSpanEntry_SafeHandling(t *testing.T) {
 			},
 			expected: Span{
 				TraceID:         "",
-				SpanId:          "",
+				SpanID:          "",
 				Name:            "",
 				DurationInNanos: 100000,
 				StartTime:       time.Time{},
@@ -270,7 +270,7 @@ func TestParseSpanEntry_SafeHandling(t *testing.T) {
 			},
 			expected: Span{
 				TraceID:         "",
-				SpanId:          "",
+				SpanID:          "",
 				Name:            "",
 				DurationInNanos: 0,
 				StartTime:       time.Time{},
@@ -287,8 +287,8 @@ func TestParseSpanEntry_SafeHandling(t *testing.T) {
 				t.Errorf("TraceID: expected '%s', got '%s'", tt.expected.TraceID, result.TraceID)
 			}
 
-			if result.SpanId != tt.expected.SpanId {
-				t.Errorf("SpanId: expected '%s', got '%s'", tt.expected.SpanId, result.SpanId)
+			if result.SpanID != tt.expected.SpanID {
+				t.Errorf("SpanId: expected '%s', got '%s'", tt.expected.SpanID, result.SpanID)
 			}
 
 			if result.Name != tt.expected.Name {
@@ -314,8 +314,8 @@ func TestParseSpanEntry_EdgeCases(t *testing.T) {
 		if result.TraceID != "" {
 			t.Errorf("Expected empty TraceID, got '%s'", result.TraceID)
 		}
-		if result.SpanId != "" {
-			t.Errorf("Expected empty SpanId, got '%s'", result.SpanId)
+		if result.SpanID != "" {
+			t.Errorf("Expected empty SpanId, got '%s'", result.SpanID)
 		}
 		if result.Name != "" {
 			t.Errorf("Expected empty Name, got '%s'", result.Name)
@@ -336,8 +336,8 @@ func TestParseSpanEntry_EdgeCases(t *testing.T) {
 		if result.TraceID != "" {
 			t.Errorf("Expected empty TraceID, got '%s'", result.TraceID)
 		}
-		if result.SpanId != "" {
-			t.Errorf("Expected empty SpanId, got '%s'", result.SpanId)
+		if result.SpanID != "" {
+			t.Errorf("Expected empty SpanId, got '%s'", result.SpanID)
 		}
 		if result.Name != "" {
 			t.Errorf("Expected empty Name, got '%s'", result.Name)

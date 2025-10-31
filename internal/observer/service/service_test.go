@@ -435,7 +435,7 @@ func TestLoggingService_GetComponentTraces(t *testing.T) {
 				Spans: []opensearch.Span{
 					{
 						TraceID:         "trace-123",
-						SpanId:          "span-456",
+						SpanID:          "span-456",
 						Name:            "database-query",
 						DurationInNanos: 101018208,
 						StartTime:       mustParseTime("2024-01-01T10:00:00.000000Z"),
@@ -443,7 +443,7 @@ func TestLoggingService_GetComponentTraces(t *testing.T) {
 					},
 					{
 						TraceID:         "trace-124",
-						SpanId:          "span-457",
+						SpanID:          "span-457",
 						Name:            "api-call",
 						DurationInNanos: 200000000,
 						StartTime:       mustParseTime("2024-01-01T11:00:00.000000Z"),
@@ -544,7 +544,7 @@ func TestLoggingService_GetComponentTraces(t *testing.T) {
 				Spans: []opensearch.Span{
 					{
 						TraceID:         "trace-125",
-						SpanId:          "span-458",
+						SpanID:          "span-458",
 						Name:            "minimal-span",
 						DurationInNanos: 0,
 						StartTime:       time.Time{},
@@ -624,8 +624,8 @@ func TestLoggingService_GetComponentTraces(t *testing.T) {
 					t.Errorf("Span %d: Expected TraceID '%s', got '%s'", i, expectedSpan.TraceID, actualSpan.TraceID)
 				}
 
-				if actualSpan.SpanId != expectedSpan.SpanId {
-					t.Errorf("Span %d: Expected SpanId '%s', got '%s'", i, expectedSpan.SpanId, actualSpan.SpanId)
+				if actualSpan.SpanID != expectedSpan.SpanID {
+					t.Errorf("Span %d: Expected SpanId '%s', got '%s'", i, expectedSpan.SpanID, actualSpan.SpanID)
 				}
 
 				if actualSpan.Name != expectedSpan.Name {
