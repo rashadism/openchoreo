@@ -28,7 +28,6 @@ type LoggingService struct {
 	osClient     OpenSearchClient
 	queryBuilder *opensearch.QueryBuilder
 	config       *config.Config
-	k8sClient    *k8s.Client
 	logger       *slog.Logger
 }
 
@@ -40,13 +39,28 @@ type LogResponse struct {
 }
 
 // NewLoggingService creates a new logging service instance
-func NewLoggingService(osClient OpenSearchClient, cfg *config.Config, k8sClient *k8s.Client, logger *slog.Logger) *LoggingService {
+func NewLoggingService(osClient OpenSearchClient, cfg *config.Config, logger *slog.Logger) *LoggingService {
 	return &LoggingService{
 		osClient:     osClient,
 		queryBuilder: opensearch.NewQueryBuilder(cfg.OpenSearch.IndexPrefix),
 		config:       cfg,
-		k8sClient:    k8sClient,
 		logger:       logger,
+	}
+}
+
+// RCAService provides AI-powered root cause analysis functionality
+type RCAService struct {
+	k8sClient *k8s.Client
+	config    *config.Config
+	logger    *slog.Logger
+}
+
+// NewRCAService creates a new RCA service instance
+func NewRCAService(k8sClient *k8s.Client, cfg *config.Config, logger *slog.Logger) *RCAService {
+	return &RCAService{
+		k8sClient: k8sClient,
+		config:    cfg,
+		logger:    logger,
 	}
 }
 
@@ -252,8 +266,8 @@ type RCAResponse struct {
 	Labels       map[string]string `json:"labels"`
 }
 
-// KickoffRCA creates a Kubernetes job to perform root cause analysis
-func (s *LoggingService) KickoffRCA(ctx context.Context, req RCARequest) (*RCAResponse, error) {
+// TriggerRCA creates a Kubernetes job to perform root cause analysis
+func (s *RCAService) TriggerRCA(ctx context.Context, req RCARequest) (*RCAResponse, error) {
 	if !s.config.RCA.Enabled {
 		return nil, fmt.Errorf("AI RCA feature is not enabled")
 	}

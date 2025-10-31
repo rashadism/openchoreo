@@ -48,26 +48,26 @@ func main() {
 		log.Fatalf("Failed to initialize OpenSearch client: %v", err)
 	}
 
-	// Initialize Kubernetes k8sClient if RCA is enabled
-	var k8sClient *k8s.Client
+	// Initialize logging service
+	loggingService := service.NewLoggingService(osClient, cfg, logger)
+
+	// Initialize RCA service if enabled
+	var rcaService *service.RCAService
 	if cfg.RCA.Enabled {
-		k8sClient, err = k8s.NewClient()
+		k8sClient, err := k8s.NewClient()
 		if err != nil {
 			logger.Warn("Failed to initialize Kubernetes client, RCA features will be unavailable", "error", err)
-			k8sClient = nil
 		} else {
 			logger.Info("Kubernetes client initialized successfully")
+			rcaService = service.NewRCAService(k8sClient, cfg, logger)
 		}
 	}
-
-	// Initialize logging service
-	loggingService := service.NewLoggingService(osClient, cfg, k8sClient, logger)
 
 	// Initialize HTTP server
 	mux := http.NewServeMux()
 
 	// Initialize handlers
-	handler := handlers.NewHandler(loggingService, logger)
+	handler := handlers.NewHandler(loggingService, rcaService, logger)
 
 	// Health check endpoint
 	mux.HandleFunc("GET /health", handler.Health)

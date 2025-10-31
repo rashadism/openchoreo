@@ -16,6 +16,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -93,7 +94,7 @@ func (c *Client) CreateJob(ctx context.Context, spec JobSpec) (*batchv1.Job, err
 		},
 		Spec: batchv1.JobSpec{
 			TTLSecondsAfterFinished: spec.TTLSecondsAfterFinished,
-			BackoffLimit:            int32Ptr(3),
+			BackoffLimit:            ptr.To[int32](3),
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
@@ -183,11 +184,6 @@ func (c *Client) createContextConfigMap(ctx context.Context, namespace, name str
 	}
 
 	return nil
-}
-
-// int32Ptr returns a pointer to an int32 value
-func int32Ptr(i int32) *int32 {
-	return &i
 }
 
 // buildResourceRequirements creates ResourceRequirements from JobSpec

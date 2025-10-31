@@ -46,15 +46,17 @@ const (
 
 // Handler contains the HTTP handlers for the logging API
 type Handler struct {
-	service *service.LoggingService
-	logger  *slog.Logger
+	loggingService *service.LoggingService
+	rcaService     *service.RCAService
+	logger         *slog.Logger
 }
 
 // NewHandler creates a new handler instance
-func NewHandler(service *service.LoggingService, logger *slog.Logger) *Handler {
+func NewHandler(loggingService *service.LoggingService, rcaService *service.RCAService, logger *slog.Logger) *Handler {
 	return &Handler{
-		service: service,
-		logger:  logger,
+		loggingService: loggingService,
+		rcaService:     rcaService,
+		logger:         logger,
 	}
 }
 
@@ -168,7 +170,7 @@ func (h *Handler) GetComponentLogs(w http.ResponseWriter, r *http.Request) {
 
 	// Execute query
 	ctx := r.Context()
-	result, err := h.service.GetComponentLogs(ctx, params)
+	result, err := h.loggingService.GetComponentLogs(ctx, params)
 	if err != nil {
 		h.logger.Error("Failed to get component logs", "error", err)
 		h.writeErrorResponse(w, http.StatusInternalServerError, ErrorTypeInternalError, ErrorCodeInternalError, ErrorMsgFailedToRetrieveLogs)
@@ -218,7 +220,7 @@ func (h *Handler) GetProjectLogs(w http.ResponseWriter, r *http.Request) {
 
 	// Execute query
 	ctx := r.Context()
-	result, err := h.service.GetProjectLogs(ctx, params, req.ComponentIDs)
+	result, err := h.loggingService.GetProjectLogs(ctx, params, req.ComponentIDs)
 	if err != nil {
 		h.logger.Error("Failed to get project logs", "error", err)
 		h.writeErrorResponse(w, http.StatusInternalServerError, ErrorTypeInternalError, ErrorCodeInternalError, ErrorMsgFailedToRetrieveLogs)
@@ -262,7 +264,7 @@ func (h *Handler) GetGatewayLogs(w http.ResponseWriter, r *http.Request) {
 
 	// Execute query
 	ctx := r.Context()
-	result, err := h.service.GetGatewayLogs(ctx, params)
+	result, err := h.loggingService.GetGatewayLogs(ctx, params)
 	if err != nil {
 		h.logger.Error("Failed to get gateway logs", "error", err)
 		h.writeErrorResponse(w, http.StatusInternalServerError, ErrorTypeInternalError, ErrorCodeInternalError, ErrorMsgFailedToRetrieveLogs)
@@ -313,7 +315,7 @@ func (h *Handler) GetOrganizationLogs(w http.ResponseWriter, r *http.Request) {
 
 	// Execute query
 	ctx := r.Context()
-	result, err := h.service.GetOrganizationLogs(ctx, params, req.PodLabels)
+	result, err := h.loggingService.GetOrganizationLogs(ctx, params, req.PodLabels)
 	if err != nil {
 		h.logger.Error("Failed to get organization logs", "error", err)
 		h.writeErrorResponse(w, http.StatusInternalServerError, ErrorTypeInternalError, ErrorCodeInternalError, ErrorMsgFailedToRetrieveLogs)
@@ -326,7 +328,7 @@ func (h *Handler) GetOrganizationLogs(w http.ResponseWriter, r *http.Request) {
 // Health handles GET /health
 func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	if err := h.service.HealthCheck(ctx); err != nil {
+	if err := h.loggingService.HealthCheck(ctx); err != nil {
 		h.writeJSON(w, http.StatusServiceUnavailable, map[string]interface{}{
 			"status": "unhealthy",
 			"error":  err.Error(),
@@ -367,9 +369,9 @@ func (h *Handler) Analyze(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	result, err := h.service.KickoffRCA(ctx, req)
+	result, err := h.rcaService.TriggerRCA(ctx, req)
 	if err != nil {
-		h.logger.Error("Failed to kickoff AI RCA", "error", err)
+		h.logger.Error("Failed to trigger AI RCA", "error", err)
 
 		errMsg := err.Error()
 		switch {
