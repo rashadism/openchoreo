@@ -327,6 +327,13 @@ func TestQueryBuilder_BuildComponentTracesQuery(t *testing.T) {
 						},
 					},
 				},
+				"sort": []map[string]interface{}{
+					{
+						"startTime": map[string]interface{}{
+							"order": "desc",
+						},
+					},
+				},
 			},
 		},
 		{
@@ -336,6 +343,7 @@ func TestQueryBuilder_BuildComponentTracesQuery(t *testing.T) {
 				StartTime:   "2024-02-01T10:00:00Z",
 				EndTime:     "2024-02-01T20:00:00Z",
 				Limit:       0, // Should use this value
+				SortOrder:   "asc",
 			},
 			want: map[string]interface{}{
 				"size": 0,
@@ -361,6 +369,13 @@ func TestQueryBuilder_BuildComponentTracesQuery(t *testing.T) {
 									},
 								},
 							},
+						},
+					},
+				},
+				"sort": []map[string]interface{}{
+					{
+						"startTime": map[string]interface{}{
+							"order": "asc",
 						},
 					},
 				},

@@ -478,6 +478,13 @@ func (qb *QueryBuilder) BuildComponentTracesQuery(params ComponentTracesRequestP
 				},
 			},
 		},
+		"sort": []map[string]interface{}{
+			{
+				"startTime": map[string]interface{}{
+					"order": params.SortOrder,
+				},
+			},
+		},
 	}
 
 	return query

@@ -325,6 +325,34 @@ func (h *Handler) GetComponentTraces(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Input validations
+	err := validateTimes(req.StartTime, req.EndTime)
+	if err != nil {
+		h.logger.Debug("Invalid/missing request parameters", "requestBody", req, "error", err)
+		h.writeErrorResponse(w, http.StatusBadRequest, ErrorTypeInvalidRequest, ErrorCodeInvalidRequest, err.Error())
+		return
+	}
+
+	err = validateSortOrder(req.SortOrder)
+	if err != nil {
+		h.logger.Debug("Invalid sortOrder parameter", "requestBody", req, "error", err)
+		h.writeErrorResponse(w, http.StatusBadRequest, ErrorTypeInvalidRequest, ErrorCodeInvalidRequest, err.Error())
+		return
+	}
+
+	err = validateLimit(req.Limit)
+	if err != nil {
+		h.logger.Debug("Invalid limit parameter", "requestBody", req, "error", err)
+		h.writeErrorResponse(w, http.StatusBadRequest, ErrorTypeInvalidRequest, ErrorCodeInvalidRequest, err.Error())
+		return
+	}
+
+	if req.ServiceName == "" {
+		h.logger.Debug("Missing request parameters", "requestBody", req)
+		h.writeErrorResponse(w, http.StatusBadRequest, ErrorTypeMissingParameter, ErrorCodeMissingParameter, "Required field serviceName not found")
+		return
+	}
+
 	// Set defaults
 	if req.Limit == 0 {
 		req.Limit = 100
