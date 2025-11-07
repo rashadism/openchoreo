@@ -358,7 +358,6 @@ prometheus:
   thanosRuler:
     enabled: false # This section needs to be further configured for queryEndpoints etc.
 
-  ## Set the following flags to false when custom recording rules are added to templates
   ## Create default rules for monitoring the cluster
   defaultRules:
     create: false
@@ -384,6 +383,3 @@ prometheus:
     enabled: false
   nodeExporter:
     enabled: false
-
-  windowsMonitoring:
-    enabled: false # This is the base chart default, can be removed from values.yaml
