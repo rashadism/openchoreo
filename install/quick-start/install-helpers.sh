@@ -213,18 +213,7 @@ install_helm_chart() {
 install_data_plane() {
     log_info "Installing OpenChoreo Data Plane with gateway enabled..."
     install_helm_chart "openchoreo-data-plane" "openchoreo-data-plane" "$DATA_PLANE_NS" "true" "true" "1800" \
-        "--set" "gateway.enabled=true" \
-        "--set" "vault.enabled=false" \
-        "--set" "secrets-store-csi-driver.enabled=false" \
-        "--set" "registry.enabled=false" \
-        "--set" "cert-manager.enabled=false" \
-        "--set" "cert-manager.crds.enabled=false" \
-        "--set" "external-secrets.enabled=false" \
-        "--set" "networking.enabled=false" \
-        "--set" "security.enabled=false" \
-        "--set" "observability.enabled=false" \
-        "--set" "gateway.deployment.httpPort=8080" \
-        "--set" "gateway.deployment.httpsPort=8443"
+        "--values" "/app/openchoreo-dp-values.yaml"
 }
 
 # Install OpenChoreo Control Plane
