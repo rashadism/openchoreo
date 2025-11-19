@@ -128,6 +128,7 @@ openSearchDashboards:
   - name: DISABLE_SECURITY_DASHBOARDS_PLUGIN
     value: "true"
 
+  nameOverride: "opensearch-dashboards"
   fullnameOverride: "opensearch-dashboards"
   image:
     tag: "3.3.0"
