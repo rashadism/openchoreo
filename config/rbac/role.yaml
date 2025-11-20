@@ -50,9 +50,9 @@ rules:
   - update
   - watch
 - apiGroups:
-  - batch
+  - argoproj.io
   resources:
-  - cronjobs
+  - workflows
   verbs:
   - create
   - delete
@@ -62,9 +62,9 @@ rules:
   - update
   - watch
 - apiGroups:
-  - cilium.io
+  - batch
   resources:
-  - ciliumnetworkpolicies
+  - cronjobs
   verbs:
   - create
   - delete
@@ -102,7 +102,6 @@ rules:
 - apiGroups:
   - openchoreo.dev
   resources:
-  - addons
   - apibindings
   - apiclasses
   - apis
@@ -110,8 +109,9 @@ rules:
   - builds
   - componentdeployments
   - componentenvsnapshots
+  - componentreleases
   - components
-  - componenttypedefinitions
+  - componenttypes
   - dataplanes
   - deployableartifacts
   - deploymentpipelines
@@ -122,16 +122,21 @@ rules:
   - gitcommitrequests
   - organizations
   - projects
+  - releasebindings
   - releases
   - scheduledtaskbindings
   - scheduledtaskclasses
   - scheduledtasks
+  - secretreferences
   - servicebindings
   - serviceclasses
   - services
+  - traits
   - webapplicationbindings
   - webapplicationclasses
   - webapplications
+  - workflowruns
+  - workflows
   - workloads
   verbs:
   - create
@@ -144,7 +149,6 @@ rules:
 - apiGroups:
   - openchoreo.dev
   resources:
-  - addons/finalizers
   - apibindings/finalizers
   - apiclasses/finalizers
   - apis/finalizers
@@ -152,8 +156,9 @@ rules:
   - builds/finalizers
   - componentdeployments/finalizers
   - componentenvsnapshots/finalizers
+  - componentreleases/finalizers
   - components/finalizers
-  - componenttypedefinitions/finalizers
+  - componenttypes/finalizers
   - dataplanes/finalizers
   - deployableartifacts/finalizers
   - deploymentpipelines/finalizers
@@ -164,23 +169,27 @@ rules:
   - gitcommitrequests/finalizers
   - organizations/finalizers
   - projects/finalizers
+  - releasebindings/finalizers
   - releases/finalizers
   - scheduledtaskbindings/finalizers
   - scheduledtaskclasses/finalizers
   - scheduledtasks/finalizers
+  - secretreferences/finalizers
   - servicebindings/finalizers
   - serviceclasses/finalizers
   - services/finalizers
+  - traits/finalizers
   - webapplicationbindings/finalizers
   - webapplicationclasses/finalizers
   - webapplications/finalizers
+  - workflowruns/finalizers
+  - workflows/finalizers
   - workloads/finalizers
   verbs:
   - update
 - apiGroups:
   - openchoreo.dev
   resources:
-  - addons/status
   - apibindings/status
   - apiclasses/status
   - apis/status
@@ -188,8 +197,9 @@ rules:
   - builds/status
   - componentdeployments/status
   - componentenvsnapshots/status
+  - componentreleases/status
   - components/status
-  - componenttypedefinitions/status
+  - componenttypes/status
   - dataplanes/status
   - deployableartifacts/status
   - deploymentpipelines/status
@@ -200,16 +210,21 @@ rules:
   - gitcommitrequests/status
   - organizations/status
   - projects/status
+  - releasebindings/status
   - releases/status
   - scheduledtaskbindings/status
   - scheduledtaskclasses/status
   - scheduledtasks/status
+  - secretreferences/status
   - servicebindings/status
   - serviceclasses/status
   - services/status
+  - traits/status
   - webapplicationbindings/status
   - webapplicationclasses/status
   - webapplications/status
+  - workflowruns/status
+  - workflows/status
   - workloads/status
   verbs:
   - get

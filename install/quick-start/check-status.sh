@@ -1,79 +1,58 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -eo pipefail
 
-# Namespace definitions
-CONTROL_PLANE_NS="openchoreo-control-plane"
-DATA_PLANE_NS="openchoreo-data-plane"
-BUILD_PLANE_NS="openchoreo-build-plane"
-IDENTITY_NS="openchoreo-identity-system"
-OBSERVABILITY_NS="openchoreo-observability-plane"
-CILIUM_NS="cilium"
+# Source shared configuration
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/.config.sh"
 
 # Component groups organized by architectural layers (bash 3.2 compatible)
 get_component_group() {
     local group="$1"
     case "$group" in
-        "Networking") echo "cilium" ;;
-        "Control_Plane") echo "cert_manager_cp controller_manager api_server" ;;
-        "Data_Plane") echo "vault registry redis envoy_gateway external_gateway internal_gateway fluent_bit_dp" ;;
-        "Build_Plane") echo "build_plane" ;;
-        "Identity_Provider") echo "identity_provider" ;;
+        "Control_Plane") echo "cert_manager_cp controller_manager" ;; # TODO: add api_server, backstage and thunder
+        "Data_Plane") echo "envoy_gateway" ;;
+        "Build_Plane") echo "argo_workflow_controller registry" ;;
         "Observability_Plane") echo "opensearch opensearch_dashboard observer" ;;
-        "Backstage_Demo") echo "backstage" ;;
         *) echo "" ;;
     esac
 }
 
 # Group order for display (using underscores for bash compatibility)
-group_order=("Networking" "Control_Plane" "Data_Plane" "Build_Plane" "Identity_Provider" "Observability_Plane" "Backstage_Demo")
+group_order=("Control_Plane" "Data_Plane" "Build_Plane" "Observability_Plane")
 
 # Group display names
 get_group_display_name() {
     local group="$1"
     case "$group" in
-        "Networking") echo "Networking" ;;
         "Control_Plane") echo "Control Plane" ;;
         "Data_Plane") echo "Data Plane" ;;
         "Build_Plane") echo "Build Plane" ;;
-        "Identity_Provider") echo "Identity Provider" ;;
         "Observability_Plane") echo "Observability Plane" ;;
-        "Backstage_Demo") echo "Backstage Demo" ;;
         *) echo "$group" ;;
     esac
 }
 
 # Component lists for multi-cluster mode (kept for backward compatibility)
 components_cp=("cert_manager_cp" "controller_manager" "api_server")
-components_dp=(
-    "cilium" "vault" "registry" "redis" "envoy_gateway"
-    "external_gateway" "internal_gateway" "fluent_bit_dp"
-    "build_plane" "identity_provider" "opensearch" "opensearch_dashboard" "observer"
-)
+components_dp=("envoy_gateway")
 
-# Core vs optional component classification
-core_components=("cilium" "cert_manager_cp" "controller_manager" "api_server" "vault" "registry" "redis" "envoy_gateway" "external_gateway" "internal_gateway" "fluent_bit_dp")
-optional_components=("build_plane" "identity_provider" "opensearch" "opensearch_dashboard" "observer" "backstage")
+# Core vs optional component classification (used in multi-cluster mode)
+core_components=("cert_manager_cp" "controller_manager" "api_server" "envoy_gateway")
+optional_components=("opensearch" "opensearch_dashboard" "observer")
 
 # Function to get component configuration (namespace:label)
 get_component_config() {
     local component="$1"
     case "$component" in
-        "cilium") echo "$CILIUM_NS:k8s-app=cilium" ;;
         "cert_manager_cp") echo "$CONTROL_PLANE_NS:app.kubernetes.io/name=cert-manager" ;;
         "controller_manager") echo "$CONTROL_PLANE_NS:app.kubernetes.io/name=openchoreo-control-plane,app.kubernetes.io/component=controller-manager" ;;
         "api_server") echo "$CONTROL_PLANE_NS:app.kubernetes.io/name=openchoreo-control-plane,app.kubernetes.io/component=api-server" ;;
-        "vault") echo "$DATA_PLANE_NS:app.kubernetes.io/name=hashicorp-vault" ;;
-        "registry") echo "$DATA_PLANE_NS:app=registry" ;;
-        "redis") echo "$DATA_PLANE_NS:app=redis" ;;
         "envoy_gateway") echo "$DATA_PLANE_NS:app.kubernetes.io/name=gateway-helm" ;;
-        "external_gateway") echo "$DATA_PLANE_NS:gateway.envoyproxy.io/owning-gateway-name=gateway-external" ;;
-        "internal_gateway") echo "$DATA_PLANE_NS:gateway.envoyproxy.io/owning-gateway-name=gateway-internal" ;;
-        "fluent_bit_dp") echo "$DATA_PLANE_NS:app.kubernetes.io/component=fluent-bit" ;;
-        "build_plane") echo "$BUILD_PLANE_NS:app.kubernetes.io/name=argo-workflows-workflow-controller" ;;
-        "identity_provider") echo "$IDENTITY_NS:app.kubernetes.io/name=identity-provider" ;;
-        "opensearch") echo "$OBSERVABILITY_NS:app.kubernetes.io/component=opensearch" ;;
-        "opensearch_dashboard") echo "$OBSERVABILITY_NS:app.kubernetes.io/component=opensearch-dashboard" ;;
+        "argo_workflow_controller") echo "$BUILD_PLANE_NS:app.kubernetes.io/name=argo-workflows-workflow-controller" ;;
+        "registry") echo "$BUILD_PLANE_NS:app=registry" ;;
+        "opensearch") echo "$OBSERVABILITY_NS:app.kubernetes.io/component=opensearch-master" ;;
+        "opensearch_dashboard") echo "$OBSERVABILITY_NS:app.kubernetes.io/name=opensearch-dashboards" ;;
         "observer") echo "$OBSERVABILITY_NS:app.kubernetes.io/component=observer" ;;
-        "backstage") echo "$CONTROL_PLANE_NS:app.kubernetes.io/name=backstage" ;;
         *) echo "unknown:unknown" ;;
     esac
 }
@@ -159,9 +138,6 @@ print_grouped_components() {
         # Determine group type
         local group_type=""
         case "$group" in
-            "Networking")
-                group_type="Infrastructure"
-                ;;
             "Control_Plane")
                 group_type="Core"
                 ;;
@@ -171,27 +147,23 @@ print_grouped_components() {
             "Build_Plane")
                 group_type="Optional"
                 ;;
-            "Identity_Provider")
-                group_type="Optional"
-                ;;
             "Observability_Plane")
-                group_type="Optional"
-                ;;
-            "Backstage_Demo")
                 group_type="Optional"
                 ;;
         esac
 
         echo ""
-        # Calculate the proper line length for consistent borders
-        local line_length=65
+        # Fixed width: 70 characters total
+        local total_width=70
+        local header_text="${group_display_name} (${group_type})"
+        local header_length=${#header_text}
+        local dashes_length=$((total_width - header_length - 5))  # 5 for "+- ", " ", and "+"
         local header_padding=""
-        local remaining_length=$((line_length - ${#group_display_name} - ${#group_type} - 6))  # 6 for "+- " + " (" + ") "
-        for ((i=0; i<remaining_length; i++)); do
+        for ((i=0; i<dashes_length; i++)); do
             header_padding="${header_padding}-"
         done
 
-        printf "+- %s (%s) %s+\n" "$group_display_name" "$group_type" "$header_padding"
+        printf "+- %s %s+\n" "$header_text" "$header_padding"
 
         for component in "${components[@]}"; do
             local status
@@ -199,23 +171,24 @@ print_grouped_components() {
             local status_text
             status_text=$(get_status_text "$status")
 
-            # Calculate padding for right border alignment
-            local content_length=$((25 + ${#status_text} + 1))  # 25 for component width, 1 for space
-            local padding_needed=$((line_length - content_length - 4))  # 4 for "| " + " |"
+            # Fixed layout: "| component (25 chars) status (rest) |"
+            local content="${component} ${status_text}"
+            local content_length=${#content}
+            local padding_length=$((total_width - content_length - 4))  # 4 for "| " and " |"
             local padding=""
-            for ((i=0; i<padding_needed; i++)); do
+            for ((i=0; i<padding_length; i++)); do
                 padding="${padding} "
             done
 
-            printf "| %-25s %s%s|\n" "$component" "$status_text" "$padding"
+            printf "| %s %s%s |\n" "$component" "$status_text" "$padding"
         done
 
-        # Bottom border
-        local bottom_line=""
-        for ((i=0; i<line_length; i++)); do
-            bottom_line="${bottom_line}-"
+        # Bottom border - exact width
+        printf "+"
+        for ((i=0; i<total_width-2; i++)); do
+            printf "-"
         done
-        printf "+%s+\n" "$bottom_line"
+        printf "+\n"
     done
 
     echo ""
