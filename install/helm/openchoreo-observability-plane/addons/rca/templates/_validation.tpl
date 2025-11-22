@@ -6,6 +6,17 @@ This template validates that required LLM configuration is provided based on the
 {{- define "openchoreo-observer-rca.validateLLMConfig" -}}
 {{- $provider := .Values.rcaService.llm.provider -}}
 
+{{/* Validate provider value */}}
+{{- $validProviders := list "openai" "anthropic" "azureopenai" "googlegenai" -}}
+{{- if not (has $provider $validProviders) -}}
+  {{- fail (printf "\n\nERROR: Unsupported provider '%s'.\n\nValid providers are: %s\n\nSet the provider using:\n  --set rcaService.llm.provider=\"<provider>\"\n" $provider (join ", " $validProviders)) -}}
+{{- end -}}
+
+{{/* Validate model name is provided */}}
+{{- if not .Values.rcaService.llm.modelName -}}
+  {{- fail "\n\nERROR: rcaService.llm.modelName is required.\n\nProvide the model name using:\n  --set rcaService.llm.modelName=\"your-model-name\"\n\nExamples:\n  Anthropic: claude-sonnet-4-5, claude-3-5-sonnet-20241022\n  OpenAI: gpt-5, gpt-4-turbo\n  Azure OpenAI: (same as azure.deployment)\n  Google: gemini-2.0-flash-exp, gemini-1.5-pro\n" -}}
+{{- end -}}
+
 {{/* Validate API key is provided when not using external secrets */}}
 {{- if not .Values.rcaService.llm.externalSecret.enabled -}}
   {{- if not .Values.rcaService.llm.apiKey -}}
@@ -34,17 +45,6 @@ This template validates that required LLM configuration is provided based on the
   {{- if not .Values.rcaService.llm.azure.deployment -}}
     {{- fail (printf "\n\nERROR: rcaService.llm.azure.deployment is required when provider is 'azureopenai'.\n\nProvide the deployment name using:\n  --set rcaService.llm.azure.deployment=\"your-deployment-name\"\n") -}}
   {{- end -}}
-{{- end -}}
-
-{{/* Validate provider value */}}
-{{- $validProviders := list "openai" "anthropic" "azureopenai" "googlegenai" -}}
-{{- if not (has $provider $validProviders) -}}
-  {{- fail (printf "\n\nERROR: Unsupported provider '%s'.\n\nValid providers are: %s\n\nSet the provider using:\n  --set rcaService.llm.provider=\"<provider>\"\n" $provider (join ", " $validProviders)) -}}
-{{- end -}}
-
-{{/* Validate model name is provided */}}
-{{- if not .Values.rcaService.llm.modelName -}}
-  {{- fail "\n\nERROR: rcaService.llm.modelName is required.\n\nProvide the model name using:\n  --set rcaService.llm.modelName=\"your-model-name\"\n\nExamples:\n  Anthropic: claude-sonnet-4-5, claude-3-5-sonnet-20241022\n  OpenAI: gpt-5, gpt-4-turbo\n  Azure OpenAI: (same as azure.deployment)\n  Google: gemini-2.0-flash-exp, gemini-1.5-pro\n" -}}
 {{- end -}}
 
 {{- end -}}
