@@ -25,9 +25,9 @@ spec:
     spec:
       securityContext:
         runAsNonRoot: true
-        runAsUser: 65532
-        runAsGroup: 65532
-        fsGroup: 65532
+        runAsUser: 12000
+        runAsGroup: 12000
+        fsGroup: 12000
       containers:
       - name: {{ .Values.rcaService.name }}
         image: "{{ .Values.rcaService.image.repository }}:{{ .Values.rcaService.image.tag | default .Chart.AppVersion }}"
@@ -115,9 +115,6 @@ spec:
 
         securityContext:
           allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - ALL
-          readOnlyRootFilesystem: true
+          readOnlyRootFilesystem: false
           runAsNonRoot: true
-          runAsUser: 65532
+          runAsUser: 12000
