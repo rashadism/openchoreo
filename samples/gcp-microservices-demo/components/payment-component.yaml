@@ -1,17 +1,18 @@
 apiVersion: openchoreo.dev/v1alpha1
 kind: Component
 metadata:
-  name: email
+  name: payment
   namespace: default
 spec:
   owner:
     projectName: gcp-microservice-demo
 
   componentType: deployment/service
+  autoDeploy: true
 
   parameters:
     replicas: 1
-    port: 5000
+    port: 50051
     resources:
       requests:
         cpu: "50m"
@@ -25,31 +26,17 @@ spec:
 apiVersion: openchoreo.dev/v1alpha1
 kind: Workload
 metadata:
-  name: email
+  name: payment
   namespace: default
 spec:
   owner:
-    componentName: email
+    componentName: payment
     projectName: gcp-microservice-demo
   containers:
     main:
-      image: us-central1-docker.pkg.dev/google-samples/microservices-demo/emailservice:v0.10.3
+      image: us-central1-docker.pkg.dev/google-samples/microservices-demo/paymentservice:v0.10.3
       env:
         - key: DISABLE_PROFILER
           value: "1"
         - key: PORT
-          value: "5000"
-
----
-
-apiVersion: openchoreo.dev/v1alpha1
-kind: ComponentDeployment
-metadata:
-  name: email-development
-  namespace: default
-spec:
-  owner:
-    projectName: gcp-microservice-demo
-    componentName: email
-
-  environment: development
+          value: "50051"

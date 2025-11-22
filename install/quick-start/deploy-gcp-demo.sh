@@ -53,13 +53,11 @@ fi
 if [[ "$CLEAN_MODE" == "true" ]]; then
     log_info "Deleting the GCP Microservices Demo..."
 
-    # Delete in reverse order (components before project)
-    for file in "$SAMPLE_DIR"/*-component.yaml; do
-        if [[ -f "$file" ]]; then
-            log_info "Deleting $(basename "$file")..."
-            kubectl delete -f "$file" 2>/dev/null || log_warning "  Resource may not exist"
-        fi
-    done
+    # Delete components first
+    if [[ -d "$SAMPLE_DIR/components" ]]; then
+        log_info "Deleting components..."
+        kubectl delete -f "$SAMPLE_DIR/components/" 2>/dev/null || log_warning "  Components may not exist"
+    fi
 
     # Delete project last
     if [[ -f "$SAMPLE_DIR/gcp-microservice-demo-project.yaml" ]]; then
@@ -88,7 +86,7 @@ fi
 # Apply all component files
 log_info "Deploying microservices..."
 component_count=0
-for file in "$SAMPLE_DIR"/*-component.yaml; do
+for file in "$SAMPLE_DIR"/components/*-component.yaml; do
     if [[ -f "$file" ]]; then
         component_name=$(basename "$file" | sed 's/-component.yaml//')
         log_info "  Deploying $component_name..."
@@ -104,23 +102,23 @@ done
 
 log_success "Deployed $component_count microservices"
 
-# Wait for all ComponentDeployments to be synced
-log_info "Waiting for ComponentDeployments to sync..."
+# Wait for all ReleaseBindings to be synced
+log_info "Waiting for ReleaseBindings to sync..."
 elapsed=0
 while true; do
-    # Count total ComponentDeployments for this project
-    total=$(kubectl get componentdeployment -n "$NAMESPACE" -o json 2>/dev/null | jq -r "[.items[] | select(.spec.owner.projectName == \"$PROJECT_NAME\")] | length" || echo "0")
+    # Count total ReleaseBindings for this project
+    total=$(kubectl get releasebinding -n "$NAMESPACE" -o json 2>/dev/null | jq -r "[.items[] | select(.spec.owner.projectName == \"$PROJECT_NAME\")] | length" || echo "0")
 
-    # Count synced ComponentDeployments
-    synced=$(kubectl get componentdeployment -n "$NAMESPACE" -o json 2>/dev/null | jq -r "[.items[] | select(.spec.owner.projectName == \"$PROJECT_NAME\") | select(.status.conditions[]? | select(.type==\"ReleaseSynced\" and .status==\"True\"))] | length" || echo "0")
+    # Count synced ReleaseBindings
+    synced=$(kubectl get releasebinding -n "$NAMESPACE" -o json 2>/dev/null | jq -r "[.items[] | select(.spec.owner.projectName == \"$PROJECT_NAME\") | select(.status.conditions[]? | select(.type==\"ReleaseSynced\" and .status==\"True\"))] | length" || echo "0")
 
     if [[ "$total" -gt 0 ]] && [[ "$synced" -eq "$total" ]]; then
-        log_success "All $total ComponentDeployments synced with Releases"
+        log_success "All $total ReleaseBindings synced with Releases"
         break
     fi
 
     if [[ $elapsed -ge $MAX_WAIT ]]; then
-        log_error "Timeout waiting for ComponentDeployments to sync (${MAX_WAIT}s)"
+        log_error "Timeout waiting for ReleaseBindings to sync (${MAX_WAIT}s)"
         log_info "Synced: $synced / Total: $total"
         exit 1
     fi

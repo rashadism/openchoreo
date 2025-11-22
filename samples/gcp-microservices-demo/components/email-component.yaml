@@ -1,17 +1,18 @@
 apiVersion: openchoreo.dev/v1alpha1
 kind: Component
 metadata:
-  name: productcatalog
+  name: email
   namespace: default
 spec:
   owner:
     projectName: gcp-microservice-demo
 
   componentType: deployment/service
+  autoDeploy: true
 
   parameters:
     replicas: 1
-    port: 3550
+    port: 5000
     resources:
       requests:
         cpu: "50m"
@@ -25,31 +26,17 @@ spec:
 apiVersion: openchoreo.dev/v1alpha1
 kind: Workload
 metadata:
-  name: productcatalog
+  name: email
   namespace: default
 spec:
   owner:
-    componentName: productcatalog
+    componentName: email
     projectName: gcp-microservice-demo
   containers:
     main:
-      image: us-central1-docker.pkg.dev/google-samples/microservices-demo/productcatalogservice:v0.10.3
+      image: us-central1-docker.pkg.dev/google-samples/microservices-demo/emailservice:v0.10.3
       env:
         - key: DISABLE_PROFILER
           value: "1"
         - key: PORT
-          value: "3550"
-
----
-
-apiVersion: openchoreo.dev/v1alpha1
-kind: ComponentDeployment
-metadata:
-  name: productcatalog-development
-  namespace: default
-spec:
-  owner:
-    projectName: gcp-microservice-demo
-    componentName: productcatalog
-
-  environment: development
+          value: "5000"

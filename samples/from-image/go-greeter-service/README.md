@@ -32,8 +32,8 @@ First, get the service URL from the HTTPRoute:
 
 ```bash
 # Get the hostname and path prefix from the HTTPRoute
-HOSTNAME=$(kubectl get httproute -A -l openchoreo.org/component=greeter-service -o jsonpath='{.items[0].spec.hostnames[0]}')
-PATH_PREFIX=$(kubectl get httproute -A -l openchoreo.org/component=greeter-service -o jsonpath='{.items[0].spec.rules[0].matches[0].path.value}')
+HOSTNAME=$(kubectl get httproute -A -l openchoreo.dev/component=greeter-service -o jsonpath='{.items[0].spec.hostnames[0]}')
+PATH_PREFIX=$(kubectl get httproute -A -l openchoreo.dev/component=greeter-service -o jsonpath='{.items[0].spec.rules[0].matches[0].path.value}')
 ```
 
 ### Basic Greet
@@ -55,19 +55,24 @@ curl http://development.openchoreoapis.localhost:9080/greeter-service/greeter/gr
 
 If you cannot access the service:
 
-1. Check if the ComponentDeployment is ready:
+1. Check if the ReleaseBinding is ready:
    ```bash
-   kubectl get componentdeployment greeter-service-development -o yaml
+   kubectl get releasebinding greeter-service-development -n default -o yaml
    ```
 
-2. Check the Release status and resources:
+2. Check the ReleaseBinding status conditions:
    ```bash
-   kubectl get release greeter-service-development -o yaml
+   kubectl get releasebinding greeter-service-development -n default -o jsonpath='{.status.conditions}' | jq .
    ```
 
 3. Verify the HTTPRoute is configured correctly:
    ```bash
-   kubectl get httproute -A -l openchoreo.org/component=greeter-service -o yaml
+   kubectl get httproute -A -l openchoreo.dev/component=greeter-service -o yaml
+   ```
+
+4. Check the deployment status:
+   ```bash
+   kubectl get deployment -A -l openchoreo.dev/component=greeter-service
    ```
 
 ## Clean Up
