@@ -124,10 +124,50 @@ otelTracesIndexTemplate='
   }
 }'
 
+# Template for indices which hold RCA reports
+rcaReportsIndexTemplate='
+{
+  "index_patterns": [
+    "rca-reports-*"
+  ],
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 1
+    },
+    "mappings": {
+      "properties": {
+        "@timestamp": {
+          "type": "date"
+        },
+        "reportId": {
+          "type": "keyword"
+        },
+        "alertId": {
+          "type": "keyword"
+        },
+        "status": {
+          "type": "keyword"
+        },
+        "environmentId": {
+          "type": "keyword"
+        },
+        "organizationId": {
+          "type": "keyword"
+        },
+        "report": {
+          "type": "object",
+          "enabled": true
+        }
+      }
+    }
+  }
+}'
+
 # The following array holds pairs of index template names and their definitions. Define more templates above
 # and add them to this array.
 # Format: (templateName1 templateDefinition1 templateName2 templateDefinition2 ...)
-indexTemplates=("container-logs" "containerLogsIndexTemplate" "otel-traces" "otelTracesIndexTemplate")
+indexTemplates=("container-logs" "containerLogsIndexTemplate" "otel-traces" "otelTracesIndexTemplate" "rca-reports" "rcaReportsIndexTemplate")
 
 # Create index templates through a loop using the above array
 echo "Creating index templates..."
