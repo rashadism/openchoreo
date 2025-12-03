@@ -92,6 +92,22 @@ spec:
               key: RCA_AZURE_DEPLOYMENT
         {{- end }}
 
+        # OpenSearch Configuration
+        - name: OPENSEARCH_ADDRESS
+          value: "https://opensearch:9200"
+
+        - name: OPENSEARCH_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: observer-opensearch
+              key: username
+
+        - name: OPENSEARCH_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: observer-opensearch
+              key: password
+
         resources:
           {{- toYaml .Values.rcaService.resources | nindent 10 }}
 
