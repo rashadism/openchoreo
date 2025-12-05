@@ -20,6 +20,7 @@ spec:
         {{- else }}
         checksum/llm-external-secret: {{ include (print $.Template.BasePath "/rca-llm-external-secret.yaml") . | sha256sum }}
         {{- end }}
+        checksum/opensearch-secret: {{ include (print $.Template.BasePath "/rca-opensearch-secret.yaml") . | sha256sum }}
       labels:
         {{- include "openchoreo-observer-rca.componentSelectorLabels" (dict "context" . "component" .Values.rcaService.name) | nindent 8 }}
     spec:
@@ -99,13 +100,13 @@ spec:
         - name: OPENSEARCH_USERNAME
           valueFrom:
             secretKeyRef:
-              name: observer-opensearch
+              name: {{ include "openchoreo-observer-rca.fullname" . }}-opensearch-secret
               key: username
 
         - name: OPENSEARCH_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: observer-opensearch
+              name: {{ include "openchoreo-observer-rca.fullname" . }}-opensearch-secret
               key: password
 
         resources:
