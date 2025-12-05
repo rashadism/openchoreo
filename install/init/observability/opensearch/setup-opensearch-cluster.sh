@@ -149,16 +149,19 @@ rcaReportsIndexTemplate='
         "status": {
           "type": "keyword"
         },
-        "environmentId": {
-          "type": "keyword"
+        "version": {
+          "type": "integer"
         },
-        "organizationId": {
-          "type": "keyword"
+        "resource": {
+          "properties": {
+            "openchoreo.dev/environment-uid": {
+              "type": "keyword"
+            },
+            "openchoreo.dev/organization-uid": {
+              "type": "keyword"
+            }
+          }
         },
-        "report": {
-          "type": "object",
-          "enabled": true
-        }
       }
     }
   }
