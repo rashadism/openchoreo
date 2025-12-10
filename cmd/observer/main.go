@@ -93,6 +93,11 @@ func main() {
 	mux.HandleFunc("DELETE /api/alerting/rule/{sourceType}/{ruleName}", handler.DeleteAlertingRule)
 	mux.HandleFunc("POST /api/alerting/webhook/{secret}", handler.AlertingWebhook) // Internal webhook for alerting
 
+	// API routes - RCA Reports
+	// TODO: Remove temporary RCA service availability check middleware
+	mux.HandleFunc("POST /api/rca-reports/project/{projectUid}", requireRCAService(handler.GetRCAReportsByProject, logger))
+	mux.HandleFunc("GET /api/rca-reports/alert/{alertId}", requireRCAService(handler.GetRCAReportByAlert, logger))
+
 	// MCP endpoint
 	mux.Handle("/mcp", mcp.NewHTTPServer(&mcp.MCPHandler{Service: loggingService}))
 
@@ -215,4 +220,19 @@ func initJWTMiddleware(logger *slog.Logger) func(http.Handler) http.Handler {
 	}
 
 	return jwt.Middleware(config)
+}
+
+// requireRCAService wraps a handler and checks if the RCA service is available
+func requireRCAService(next http.HandlerFunc, logger *slog.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		client := &http.Client{Timeout: 2 * time.Second}
+		resp, err := client.Get("http://ai-rca-agent:8080/health")
+		if err != nil || resp.StatusCode != http.StatusOK {
+			logger.Debug("RCA service not available", "endpoint", r.URL.Path)
+			http.Error(w, "RCA service not available", http.StatusServiceUnavailable)
+			return
+		}
+		resp.Body.Close()
+		next(w, r)
+	}
 }
