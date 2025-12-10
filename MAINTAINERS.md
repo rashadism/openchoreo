@@ -7,7 +7,7 @@ All project decisions follow the OpenChoreo Governance Policy and are driven by 
 Core Maintainers have merge authority across the entire repository and are responsible for stewardship of the project’s long-term roadmap and architectural consistency. Core Maintainers are expected to remain active, participate in design discussions, and provide timely reviews.
 - Sameera Jayasoma ([@sameerajayasoma](https://github.com/sameerajayasoma))
 - Lakmal Warusawithana ([@lakwarus](https://github.com/lakwarus))
-- Binura Gunasekara ([@binurag](https://github.com/binurag))
+- Binura Gunasekara ([@binura-g](https://github.com/binura-g))
 - Tishan Dahanayaka ([@tishan89](https://github.com/tishan89))
 - Miraj Abeysekara ([@Mirage20](https://github.com/Mirage20))
 
