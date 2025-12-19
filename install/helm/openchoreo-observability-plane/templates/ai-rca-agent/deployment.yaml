@@ -55,7 +55,7 @@ spec:
 
         # OpenSearch Configuration
         - name: OPENSEARCH_ADDRESS
-          value: "https://opensearch:9200"
+          value: {{ .Values.rca.opensearch.address | default "https://opensearch:9200" | quote }}
 
         - name: OPENSEARCH_USERNAME
           valueFrom:

@@ -741,3 +741,7 @@ rca:
 
     # API key can be set via: --set rca.llm.apiKey="your-key" during helm install/upgrade
     apiKey: ""
+
+  # OpenSearch Configuration for RCA agent
+  opensearch:
+    address: "https://opensearch:9200"
