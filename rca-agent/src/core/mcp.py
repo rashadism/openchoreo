@@ -6,6 +6,7 @@ import logging
 from langchain_core.tools import BaseTool
 from langchain_mcp_adapters.client import MultiServerMCPClient, StreamableHttpConnection
 
+from src.core.auth import get_oauth2_auth
 from src.core.config import settings
 from src.core.constants import obs_tools, oc_tools
 
@@ -21,6 +22,7 @@ MCP_CONFIG: dict[str, dict] = {
             obs_tools.GET_PROJECT_LOGS,
             obs_tools.GET_COMPONENT_RESOURCE_METRICS,
         ],
+        "requires_auth": True,
     },
     "openchoreo": {
         "env_url_key": "mcp_openchoreo_url",
@@ -30,18 +32,24 @@ MCP_CONFIG: dict[str, dict] = {
             oc_tools.LIST_PROJECTS,
             oc_tools.LIST_COMPONENTS,
         ],
+        "requires_auth": True,
     },
 }
 
 
 class MCPClient:
     def __init__(self):
-        mcp_config = {
-            name: StreamableHttpConnection(
-                transport="streamable_http", url=getattr(settings, config["env_url_key"])
-            )
-            for name, config in MCP_CONFIG.items()
-        }
+        oauth_auth = get_oauth2_auth()
+
+        mcp_config = {}
+        for name, config in MCP_CONFIG.items():
+            connection: StreamableHttpConnection = {
+                "transport": "streamable_http",
+                "url": getattr(settings, config["env_url_key"]),
+            }
+            if config.get("requires_auth") and oauth_auth:
+                connection["auth"] = oauth_auth
+            mcp_config[name] = connection
 
         self._client = MultiServerMCPClient(mcp_config)
         logger.info("Initialized MCP client with servers: %s", list(mcp_config.keys()))

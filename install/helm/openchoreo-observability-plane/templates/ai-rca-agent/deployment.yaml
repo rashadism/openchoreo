@@ -38,7 +38,7 @@ spec:
           value: {{ .Values.rca.observerMcpUrl | default (printf "http://observer.%s.svc.cluster.local:8080/mcp" .Release.Namespace) | quote }}
 
         - name: OPENCHOREO_MCP_URL
-          value: {{ .Values.rca.openchoreoMcpUrl | default (printf "http://openchoreo-api.%s.svc.cluster.local:8080/mcp" .Values.rca.controlPlaneNamespace) | quote }}
+          value: {{ .Values.rca.openchoreoMcpUrl | default "http://openchoreo-api.openchoreo-control-plane.svc.cluster.local:8080/mcp" | quote }}
 
         # LLM Configuration
         - name: RCA_MODEL_NAME
@@ -68,6 +68,19 @@ spec:
             secretKeyRef:
               name: {{ include "openchoreo-observability-plane.fullname" . }}-rca-opensearch-secret
               key: password
+
+        # OAuth2 Client Credentials Configuration
+        - name: OAUTH_TOKEN_URL
+          value: {{ .Values.rca.oauth.tokenUrl | quote }}
+
+        - name: OAUTH_CLIENT_ID
+          value: {{ .Values.rca.oauth.clientId | quote }}
+
+        - name: OAUTH_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "openchoreo-observability-plane.fullname" . }}-rca-oauth-secret
+              key: client-secret
 
         resources:
           {{- toYaml .Values.rca.resources | nindent 10 }}

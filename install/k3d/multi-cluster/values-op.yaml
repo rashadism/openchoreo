@@ -73,3 +73,8 @@ gateway:
 
 tls:
   enabled: true
+
+rca:
+  openchoreoMcpUrl: "https://api.openchoreo.localhost:8080/mcp"
+  oauth:
+    tokenUrl: "https://thunder.openchoreo.localhost:8443/oauth2/token"

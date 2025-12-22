@@ -33,5 +33,10 @@ class Settings(BaseSettings):
     opensearch_username: str = "admin"
     opensearch_password: str = "ThisIsTheOpenSearchPassword1"
 
+    # OAuth2 Client Credentials
+    oauth_token_url: str = ""
+    oauth_client_id: str = ""
+    oauth_client_secret: str = ""
+
 
 settings = Settings()
