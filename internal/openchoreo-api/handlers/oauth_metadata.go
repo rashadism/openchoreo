@@ -12,7 +12,7 @@ import (
 )
 
 // OAuthProtectedResourceMetadata handles requests for OAuth 2.0 protected resource metadata
-// as defined in RFC 8693 and related OAuth standards
+// as defined in RFC 9728 and related OAuth standards
 func (h *Handler) OAuthProtectedResourceMetadata(w http.ResponseWriter, r *http.Request) {
 	// Get configuration from environment variables
 	serverBaseURL := os.Getenv(config.EnvServerBaseURL)

@@ -40,17 +40,21 @@ func NewMetadataHandler(config MetadataHandlerConfig) http.HandlerFunc {
 			ScopesSupported: []string{},
 		}
 
-		// Set response headers
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-
-		// Encode and send response
-		if err := json.NewEncoder(w).Encode(metadata); err != nil {
+		// Encode to ensure no errors before committing response
+		data, err := json.Marshal(metadata)
+		if err != nil {
 			if config.Logger != nil {
 				config.Logger.Error("Failed to encode OAuth metadata response", slog.Any("error", err))
 			}
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
+		}
+
+		// Set response headers and write response
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		if _, err := w.Write(data); err != nil && config.Logger != nil {
+			config.Logger.Error("Failed to write OAuth metadata response", slog.Any("error", err))
 		}
 	}
 }
