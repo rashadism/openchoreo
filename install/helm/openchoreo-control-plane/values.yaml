@@ -670,9 +670,8 @@ thunder:
     defaultApps:
       - clientId: "customer-portal-client"
         clientSecret: "supersecret"
-        redirectUrls:
-          - "http://localhost:3000/auth/callback"
-          - "http://localhost:3000/auth/handler"
+      # - clientId: "openchoreo-rca-agent"
+      #   clientSecret: "openchoreo-rca-agent-secret"
 
 # Cluster Gateway configuration
 # The gateway manages WebSocket connections from cluster agents

@@ -1,13 +1,10 @@
 # Git
-.git/
-.github/
 .gitignore
 .gitattributes
 
 # Docker
 Dockerfile
 .dockerignore
-docker-compose*.yml
 
 # Python
 __pycache__/
@@ -33,7 +30,6 @@ env/
 .vscode/
 .idea/
 .claude/
-CLAUDE.md
 *.swp
 *.swo
 *~

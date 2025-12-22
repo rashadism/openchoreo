@@ -3,6 +3,7 @@
 
 import logging
 from typing import Any
+from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
 from langchain_core.callbacks import UsageMetadataCallbackHandler
@@ -22,9 +23,9 @@ router = APIRouter()
 
 class AnalyzeRequest(BaseModel):
     rule_name: str = Field(alias="ruleName")
-    component_uid: str = Field(alias="componentUid")
-    project_uid: str = Field(alias="projectUid")
-    environment_uid: str = Field(alias="environmentUid")
+    component_uid: UUID = Field(alias="componentUid")
+    project_uid: UUID = Field(alias="projectUid")
+    environment_uid: UUID = Field(alias="environmentUid")
     alert_value: int = Field(alias="alertValue")
     timestamp: str
     alert_id: str = Field(alias="alertId")
@@ -60,9 +61,9 @@ async def analyze(request: AnalyzeRequest):
             report_id=report_id,
             alert_id=request.alert_id,
             status="pending",
-            environment_uid=request.environment_uid,
-            project_uid=request.project_uid,
-            component_uids=[request.component_uid],
+            environment_uid=str(request.environment_uid),
+            project_uid=str(request.project_uid),
+            component_uids=[str(request.component_uid)],
         )
         logger.info("Created pending RCA report: report_id=%s", report_id)
 
@@ -108,9 +109,9 @@ async def analyze(request: AnalyzeRequest):
                 alert_id=request.alert_id,
                 status="completed",
                 report=rca_report,
-                environment_uid=request.environment_uid,
-                project_uid=request.project_uid,
-                component_uids=[request.component_uid],
+                environment_uid=str(request.environment_uid),
+                project_uid=str(request.project_uid),
+                component_uids=[str(request.component_uid)],
             )
             logger.info(
                 "Updated RCA report to completed: index=%s, report_id=%s, status=%s",
@@ -131,9 +132,9 @@ async def analyze(request: AnalyzeRequest):
                 report_id=report_id,
                 alert_id=request.alert_id,
                 status="failed",
-                environment_uid=request.environment_uid,
-                project_uid=request.project_uid,
-                component_uids=[request.component_uid],
+                environment_uid=str(request.environment_uid),
+                project_uid=str(request.project_uid),
+                component_uids=[str(request.component_uid)],
             )
             logger.info("Updated RCA report status to failed: report_id=%s", report_id)
         except Exception as update_error:

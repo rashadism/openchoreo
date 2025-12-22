@@ -26,3 +26,7 @@ global:
 openSearch:
   enabled: true
   singleNode: true
+
+rca:
+  oauth:
+    tokenUrl: "http://thunder-service.openchoreo-control-plane.svc.cluster.local:8090/oauth2/token"
