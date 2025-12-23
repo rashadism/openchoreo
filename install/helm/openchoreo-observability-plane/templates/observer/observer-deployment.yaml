@@ -95,6 +95,8 @@ spec:
             secretKeyRef:
               name: observer-opensearch
               key: password
+        - name: AI_RCA_ENABLED
+          value: {{ .Values.rca.enabled | default false | quote }}
         {{- if .Values.observer.extraEnvs }}
         {{- toYaml .Values.observer.extraEnvs | nindent 8 }}
         {{- end }}
