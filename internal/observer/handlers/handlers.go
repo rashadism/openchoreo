@@ -4,11 +4,14 @@
 package handlers
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/openchoreo/openchoreo/internal/observer/httputil"
@@ -56,14 +59,16 @@ type Handler struct {
 	service               *service.LoggingService
 	logger                *slog.Logger
 	alertingWebhookSecret string
+	rcaServiceURL         string
 }
 
 // NewHandler creates a new handler instance
-func NewHandler(service *service.LoggingService, logger *slog.Logger, alertingWebhookSecret string) *Handler {
+func NewHandler(service *service.LoggingService, logger *slog.Logger, alertingWebhookSecret, rcaServiceURL string) *Handler {
 	return &Handler{
 		service:               service,
 		logger:                logger,
 		alertingWebhookSecret: alertingWebhookSecret,
+		rcaServiceURL:         rcaServiceURL,
 	}
 }
 
@@ -724,7 +729,7 @@ func (h *Handler) AlertingWebhook(w http.ResponseWriter, r *http.Request) {
 		"enableAiRootCauseAnalysis": false,
 		"notificationChannel": "default-smp-channel",
 		"environmentUid": "46ba778e-4e58-4557-8df4-654c8e1e92d1",
-		"prjectUid": "9ec65f73-c507-4f83-9894-fbc57366527a",
+		"projectUid": "9ec65f73-c507-4f83-9894-fbc57366527a",
 		"ruleName": "requests-log-alert-rule",
 		"timestamp": "2025-12-21T14:51:08.592Z"
 	}
@@ -748,9 +753,33 @@ func (h *Handler) AlertingWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: if requestBody["enableAiRootCauseAnalysis"] is true
-	// send a request to the AI RCA service with the alertID
+	// Trigger AI RCA analysis if enabled
+	if enableRCA, ok := requestBody["enableAiRootCauseAnalysis"].(bool); ok && enableRCA {
+		if enabled, _ := strconv.ParseBool(os.Getenv("AI_RCA_ENABLED")); !enabled {
+			h.logger.Debug("AI RCA analysis skipped, AI_RCA_ENABLED is not true")
+			goto respond
+		}
+		requestBody["alertId"] = alertID
 
+		// Fire-and-forget request to AI RCA service
+		go func(rcaURL string) {
+			payloadBytes, err := json.Marshal(requestBody)
+			if err != nil {
+				h.logger.Error("Failed to marshal RCA request payload", "error", err)
+				return
+			}
+
+			client := &http.Client{Timeout: 10 * time.Second}
+			resp, _ := client.Post(rcaURL+"/analyze", "application/json", bytes.NewReader(payloadBytes))
+			if resp != nil {
+				resp.Body.Close()
+			}
+
+			h.logger.Debug("AI RCA analysis triggered", "alertID", alertID)
+		}(h.rcaServiceURL)
+	}
+
+respond:
 	// Return the alertID
 	h.writeJSON(w, http.StatusOK, map[string]interface{}{
 		"message": "Alert notification sent",
