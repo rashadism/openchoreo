@@ -94,6 +94,7 @@ func (h *Handler) Routes() http.Handler {
 	api.HandleFunc("GET "+v1+"/orgs/{orgName}/environments", h.ListEnvironments)
 	api.HandleFunc("POST "+v1+"/orgs/{orgName}/environments", h.CreateEnvironment)
 	api.HandleFunc("GET "+v1+"/orgs/{orgName}/environments/{envName}", h.GetEnvironment)
+	api.HandleFunc("GET "+v1+"/orgs/{orgName}/environments/{envName}/observer-url", h.GetEnvironmentObserverURL)
 
 	// BuildPlane management
 	api.HandleFunc("GET "+v1+"/orgs/{orgName}/buildplanes", h.ListBuildPlanes)
@@ -156,6 +157,7 @@ func (h *Handler) Routes() http.Handler {
 
 	// Observer URL endpoints
 	api.HandleFunc("GET "+v1+"/orgs/{orgName}/projects/{projectName}/components/{componentName}/environments/{environmentName}/observer-url", h.GetComponentObserverURL)
+	api.HandleFunc("GET "+v1+"/orgs/{orgName}/projects/{projectName}/components/{componentName}/observer-url", h.GetBuildObserverURL)
 	api.HandleFunc("GET "+v1+"/orgs/{orgName}/projects/{projectName}/components/{componentName}/observer-url", h.GetBuildObserverURL)
 
 	// Workload management

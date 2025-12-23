@@ -24,6 +24,23 @@ const (
 	defaultSortOrder = "desc"
 )
 
+// isAIRCAEnabled checks if AI RCA analysis is enabled via environment variable
+func isAIRCAEnabled() bool {
+	enabled, _ := strconv.ParseBool(os.Getenv("AI_RCA_ENABLED"))
+	return enabled
+}
+
+// RequireRCA wraps a handler and returns 503 if AI RCA is not enabled
+func RequireRCA(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !isAIRCAEnabled() {
+			http.Error(w, "RCA service is not enabled", http.StatusServiceUnavailable)
+			return
+		}
+		next(w, r)
+	}
+}
+
 // Error codes and messages
 const (
 	// Error types
@@ -755,7 +772,7 @@ func (h *Handler) AlertingWebhook(w http.ResponseWriter, r *http.Request) {
 
 	// Trigger AI RCA analysis if enabled
 	if enableRCA, ok := requestBody["enableAiRootCauseAnalysis"].(bool); ok && enableRCA {
-		if enabled, _ := strconv.ParseBool(os.Getenv("AI_RCA_ENABLED")); !enabled {
+		if !isAIRCAEnabled() {
 			h.logger.Debug("AI RCA analysis skipped, AI_RCA_ENABLED is not true")
 			goto respond
 		}
