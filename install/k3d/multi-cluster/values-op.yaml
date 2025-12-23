@@ -41,7 +41,7 @@ prometheus:
 
 clusterAgent:
   serverUrl: "wss://cluster-gateway.openchoreo.localhost:8443/ws"  # Control plane cluster gateway URL
-  planeName: "default"
+  planeID: "default-observabilityplane"
   planeType: "observabilityplane"
 
   # DNS rewrite configuration for multi-cluster k3d setup
@@ -73,3 +73,8 @@ gateway:
 
 tls:
   enabled: true
+
+rca:
+  openchoreoMcpUrl: "https://api.openchoreo.localhost:8080/mcp"
+  oauth:
+    tokenUrl: "https://thunder.openchoreo.localhost:8443/oauth2/token"

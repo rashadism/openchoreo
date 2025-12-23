@@ -26,6 +26,25 @@ func NewQueryBuilder(indexPrefix string) *QueryBuilder {
 	}
 }
 
+// formatDurationForOpenSearch normalizes durations so OpenSearch monitors accept them.
+// Handles hours/minutes/seconds cleanly (e.g., "1h0m0s" -> "1h", "5m0s" -> "5m").
+func formatDurationForOpenSearch(d string) (string, error) {
+	parsed, err := time.ParseDuration(d)
+	if err != nil {
+		return "", err
+	}
+
+	switch {
+	case parsed%time.Hour == 0:
+		return fmt.Sprintf("%dh", parsed/time.Hour), nil
+	case parsed%time.Minute == 0:
+		return fmt.Sprintf("%dm", parsed/time.Minute), nil
+	case parsed%time.Second == 0:
+		return fmt.Sprintf("%ds", parsed/time.Second), nil
+	}
+	return parsed.String(), nil
+}
+
 // addTimeRangeFilter adds time range filter to must conditions
 func addTimeRangeFilter(mustConditions []map[string]interface{}, startTime, endTime string) []map[string]interface{} {
 	if startTime != "" && endTime != "" {
@@ -586,12 +605,16 @@ func contains(slice []string, item string) bool {
 	return false
 }
 
-func (qb *QueryBuilder) BuildLogAlertingRuleQuery(params types.AlertingRuleRequest) map[string]interface{} {
+func (qb *QueryBuilder) BuildLogAlertingRuleQuery(params types.AlertingRuleRequest) (map[string]interface{}, error) {
+	window, err := formatDurationForOpenSearch(params.Condition.Window)
+	if err != nil {
+		return nil, fmt.Errorf("failed to format window duration: %w", err)
+	}
 	filterConditions := []map[string]interface{}{
 		{
 			"range": map[string]interface{}{
 				"@timestamp": map[string]interface{}{
-					"from":          "{{period_end}}||-" + params.Condition.Window,
+					"from":          "{{period_end}}||-" + window,
 					"to":            "{{period_end}}",
 					"format":        "epoch_millis",
 					"include_lower": true,
@@ -644,19 +667,24 @@ func (qb *QueryBuilder) BuildLogAlertingRuleQuery(params types.AlertingRuleReque
 			},
 		},
 	}
-	return query
+	return query, nil
 }
 
-func (qb *QueryBuilder) BuildLogAlertingRuleMonitorBody(params types.AlertingRuleRequest) (map[string]interface{}, error) {
+func (qb *QueryBuilder) BuildLogAlertingRuleMonitorBody(ruleName string, params types.AlertingRuleRequest) (map[string]interface{}, error) {
 	intervalDuration, err := time.ParseDuration(params.Condition.Interval)
 	if err != nil {
 		return nil, fmt.Errorf("invalid interval format: %w", err)
 	}
 
+	query, err := qb.BuildLogAlertingRuleQuery(params)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build log alerting rule query: %w", err)
+	}
+
 	monitorBody := MonitorBody{
 		Type:        "monitor",
 		MonitorType: "query_level_monitor",
-		Name:        params.Metadata.Name,
+		Name:        ruleName,
 		Enabled:     params.Condition.Enabled,
 		Schedule: MonitorSchedule{
 			Period: MonitorSchedulePeriod{
@@ -668,14 +696,14 @@ func (qb *QueryBuilder) BuildLogAlertingRuleMonitorBody(params types.AlertingRul
 			{
 				Search: MonitorInputSearch{
 					Indices: []string{qb.indexPrefix + "*"},
-					Query:   qb.BuildLogAlertingRuleQuery(params),
+					Query:   query,
 				},
 			},
 		},
 		Triggers: []MonitorTrigger{
 			{
 				QueryLevelTrigger: &MonitorTriggerQueryLevelTrigger{
-					Name:     "trigger-" + params.Metadata.Name,
+					Name:     "trigger-" + ruleName,
 					Severity: "1",
 					Condition: MonitorTriggerCondition{
 						Script: MonitorTriggerConditionScript{
@@ -685,7 +713,7 @@ func (qb *QueryBuilder) BuildLogAlertingRuleMonitorBody(params types.AlertingRul
 					},
 					Actions: []MonitorTriggerAction{
 						{
-							Name:          "action-" + params.Metadata.Name,
+							Name:          "action-" + ruleName,
 							DestinationID: "openchoreo-observer-alerting-webhook",
 							MessageTemplate: MonitorMessageTemplate{
 								Source: buildWebhookMessageTemplate(params),
@@ -761,4 +789,139 @@ func buildWebhookMessageTemplate(params types.AlertingRuleRequest) string {
 		string(environmentUID),
 		string(enableAiRootCauseAnalysis),
 	)
+}
+
+// BuildRCAReportsQuery builds a query for RCA reports by project with optional filtering
+func (qb *QueryBuilder) BuildRCAReportsQuery(params RCAReportQueryParams) map[string]interface{} {
+	mustConditions := []map[string]interface{}{
+		{
+			"term": map[string]interface{}{
+				"resource.openchoreo.dev/project-uid": params.ProjectUID,
+			},
+		},
+	}
+
+	// Add environment filter if specified
+	if params.EnvironmentUID != "" {
+		mustConditions = append(mustConditions, map[string]interface{}{
+			"term": map[string]interface{}{
+				"resource.openchoreo.dev/environment-uid": params.EnvironmentUID,
+			},
+		})
+	}
+
+	// Add status filter if specified
+	if params.Status != "" {
+		mustConditions = append(mustConditions, map[string]interface{}{
+			"term": map[string]interface{}{
+				"status": params.Status,
+			},
+		})
+	}
+
+	mustConditions = addTimeRangeFilter(mustConditions, params.StartTime, params.EndTime)
+
+	// Set default sort order if not specified
+	sortOrder := params.SortOrder
+	if sortOrder == "" {
+		sortOrder = "desc" //nolint:goconst
+	}
+
+	query := map[string]interface{}{
+		"size": params.Limit,
+		"query": map[string]interface{}{
+			"bool": map[string]interface{}{
+				"must": mustConditions,
+			},
+		},
+		"sort": []map[string]interface{}{
+			{
+				"@timestamp": map[string]interface{}{
+					"order": sortOrder,
+				},
+			},
+		},
+	}
+
+	// Add component UID filters as "should" conditions if specified
+	if len(params.ComponentUIDs) > 0 {
+		shouldConditions := []map[string]interface{}{}
+		for _, componentUID := range params.ComponentUIDs {
+			shouldConditions = append(shouldConditions, map[string]interface{}{
+				"term": map[string]interface{}{
+					"resource.openchoreo.dev/component-uids": componentUID,
+				},
+			})
+		}
+		query["query"].(map[string]interface{})["bool"].(map[string]interface{})["should"] = shouldConditions
+		query["query"].(map[string]interface{})["bool"].(map[string]interface{})["minimum_should_match"] = 1
+	}
+
+	return query
+}
+
+// BuildRCAReportByAlertQuery builds a query for a single RCA report by alert ID with optional version
+func (qb *QueryBuilder) BuildRCAReportByAlertQuery(params RCAReportByAlertQueryParams) map[string]interface{} {
+	mustConditions := []map[string]interface{}{
+		{
+			"term": map[string]interface{}{
+				"alertId": params.AlertID,
+			},
+		},
+	}
+
+	// Add version filter if specified
+	if params.Version != nil {
+		mustConditions = append(mustConditions, map[string]interface{}{
+			"term": map[string]interface{}{
+				"version": *params.Version,
+			},
+		})
+	}
+
+	query := map[string]interface{}{
+		"size": 1, // We only expect one result
+		"query": map[string]interface{}{
+			"bool": map[string]interface{}{
+				"must": mustConditions,
+			},
+		},
+		"sort": []map[string]interface{}{
+			{
+				"version": map[string]interface{}{
+					"order": "desc", //nolint:goconst
+				},
+			},
+		},
+	}
+
+	return query
+}
+
+// BuildRCAReportVersionsQuery builds a query to get all available versions for an alert ID
+func (qb *QueryBuilder) BuildRCAReportVersionsQuery(alertID string) map[string]interface{} {
+	query := map[string]interface{}{
+		"size": 100, // Should be enough for version count
+		"query": map[string]interface{}{
+			"bool": map[string]interface{}{
+				"must": []map[string]interface{}{
+					{
+						"term": map[string]interface{}{
+							"alertId": alertID,
+						},
+					},
+				},
+			},
+		},
+		"sort": []map[string]interface{}{
+			{
+				"version": map[string]interface{}{
+					"order": "desc", //nolint:goconst
+				},
+			},
+		},
+		"_source": []string{"version"}, // Only fetch version field
+	}
+
+	return query
 }

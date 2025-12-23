@@ -74,7 +74,7 @@ controllerManager:
   # multiCluster: When deploying OpenChoreo planes in multiple Kubernetes clusters (To be supported in the future)
   # quickStart: Limited set of features for quick-start setup
   installationMode: singleCluster
-  
+
 
 ## Values for dependent charts
 data-prepper:
@@ -199,75 +199,6 @@ openSearch:
     serviceAccountName: "opensearch"
 
   singleNode: true
-
-# OpenSearch configuration for operator based OpenSearch deployment
-openSearchCluster:
-  enabled: true
-
-  bootstrap:
-    resources:
-      limits:
-        cpu: 1000m
-        memory: 1000Mi
-      requests:
-        cpu: 100m
-        memory: 1000Mi
-
-  general:
-    setVMMaxMapCount: true
-    version: 3.3.0
-
-  dashboards:
-    enable: false
-    replicas: 1
-    version: 3.3.0
-
-  nodePools:
-    data:
-      replicas: 2
-      diskSize: 5Gi
-      resources:
-        limits:
-          cpu: 1000m
-          memory: 1000Mi
-        requests:
-          cpu: 100m
-          memory: 1000Mi
-    master:
-      replicas: 3
-      diskSize: 1Gi
-      resources:
-        limits:
-          cpu: 1000m
-          memory: 900Mi
-        requests:
-          cpu: 100m
-          memory: 900Mi
-
-  # Secrets
-  adminUsername: admin
-  adminUserPassword: ThisIsTheOpenSearchPassword1
-  internalUsers: |
-    # This is the internal user database
-    # The hash value is a bcrypt hash and can be generated with plugin/tools/hash.sh
-
-    _meta:
-      type: "internalusers"
-      config_version: 2
-
-    admin:
-      hash: "%s"
-      reserved: true
-      backend_roles:
-      - "admin"
-      description: "Admin user"
-
-openSearchClusterSetup:
-  image:
-    repository: ghcr.io/openchoreo/init-observability-opensearch
-    tag: ""
-  observerAddress: "http://observer.openchoreo-observability-plane:8080"
-  observerAlertingWebhookSecret: qxbfqk3yjiejrlelolvh # TODO: Move to a kubernetes secret
 
 # Customizing OpenSearch Dashboards configurations
 openSearchDashboards:
@@ -604,7 +535,7 @@ clusterAgent:
   # One agent per physical plane handles all CRs with the same planeID (multi-tenancy)
   # If not specified, defaults to Helm release name
   # Example: "shared-obs" - all ObservabilityPlane CRs with planeID="shared-obs" share this agent
-  planeID: ""
+  planeID: default-observabilityplane
 
   # Type of plane (dataplane, buildplane, or observabilityplane)
   planeType: observabilityplane
@@ -748,6 +679,8 @@ openSearchClusterSetup:
   image:
     repository: ghcr.io/openchoreo/init-observability-opensearch
     tag: ""
+  observerAddress: "http://observer.openchoreo-observability-plane:8080"
+  observerAlertingWebhookSecret: qxbfqk3yjiejrlelolvh # TODO: Move to a kubernetes secret
 
 
 ## opentelemetryCollectorCustomizations aren't passed to the opentelemetry-collector helm values file directly.
@@ -772,3 +705,57 @@ tls:
 # Wait job configuration for post-install hooks
 waitJob:
   image: bitnamilegacy/kubectl:1.32.4
+
+# RCA Agent configuration
+rca:
+  enabled: false
+  name: ai-rca-agent
+  replicas: 1
+
+  image:
+    repository: ghcr.io/openchoreo/ai-rca-agent
+    tag: ""
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    port: 8080
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  # Observer MCP endpoint (leave empty for auto-discovery)
+  observerMcpUrl: ""
+
+  # OpenChoreo API MCP endpoint (leave empty for auto-discovery)
+  openchoreoMcpUrl: ""
+
+  # Control plane namespace (required for auto-discovery)
+  controlPlaneNamespace: openchoreo-control-plane
+
+  # LLM Configuration for RCA agent
+  llm:
+    # Model name (e.g., claude-sonnet-4-5, gpt-5, gemini-2.0-flash-exp)
+    modelName: ""
+
+    # API key can be set via: --set rca.llm.apiKey="your-key" during helm install/upgrade
+    apiKey: ""
+
+  # OpenSearch Configuration for RCA agent
+  opensearch:
+    address: "https://opensearch:9200"
+
+  # OAuth2 Client Credentials Configuration for RCA agent authentication
+  # Works with any IDP that supports OAuth2 client_credentials grant (Thunder, Keycloak, Auth0, etc.)
+  oauth:
+    # Token URL for obtaining access tokens
+    tokenUrl: "http://thunder.openchoreo.localhost:8080/oauth2/token"
+    # Client ID registered with the IDP
+    clientId: "openchoreo-rca-agent"
+    # Client Secret - can be overridden via: --set rca.oauth.clientSecret="your-secret"
+    clientSecret: "openchoreo-rca-agent-secret"

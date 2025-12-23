@@ -364,7 +364,7 @@ func (s *LoggingService) UpsertAlertRule(ctx context.Context, sourceType string,
 // UpsertOpenSearchAlertRule creates or updates an alert rule in OpenSearch
 func (s *LoggingService) UpsertOpenSearchAlertRule(ctx context.Context, ruleName string, rule types.AlertingRuleRequest) (*types.AlertingRuleSyncResponse, error) {
 	// Build the alert rule body
-	alertRuleBody, err := s.queryBuilder.BuildLogAlertingRuleMonitorBody(rule)
+	alertRuleBody, err := s.queryBuilder.BuildLogAlertingRuleMonitorBody(ruleName, rule)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build log alerting rule body: %w", err)
 	}
@@ -853,4 +853,100 @@ func (s *LoggingService) GetComponentResourceMetrics(ctx context.Context, compon
 		"memory_limits_points", len(metrics.MemoryLimits))
 
 	return metrics, nil
+}
+
+// GetRCAReportsByProject retrieves RCA reports for a specific project with optional filtering
+func (s *LoggingService) GetRCAReportsByProject(ctx context.Context, params opensearch.RCAReportQueryParams) (map[string]interface{}, error) {
+	s.logger.Info("Getting RCA reports for project",
+		"project_uid", params.ProjectUID,
+		"environment_uid", params.EnvironmentUID,
+		"component_count", len(params.ComponentUIDs),
+		"status", params.Status)
+
+	// Use wildcard index pattern for RCA reports
+	indices := []string{"rca-reports-*"}
+
+	// Build query
+	query := s.queryBuilder.BuildRCAReportsQuery(params)
+
+	// Execute search
+	response, err := s.osClient.Search(ctx, indices, query)
+	if err != nil {
+		s.logger.Error("Failed to execute RCA reports search", "error", err)
+		return nil, fmt.Errorf("failed to execute search: %w", err)
+	}
+
+	// Parse reports using opensearch package helper
+	reports := make([]map[string]interface{}, 0, len(response.Hits.Hits))
+	for _, hit := range response.Hits.Hits {
+		report := opensearch.ParseRCAReportSummary(hit)
+		reports = append(reports, report)
+	}
+
+	s.logger.Debug("RCA reports retrieved",
+		"count", len(reports),
+		"total", response.Hits.Total.Value)
+
+	return map[string]interface{}{
+		"reports":    reports,
+		"totalCount": response.Hits.Total.Value,
+		"tookMs":     response.Took,
+	}, nil
+}
+
+// GetRCAReportByAlert retrieves a single RCA report by alert with optional version
+func (s *LoggingService) GetRCAReportByAlert(ctx context.Context, params opensearch.RCAReportByAlertQueryParams) (map[string]interface{}, error) {
+	s.logger.Debug("Getting RCA report by alert",
+		"alert_id", params.AlertID,
+		"version", params.Version)
+
+	// Use wildcard index pattern for RCA reports
+	indices := []string{"rca-reports-*"}
+
+	// First, get all available versions for this alert ID
+	versionsQuery := s.queryBuilder.BuildRCAReportVersionsQuery(params.AlertID)
+	versionsResponse, err := s.osClient.Search(ctx, indices, versionsQuery)
+	if err != nil {
+		s.logger.Error("Failed to query available versions", "error", err)
+		return nil, fmt.Errorf("failed to query versions: %w", err)
+	}
+
+	if len(versionsResponse.Hits.Hits) == 0 {
+		s.logger.Info("No RCA report found for alert ID", "alert_id", params.AlertID)
+		return nil, fmt.Errorf("report not found")
+	}
+
+	// Extract available versions using opensearch helper
+	availableVersions := make([]int, 0, len(versionsResponse.Hits.Hits))
+	for _, hit := range versionsResponse.Hits.Hits {
+		version := opensearch.ExtractRCAReportVersion(hit)
+		if version > 0 {
+			availableVersions = append(availableVersions, version)
+		}
+	}
+
+	// Build query for the specific report
+	query := s.queryBuilder.BuildRCAReportByAlertQuery(params)
+
+	// Execute search
+	response, err := s.osClient.Search(ctx, indices, query)
+	if err != nil {
+		s.logger.Error("Failed to execute RCA report search", "error", err)
+		return nil, fmt.Errorf("failed to execute search: %w", err)
+	}
+
+	if len(response.Hits.Hits) == 0 {
+		s.logger.Info("RCA report not found", "alert_id", params.AlertID, "version", params.Version)
+		return nil, fmt.Errorf("report not found")
+	}
+
+	// Parse the full report using opensearch package helper
+	result := opensearch.ParseRCAReportDetailed(response.Hits.Hits[0], availableVersions)
+
+	s.logger.Debug("RCA report retrieved",
+		"alert_id", params.AlertID,
+		"version", result["reportVersion"],
+		"available_versions_count", len(availableVersions))
+
+	return result, nil
 }
