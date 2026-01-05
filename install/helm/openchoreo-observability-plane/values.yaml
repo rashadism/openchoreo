@@ -2907,9 +2907,9 @@ rca:
     # @schema
     # type: string
     # description: Token URL for obtaining access tokens from IDP
-    # default: http://thunder.openchoreo.localhost:8080/oauth2/token
+    # default: http://thunder-service.openchoreo-control-plane.svc.cluster.local:8090/oauth2/token
     # @schema
-    tokenUrl: "http://thunder.openchoreo.localhost:8080/oauth2/token"
+    tokenUrl: "http://thunder-service.openchoreo-control-plane.svc.cluster.local:8090/oauth2/token"
     # @schema
     # type: string
     # description: OAuth2 client ID registered with the IDP

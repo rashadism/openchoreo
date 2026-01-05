@@ -4,7 +4,6 @@
 package handlers
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,6 +13,7 @@ import (
 	"strconv"
 	"time"
 
+	choreoapis "github.com/openchoreo/openchoreo/api/v1alpha1"
 	"github.com/openchoreo/openchoreo/internal/observer/httputil"
 	"github.com/openchoreo/openchoreo/internal/observer/opensearch"
 	"github.com/openchoreo/openchoreo/internal/observer/service"
@@ -766,15 +766,33 @@ func (h *Handler) AlertingWebhook(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
+	var alertRule *choreoapis.ObservabilityAlertRule
+	ruleName, _ := requestBody["ruleName"].(string)
+	componentUID, _ := requestBody["componentUid"].(string)
+	projectUID, _ := requestBody["projectUid"].(string)
+	environmentUID, _ := requestBody["environmentUid"].(string)
+
+	// TODO: Remove label selectors and use direct Get by NamespacedName
+	if ruleName != "" && componentUID != "" && projectUID != "" && environmentUID != "" {
+		var err error
+		alertRule, err = h.service.GetObservabilityAlertRuleByName(ctx, ruleName, componentUID, projectUID, environmentUID)
+		if err != nil {
+			h.logger.Warn("Failed to fetch ObservabilityAlertRule", "ruleName", ruleName, "error", err)
+		}
+	}
+
+	specRuleName := ruleName
+	if alertRule != nil {
+		specRuleName = alertRule.Spec.Name
+	}
+
 	// Send alert notification
-	if err := h.service.SendAlertNotification(ctx, requestBody); err != nil {
+	if err := h.service.SendAlertNotification(ctx, requestBody, specRuleName); err != nil {
 		h.logger.Error("Failed to send alert notification", "error", err)
-		h.writeErrorResponse(w, http.StatusInternalServerError, ErrorTypeInternalError, ErrorCodeInternalError, "Failed to send alert notification")
-		return
 	}
 
 	// Store alert entry in logs backend
-	alertID, err := h.service.StoreAlertEntry(ctx, requestBody)
+	alertID, err := h.service.StoreAlertEntry(ctx, requestBody, specRuleName)
 	if err != nil {
 		h.logger.Error("Failed to store alert entry", "error", err)
 		h.writeErrorResponse(w, http.StatusInternalServerError, ErrorTypeInternalError, ErrorCodeInternalError, "Failed to store alert entry")
@@ -783,31 +801,11 @@ func (h *Handler) AlertingWebhook(w http.ResponseWriter, r *http.Request) {
 
 	// Trigger AI RCA analysis if enabled
 	if enableRCA, ok := requestBody["enableAiRootCauseAnalysis"].(bool); ok && enableRCA {
-		if !isAIRCAEnabled() {
-			h.logger.Debug("AI RCA analysis skipped, AI_RCA_ENABLED is not true")
-			goto respond
+		if isAIRCAEnabled() {
+			h.service.TriggerRCAAnalysis(ctx, h.rcaServiceURL, alertID, requestBody, alertRule)
 		}
-		requestBody["alertId"] = alertID
-
-		// Fire-and-forget request to AI RCA service
-		go func(rcaURL string) {
-			payloadBytes, err := json.Marshal(requestBody)
-			if err != nil {
-				h.logger.Error("Failed to marshal RCA request payload", "error", err)
-				return
-			}
-
-			client := &http.Client{Timeout: 10 * time.Second}
-			resp, _ := client.Post(rcaURL+"/analyze", "application/json", bytes.NewReader(payloadBytes))
-			if resp != nil {
-				resp.Body.Close()
-			}
-
-			h.logger.Debug("AI RCA analysis triggered", "alertID", alertID)
-		}(h.rcaServiceURL)
 	}
 
-respond:
 	// Return the alertID
 	h.writeJSON(w, http.StatusOK, map[string]interface{}{
 		"message": "Alert notification sent",
