@@ -3469,6 +3469,13 @@
           "title": "llm",
           "type": "object"
         },
+        "logLevel": {
+          "default": "INFO",
+          "description": "Log level for the RCA agent",
+          "required": [],
+          "title": "logLevel",
+          "type": "string"
+        },
         "name": {
           "default": "ai-rca-agent",
           "description": "Name of the RCA agent deployment",
@@ -3492,13 +3499,6 @@
               "description": "OAuth2 client secret (override via --set rca.oauth.clientSecret)",
               "required": [],
               "title": "clientSecret",
-              "type": "string"
-            },
-            "tokenUrl": {
-              "default": "http://thunder.openchoreo.localhost:8080/oauth2/token",
-              "description": "Token URL for obtaining access tokens from IDP",
-              "required": [],
-              "title": "tokenUrl",
               "type": "string"
             }
           },
@@ -3676,6 +3676,13 @@
               "description": "JWKS URL for token verification",
               "required": [],
               "title": "jwksUrl",
+              "type": "string"
+            },
+            "tokenUrl": {
+              "default": "",
+              "description": "OIDC token endpoint URL",
+              "required": [],
+              "title": "tokenUrl",
               "type": "string"
             },
             "jwksUrlTlsInsecureSkipVerify": {
