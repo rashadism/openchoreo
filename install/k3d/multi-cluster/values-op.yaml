@@ -116,15 +116,14 @@ gateway:
 security:
   oidc:
     jwksUrl: "https://thunder.openchoreo.localhost:8443/oauth2/jwks"
+    tokenUrl: "https://thunder.openchoreo.localhost:8443/oauth2/token"
     jwksUrlTlsInsecureSkipVerify: "true"
 
 tls:
   enabled: true
 
 rca:
-  openchoreoMcpUrl: "https://api.openchoreo.localhost:8080/mcp"
-  oauth:
-    tokenUrl: "https://thunder.openchoreo.localhost:8443/oauth2/token"
+  openchoreoMcpUrl: "https://api.openchoreo.localhost:8443/mcp"
 
 global:
   baseDomain: observability.openchoreo.localhost
