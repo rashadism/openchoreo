@@ -1441,8 +1441,9 @@ func (s *LoggingService) TriggerRCAAnalysis(ctx context.Context, rcaServiceURL s
 		}
 
 		ruleInfo["source"] = map[string]interface{}{
-			"type":  string(alertRule.Spec.Source.Type),
-			"query": alertRule.Spec.Source.Query,
+			"type":   string(alertRule.Spec.Source.Type),
+			"query":  alertRule.Spec.Source.Query,
+			"metric": alertRule.Spec.Source.Metric,
 		}
 
 		ruleInfo["condition"] = map[string]interface{}{
@@ -1462,7 +1463,7 @@ func (s *LoggingService) TriggerRCAAnalysis(ctx context.Context, rcaServiceURL s
 		"environmentUid": requestBody["environmentUid"],
 		"alert": map[string]interface{}{
 			"id":        alertID,
-			"value":     requestBody["alertValue"],
+			"value":     requestBody["value"],
 			"timestamp": requestBody["timestamp"],
 			"rule":      ruleInfo,
 		},
@@ -1571,6 +1572,6 @@ func (s *LoggingService) EnrichAlertDetails(alertRule *choreoapis.ObservabilityA
 		"project":                   alertRule.Labels["openchoreo.dev/project"],
 		"environment":               alertRule.Labels["openchoreo.dev/environment"],
 		"notificationChannel":       alertRule.Spec.NotificationChannel,
-		"enableAiRootCauseAnalysis": strconv.FormatBool(alertRule.Spec.EnableAiRootCauseAnalysis),
+		"enableAiRootCauseAnalysis": alertRule.Spec.EnableAiRootCauseAnalysis,
 	}, nil
 }

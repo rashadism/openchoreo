@@ -195,6 +195,16 @@ Configure BuildPlane (if installed) to use default ObservabilityPlane
 kubectl patch buildplane default -n default --type merge -p '{"spec":{"observabilityPlaneRef":"default"}}'
 ```
 
+Enable logs collection by upgrading the observability plane with Fluent Bit enabled:
+```bash
+helm upgrade openchoreo-observability-plane install/helm/openchoreo-observability-plane \
+  --kube-context k3d-openchoreo \
+  --namespace openchoreo-observability-plane \
+  --reuse-values \
+  --set fluent-bit.enabled=true \
+  --timeout 10m
+```
+
 ## Port Mappings
 
 | Plane               | Namespace                      | Kube API Port | Port Range |
