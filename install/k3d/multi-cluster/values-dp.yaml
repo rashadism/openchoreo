@@ -84,3 +84,6 @@ external-secrets:
 
 observability:
   observabilityPlaneUrl: "http://host.k3d.internal:11086"
+
+opentelemetry-collector:
+  enabled: true
