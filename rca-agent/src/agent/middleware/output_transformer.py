@@ -12,8 +12,8 @@ from langchain.messages import ToolMessage
 from langchain.tools.tool_node import ToolCallRequest
 from langgraph.types import Command
 
-from src.core.constants import obs_tools, oc_labels
-from src.core.template_manager import render
+from src.constants import obs_tools, oc_labels, templates
+from src.template_manager import render
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ def _process_component_logs(content: dict[str, Any]) -> str:
         logs = content.get("logs", [])
 
         if not logs:
-            return "No logs found"
+            return "No logs found for the given time range and filters"
 
         first_log = logs[0]
         labels = first_log.get("labels", {})
@@ -35,7 +35,7 @@ def _process_component_logs(content: dict[str, Any]) -> str:
             "logs": logs,
         }
 
-        return render("middleware/component_logs.j2", context)
+        return render(templates.COMPONENT_LOGS_TRANSFORMER, context)
     except Exception as e:
         logger.error(f"Error processing component logs: {e}")
         return json.dumps(content)
@@ -46,7 +46,7 @@ def _process_project_logs(content: dict[str, Any]) -> str:
         logs = content.get("logs", [])
 
         if not logs:
-            return "No logs found"
+            return "No logs found for the given time range and filters"
 
         first_log = logs[0]
         labels = first_log.get("labels", {})
@@ -69,14 +69,13 @@ def _process_project_logs(content: dict[str, Any]) -> str:
             "components": list(logs_by_component.values()),
         }
 
-        return render("middleware/project_logs.j2", context)
+        return render(templates.PROJECT_LOGS_TRANSFORMER, context)
     except Exception as e:
         logger.error(f"Error processing project logs: {e}")
         return json.dumps(content)
 
 
 def _calculate_metric_stats(values: np.ndarray, timestamps: list[str]) -> dict | None:
-    """Calculate comprehensive statistics for a metric."""
     if len(values) == 0:
         return None
 
@@ -100,7 +99,6 @@ def _calculate_metric_stats(values: np.ndarray, timestamps: list[str]) -> dict |
 
 
 def _detect_anomalies(values: np.ndarray, threshold: float = 3.0) -> dict:
-    """Detect anomalies using Z-score and rate of change."""
     if len(values) < 2:
         return {"spike_count": 0, "max_spike_magnitude": 0, "largest_drop": 0}
 
@@ -134,7 +132,6 @@ def _detect_anomalies(values: np.ndarray, threshold: float = 3.0) -> dict:
 def _calculate_resource_pressure(
     usage_values: np.ndarray, request_values: np.ndarray, limit_values: np.ndarray
 ) -> dict | None:
-    """Calculate resource pressure ratios."""
     if len(usage_values) == 0:
         return None
 
@@ -244,7 +241,7 @@ def _process_metrics(content: dict[str, Any]) -> str:
             "correlations": correlations,
         }
 
-        return render("middleware/metrics.j2", context)
+        return render(templates.METRICS_TRANSFORMER, context)
 
     except Exception as e:
         logger.error(f"Error processing metrics: {e}", exc_info=True)
@@ -252,7 +249,6 @@ def _process_metrics(content: dict[str, Any]) -> str:
 
 
 def _build_span_tree(spans: list[dict]) -> list[dict]:
-    """Build a hierarchical tree structure from flat span list."""
     if not spans:
         return []
 
@@ -330,7 +326,7 @@ def _process_traces(content: dict[str, Any]) -> str:
 
         context = {"traces": processed_traces, "tookMs": took_ms}
 
-        return render("middleware/traces.j2", context)
+        return render(templates.TRACES_TRANSFORMER, context)
 
     except Exception as e:
         logger.error(f"Error processing traces: {e}")
@@ -349,7 +345,7 @@ def get_processor(tool_name: str | None) -> Callable[[dict[str, Any]], str]:
     return lambda content: json.dumps(content)
 
 
-class OutputProcessorMiddleware(AgentMiddleware):
+class OutputTransformerMiddleware(AgentMiddleware):
     async def awrap_tool_call(
         self,
         request: ToolCallRequest,

@@ -20,15 +20,23 @@ class ObservabilityTools:
 obs_tools = ObservabilityTools()
 oc_tools = OpenchoreoTools()
 
-# Tool name sets for categorization
-OBS_MCP_TOOLS = {
+# Tools available to each agent type
+RCA_AGENT_TOOLS = {
     obs_tools.GET_TRACES,
-    obs_tools.GET_PROJECT_LOGS,
     obs_tools.GET_COMPONENT_LOGS,
+    obs_tools.GET_PROJECT_LOGS,
     obs_tools.GET_COMPONENT_RESOURCE_METRICS,
+    oc_tools.LIST_ENVIRONMENTS,
+    oc_tools.LIST_NAMESPACES,
+    oc_tools.LIST_PROJECTS,
+    oc_tools.LIST_COMPONENTS,
 }
 
-OC_MCP_TOOLS = {
+CHAT_AGENT_TOOLS = {
+    obs_tools.GET_TRACES,
+    obs_tools.GET_COMPONENT_LOGS,
+    obs_tools.GET_PROJECT_LOGS,
+    obs_tools.GET_COMPONENT_RESOURCE_METRICS,
     oc_tools.LIST_ENVIRONMENTS,
     oc_tools.LIST_NAMESPACES,
     oc_tools.LIST_PROJECTS,
@@ -43,4 +51,18 @@ class OpenchoreoLabels:
     PROJECT_UID = "openchoreo.dev/project-uid"
 
 
+class Templates:
+    # Agent prompts
+    RCA_AGENT_PROMPT = "prompts/rca_agent_prompt.j2"
+    CHAT_AGENT_PROMPT = "prompts/chat_agent_prompt.j2"
+    # API
+    RCA_REQUEST = "api/rca_request.j2"
+    # Transformers
+    COMPONENT_LOGS_TRANSFORMER = "middleware/component_logs.j2"
+    PROJECT_LOGS_TRANSFORMER = "middleware/project_logs.j2"
+    METRICS_TRANSFORMER = "middleware/metrics.j2"
+    TRACES_TRANSFORMER = "middleware/traces.j2"
+
+
 oc_labels = OpenchoreoLabels()
+templates = Templates()

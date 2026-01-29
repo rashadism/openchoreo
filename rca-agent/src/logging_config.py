@@ -5,7 +5,7 @@ import logging
 import sys
 from contextvars import ContextVar
 
-from src.core.config import settings
+from src.config import settings
 
 # Context variable to store the current report_id for logging
 report_id_context: ContextVar[str | None] = ContextVar("report_id", default=None)
@@ -17,8 +17,6 @@ class HealthcheckFilter(logging.Filter):
 
 
 class ReportIdFormatter(logging.Formatter):
-    """Formatter that includes report_id from context when available."""
-
     def format(self, record: logging.LogRecord) -> str:
         report_id = report_id_context.get()
         record.report_id = f"[{report_id}] " if report_id else ""

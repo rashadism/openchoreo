@@ -16,45 +16,30 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.runnables import Runnable, RunnableConfig
 from langchain_core.tools import BaseTool
 
-from src.core.config import settings
-from src.core.constants import obs_tools, oc_tools
-from src.core.llm import get_model
-from src.core.mcp import MCPClient
-from src.core.middleware import LoggingMiddleware, OutputProcessorMiddleware
-from src.core.models.chat_response import ChatResponse
-from src.core.models.rca_report import RCAReport
-from src.core.opensearch import get_opensearch_client
-from src.core.prompts.system_prompt import get_chat_prompt, get_system_prompt
-from src.core.stream_parser import ChatResponseParser
-from src.core.template_manager import render
-from src.core.utils import get_semaphore
+from src.agent.middleware import LoggingMiddleware, OutputTransformerMiddleware
+from src.agent.prompts import Agent, get_prompt
+from src.agent.stream_parser import ChatResponseParser
+from src.clients.llm import get_model
+from src.clients.mcp import MCPClient
+from src.clients.opensearch import get_opensearch_client
+from src.config import settings
+from src.constants import CHAT_AGENT_TOOLS, RCA_AGENT_TOOLS, templates
 from src.logging_config import report_id_context
+from src.models.chat_response import ChatResponse
+from src.models.rca_report import RCAReport
+from src.template_manager import render
 
 logger = logging.getLogger(__name__)
 
-# Tools available to the RCA agent (for /analyze)
-RCA_AGENT_TOOLS = {
-    obs_tools.GET_TRACES,
-    obs_tools.GET_COMPONENT_LOGS,
-    obs_tools.GET_PROJECT_LOGS,
-    obs_tools.GET_COMPONENT_RESOURCE_METRICS,
-    oc_tools.LIST_ENVIRONMENTS,
-    oc_tools.LIST_NAMESPACES,
-    oc_tools.LIST_PROJECTS,
-    oc_tools.LIST_COMPONENTS,
-}
+# Module-level semaphore for limiting concurrent analyses
+_semaphore: asyncio.Semaphore | None = None
 
-# Tools available to the chat agent (for /chat)
-CHAT_AGENT_TOOLS = {
-    obs_tools.GET_TRACES,
-    obs_tools.GET_COMPONENT_LOGS,
-    obs_tools.GET_PROJECT_LOGS,
-    obs_tools.GET_COMPONENT_RESOURCE_METRICS,
-    oc_tools.LIST_ENVIRONMENTS,
-    oc_tools.LIST_NAMESPACES,
-    oc_tools.LIST_PROJECTS,
-    oc_tools.LIST_COMPONENTS,
-}
+
+def _get_semaphore() -> asyncio.Semaphore:
+    global _semaphore
+    if _semaphore is None:
+        _semaphore = asyncio.Semaphore(settings.max_concurrent_analyses)
+    return _semaphore
 
 
 def _filter_tools(tools: list[BaseTool], allowed: set[str]) -> list[BaseTool]:
@@ -89,8 +74,8 @@ async def create_rca_agent(
     agent = create_agent(
         model=model,
         tools=tools,
-        system_prompt=get_system_prompt(tools),
-        middleware=[OutputProcessorMiddleware(), TodoListMiddleware(), LoggingMiddleware()],
+        system_prompt=get_prompt(Agent.RCA, tools),
+        middleware=[OutputTransformerMiddleware(), TodoListMiddleware(), LoggingMiddleware()],
         response_format=ToolStrategy(RCAReport),
     ).with_config(_build_config(200, usage_callback))
 
@@ -105,8 +90,8 @@ async def create_chat_agent(
     agent = create_agent(
         model=model,
         tools=tools,
-        system_prompt=get_chat_prompt(tools),
-        middleware=[OutputProcessorMiddleware(), LoggingMiddleware()],
+        system_prompt=get_prompt(Agent.CHAT, tools),
+        middleware=[OutputTransformerMiddleware(), LoggingMiddleware()],
         response_format=ToolStrategy(ChatResponse),
     ).with_config(_build_config(50, usage_callback))
 
@@ -119,7 +104,7 @@ async def stream_chat(
     report_context: dict[str, Any] | None = None,
 ) -> AsyncIterator[str]:
     def emit(event: dict[str, Any]) -> str:
-        return json.dumps(event) + "\n" # Newline for ndjson
+        return json.dumps(event) + "\n"  # Newline for ndjson
 
     try:
         model = get_model()
@@ -185,7 +170,7 @@ async def run_analysis(
     # Set report_id in context for logging
     report_id_context.set(report_id)
 
-    semaphore = get_semaphore()
+    semaphore = _get_semaphore()
     opensearch_client = get_opensearch_client()
 
     logger.info("Analysis task queued")
@@ -199,7 +184,7 @@ async def run_analysis(
             agent = await create_rca_agent(model, usage_callback=usage_callback)
 
             content = render(
-                "api/rca_request.j2",
+                templates.RCA_REQUEST,
                 {
                     "component_uid": component_uid,
                     "project_uid": project_uid,
@@ -279,7 +264,6 @@ async def _update_failed_status(
     component_uid: UUID,
     summary: str,
 ) -> None:
-    """Update OpenSearch with failed status."""
     try:
         await opensearch_client.upsert_rca_report(
             report_id=report_id,
