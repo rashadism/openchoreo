@@ -1,0 +1,1 @@
+Submit your final structured response. Call this tool when you are ready to respond with your analysis.

@@ -6,9 +6,10 @@ package authz
 type Action string
 
 const (
-	ActionViewLogs    Action = "logs:view"
-	ActionViewTraces  Action = "traces:view"
-	ActionViewMetrics Action = "metrics:view"
+	ActionViewLogs      Action = "logs:view"
+	ActionViewTraces    Action = "traces:view"
+	ActionViewMetrics   Action = "metrics:view"
+	ActionViewRCAReport Action = "rcareport:view"
 )
 
 type ResourceType string
@@ -19,4 +20,5 @@ const (
 	ResourceTypeNamespace            ResourceType = "namespace"
 	ResourceTypeComponentWorkflowRun ResourceType = "componentWorkflowRun"
 	ResourceTypeWorkflowRun          ResourceType = "workflowRun"
+	ResourceTypeRCAReport            ResourceType = "rcareport"
 )
