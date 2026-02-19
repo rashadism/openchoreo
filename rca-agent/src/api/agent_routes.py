@@ -10,8 +10,10 @@ from fastapi.responses import StreamingResponse
 from pydantic import Field
 
 from src.agent import run_analysis, stream_chat
+from src.agent.helpers import resolve_project_scope
 from src.auth import require_authn, require_chat_authz
 from src.auth.authz_models import SubjectContext
+from src.auth.bearer import BearerTokenAuth
 from src.clients import get_opensearch_client
 from src.models import BaseModel, get_current_utc
 
@@ -61,7 +63,6 @@ class ChatRequest(BaseModel):
     version: int | None = None
     project_uid: UUID = Field(alias="projectUid")
     environment_uid: UUID = Field(alias="environmentUid")
-    component_uid: UUID | None = Field(default=None, alias="componentUid")
     messages: list[dict[str, str]]
 
 
@@ -133,10 +134,15 @@ async def chat(
         version=request.version,
     )
 
+    scope = await resolve_project_scope(
+        str(request.project_uid), str(request.environment_uid), auth=BearerTokenAuth(token)
+    )
+
     return StreamingResponse(
         stream_chat(
             messages=request.messages,
             report_context=report_context,
+            scope=scope,
         ),
         media_type="application/x-ndjson",
         headers={"Cache-Control": "no-cache"},
