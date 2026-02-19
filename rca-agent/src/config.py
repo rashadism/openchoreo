@@ -3,6 +3,12 @@
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# OpenChoreo resource labels
+LABEL_COMPONENT_UID = "openchoreo.dev/component-uid"
+LABEL_COMPONENT_UIDS = "openchoreo.dev/component-uids"
+LABEL_ENVIRONMENT_UID = "openchoreo.dev/environment-uid"
+LABEL_PROJECT_UID = "openchoreo.dev/project-uid"
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -49,6 +55,9 @@ class Settings(BaseSettings):
     jwt_issuer: str = ""  # Optional: validate issuer claim
     jwt_audience: str = ""  # Optional: validate audience claim
     jwt_jwks_refresh_interval: int = 3600  # seconds (1 hour)
+
+    # Experimental features
+    remed_agent: bool = False
 
     # Authorization settings
     authz_timeout_seconds: int = 30
