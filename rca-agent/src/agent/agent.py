@@ -12,12 +12,12 @@ from uuid import UUID
 import httpx
 from langchain.agents import create_agent
 from langchain.agents.middleware import SummarizationMiddleware, TodoListMiddleware
-from langchain.agents.structured_output import ProviderStrategy
+from langchain.agents.structured_output import ProviderStrategy, StructuredOutputValidationError
 from langchain_core.callbacks import BaseCallbackHandler, UsageMetadataCallbackHandler
 from langchain_core.runnables import Runnable, RunnableConfig
 from pydantic import BaseModel
 
-from src.agent.helpers import AlertScope, resolve_scope
+from src.agent.helpers import AlertScope, resolve_component_scope
 from src.agent.middleware import (
     LoggingMiddleware,
     OutputTransformerMiddleware,
@@ -30,8 +30,9 @@ from src.auth.oauth_client import get_oauth2_auth
 from src.clients import MCPClient, get_model, get_opensearch_client
 from src.config import settings
 from src.logging_config import request_id_context
-from src.models import ChatResponse, RCAReport, RemediationResult
+from src.models import ChatResponse, RCAReport
 from src.models.rca_report import RootCauseIdentified
+from src.models.remediation_result import RemediationResult
 from src.template_manager import render
 
 logger = logging.getLogger(__name__)
@@ -184,37 +185,40 @@ async def stream_chat(
 
         parser = ChatResponseParser()
 
-        async for chunk, _ in agent.astream(
-            {"messages": agent_messages},
-            stream_mode="messages",
-        ):
-            # Skip non-AI message chunks (e.g., ToolMessage has content as list)
-            if not isinstance(chunk.content, str):
-                continue
+        try:
+            async for chunk, _ in agent.astream(
+                {"messages": agent_messages},
+                stream_mode="messages",
+            ):
+                # Skip non-AI message chunks (e.g., ToolMessage has content as list)
+                if not isinstance(chunk.content, str):
+                    continue
 
-            for block in chunk.content_blocks:
-                block_type = block.get("type")
+                for block in chunk.content_blocks:
+                    block_type = block.get("type")
 
-                if block_type == "tool_call_chunk":
-                    tool_name = block.get("name")
-                    args = block.get("args", "")
-                    if tool_name:
-                        active_form = TOOL_ACTIVE_FORMS.get(tool_name)
-                        yield emit(
-                            {
-                                "type": "tool_call",
-                                "tool": tool_name,
-                                "activeForm": active_form,
-                                "args": args,
-                            }
-                        )
+                    if block_type == "tool_call_chunk":
+                        tool_name = block.get("name")
+                        args = block.get("args", "")
+                        if tool_name:
+                            active_form = TOOL_ACTIVE_FORMS.get(tool_name)
+                            yield emit(
+                                {
+                                    "type": "tool_call",
+                                    "tool": tool_name,
+                                    "activeForm": active_form,
+                                    "args": args,
+                                }
+                            )
 
-                elif block_type == "text":
-                    text = block.get("text", "")
-                    if text:
-                        delta = parser.push(text)
-                        if delta:
-                            yield emit({"type": "message_chunk", "content": delta})
+                    elif block_type == "text":
+                        text = block.get("text", "")
+                        if text:
+                            delta = parser.push(text)
+                            if delta:
+                                yield emit({"type": "message_chunk", "content": delta})
+        except StructuredOutputValidationError:
+            logger.warning("Structured output validation failed, using streamed content")
 
         # Emit actions event if actions exist
         if parser.actions:
@@ -261,7 +265,7 @@ async def run_analysis(
             )
 
             ## TODO: Remove once namespace/environment info is received from upstream
-            scope = await resolve_scope(component_uid, environment_uid)
+            scope = await resolve_component_scope(component_uid, environment_uid)
 
             content = render(
                 "api/rca_request.j2",
@@ -285,7 +289,8 @@ async def run_analysis(
             rca_report: RCAReport = rca_result["structured_response"]
             logger.info("RCA completed: usage=%s", usage_callback.usage_metadata)
 
-            remed_report = None
+            report_data = rca_report.model_dump()
+
             if settings.remed_agent and isinstance(rca_report.result, RootCauseIdentified):
                 try:
                     logger.info("Running remediation agent")
@@ -317,7 +322,10 @@ async def run_analysis(
                         timeout=settings.analysis_timeout_seconds,
                     )
 
-                    remed_report = remed_result["structured_response"]
+                    remed_report: RemediationResult = remed_result["structured_response"]
+                    report_data["result"]["recommendations"]["recommended_actions"] = [
+                        a.model_dump() for a in remed_report.recommended_actions
+                    ]
                     logger.info("Remediation completed: usage=%s", usage_callback.usage_metadata)
                 except Exception as e:
                     logger.error("Remediation agent failed, saving RCA report without it: %s", e)
@@ -326,8 +334,7 @@ async def run_analysis(
                 report_id=report_id,
                 alert_id=alert_id,
                 status="completed",
-                report=rca_report,
-                remediation=remed_report,
+                report=report_data,
                 environment_uid=str(environment_uid),
                 project_uid=str(project_uid),
                 component_uids=[str(component_uid)],
