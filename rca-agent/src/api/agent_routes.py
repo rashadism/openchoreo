@@ -5,7 +5,7 @@ import logging
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import Field
 
@@ -112,20 +112,15 @@ async def rca(
 @router.post("/chat")
 async def chat(
     request: ChatRequest,
-    auth: Annotated[SubjectContext | None, Depends(require_authn)],
-    _authz: Annotated[SubjectContext | None, Depends(require_chat_authz)],
+    http_request: Request,
+    _auth: Annotated[SubjectContext, Depends(require_authn)],
+    _authz: Annotated[SubjectContext, Depends(require_chat_authz)],
 ):
-    if auth:
-        logger.debug(
-            "Chat request authenticated: type=%s, claim=%s, values=%s",
-            auth.type,
-            auth.entitlement_claim,
-            auth.entitlement_values,
-        )
-
     if logger.isEnabledFor(logging.DEBUG):
         body = request.model_dump_json(by_alias=True)
         logger.debug("Received chat request: %s", body)
+
+    token = http_request.state.bearer_token
 
     # Fetch report context for the chat
     opensearch_client = get_opensearch_client()
@@ -141,6 +136,7 @@ async def chat(
     return StreamingResponse(
         stream_chat(
             messages=request.messages,
+            token=token,
             report_context=report_context,
             scope=scope,
         ),

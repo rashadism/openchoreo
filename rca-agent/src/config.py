@@ -50,7 +50,6 @@ class Settings(BaseSettings):
     tls_insecure_skip_verify: bool = False
 
     # JWT Authentication settings
-    jwt_disabled: bool = False
     jwt_jwks_url: str = ""
     jwt_issuer: str = ""  # Optional: validate issuer claim
     jwt_audience: str = ""  # Optional: validate audience claim

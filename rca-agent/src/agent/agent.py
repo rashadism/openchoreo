@@ -9,6 +9,7 @@ from collections.abc import AsyncIterator
 from typing import Any
 from uuid import UUID
 
+import httpx
 from langchain.agents import create_agent
 from langchain.agents.middleware import SummarizationMiddleware, TodoListMiddleware
 from langchain.agents.structured_output import ProviderStrategy
@@ -24,6 +25,8 @@ from src.agent.middleware import (
 )
 from src.agent.stream_parser import ChatResponseParser
 from src.agent.tool_registry import OBSERVABILITY_TOOLS, OPENCHOREO_TOOLS, TOOL_ACTIVE_FORMS, TOOLS
+from src.auth.bearer import BearerTokenAuth
+from src.auth.oauth_client import get_oauth2_auth
 from src.clients import MCPClient, get_model, get_opensearch_client
 from src.config import settings
 from src.logging_config import request_id_context
@@ -58,10 +61,11 @@ class Agent:
 
     async def create(
         self,
+        auth: httpx.Auth,
         usage_callback: BaseCallbackHandler | None = None,
         context: dict[str, Any] | None = None,
     ) -> Runnable:
-        mcp_client = MCPClient()
+        mcp_client = MCPClient(auth=auth)
         all_tools = await mcp_client.get_tools()
         tools = [t for t in all_tools if t.name in self.tools]
         logger.debug("Filtered to %d tools: %s", len(tools), [t.name for t in tools])
@@ -161,6 +165,7 @@ def _get_semaphore() -> asyncio.Semaphore:
 
 async def stream_chat(
     messages: list[dict[str, str]],
+    token: str,
     report_context: dict[str, Any] | None = None,
     scope: AlertScope | None = None,
 ) -> AsyncIterator[str]:
@@ -171,6 +176,7 @@ async def stream_chat(
 
     try:
         agent = await CHAT_AGENT.create(
+            auth=BearerTokenAuth(token),
             context={"scope": scope, "report_context": report_context},
         )
 
@@ -250,7 +256,9 @@ async def run_analysis(
         try:
             usage_callback = UsageMetadataCallbackHandler()
 
-            rca_agent = await RCA_AGENT.create(usage_callback=usage_callback)
+            rca_agent = await RCA_AGENT.create(
+                auth=get_oauth2_auth(), usage_callback=usage_callback
+            )
 
             ## TODO: Remove once namespace/environment info is received from upstream
             scope = await resolve_scope(component_uid, environment_uid)
@@ -282,6 +290,7 @@ async def run_analysis(
                 try:
                     logger.info("Running remediation agent")
                     remed_agent = await REMED_AGENT.create(
+                        auth=get_oauth2_auth(),
                         usage_callback=usage_callback,
                         context={"scope": scope},
                     )

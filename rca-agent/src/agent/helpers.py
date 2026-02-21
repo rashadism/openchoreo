@@ -1,6 +1,10 @@
 import json
 from dataclasses import dataclass
 
+import httpx
+
+from src.auth.oauth_client import get_oauth2_auth
+
 
 @dataclass
 class AlertScope:
@@ -18,10 +22,12 @@ def _parse_mcp_response(content_blocks: list[dict], key: str) -> list[dict]:
     return json.loads(text)[key]
 
 
-async def resolve_scope(component_uid: str, environment_uid: str) -> AlertScope:
+async def resolve_scope(
+    component_uid: str, environment_uid: str, auth: httpx.Auth | None = None
+) -> AlertScope:
     from src.clients import MCPClient
 
-    mcp_client = MCPClient()
+    mcp_client = MCPClient(auth=auth or get_oauth2_auth())
     all_tools = await mcp_client.get_tools()
     list_namespaces = next(t for t in all_tools if t.name == "list_namespaces")
     list_projects = next(t for t in all_tools if t.name == "list_projects")
