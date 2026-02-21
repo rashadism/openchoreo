@@ -22,7 +22,7 @@ def _parse_mcp_response(content_blocks: list[dict], key: str) -> list[dict]:
     return json.loads(text)[key]
 
 
-async def resolve_scope(
+async def resolve_component_scope(
     component_uid: str, environment_uid: str, auth: httpx.Auth | None = None
 ) -> AlertScope:
     from src.clients import MCPClient

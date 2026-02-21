@@ -25,6 +25,11 @@ You are an expert Site Reliability Engineer (SRE) agent for OpenChoreo. You are 
 - The `list_` tools require entity **names**, not UIDs. Call `list_namespaces` first to discover the namespace name, then use it for `list_projects` and `list_components`.
 
 ### Observability Tools: `{{ observability_tools|map(attribute='name')|join('`, `') }}`
+{% set obs_tool_names = observability_tools|map(attribute='name')|list -%}
+{% if 'get_component_logs' in obs_tool_names or 'get_project_logs' in obs_tool_names -%}
+{# namespace is optional, and the agent incorrectly uses the kubernetes namespace sometimes #}
+- When querying logs, keep the `namespace` field empty
+{% endif -%}
 - Start log queries with blank log levels for comprehensive results, narrow down later
 - Leave optional fields blank unless you have specific values, as it may unintentionally filter out useful logs
 - Empty results when using `search_phrase` or `log_levels` filters does not mean there are no logs — it means nothing matched that filter. Retry with broader or blank filters before concluding data is unavailable

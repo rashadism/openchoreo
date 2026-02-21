@@ -10,8 +10,6 @@ from opensearchpy import AsyncOpenSearch
 from opensearchpy.exceptions import OpenSearchException
 
 from src.config import LABEL_COMPONENT_UIDS, LABEL_ENVIRONMENT_UID, LABEL_PROJECT_UID, settings
-from src.models.rca_report import RCAReport
-from src.models.remediation_result import RemediationResult
 
 logger = logging.getLogger(__name__)
 
@@ -48,8 +46,7 @@ class AsyncOpenSearchClient:
         report_id: str,
         alert_id: str,
         status: str = "pending",
-        report: RCAReport | None = None,
-        remediation: RemediationResult | None = None,
+        report: dict[str, Any] | None = None,
         summary: str | None = None,
         timestamp: datetime | None = None,
         environment_uid: str | None = None,
@@ -74,13 +71,10 @@ class AsyncOpenSearchClient:
         }
 
         if report is not None:
-            document["summary"] = report.summary
-            document["report"] = report.model_dump()
+            document["summary"] = report.get("summary")
+            document["report"] = report
         elif summary is not None:
             document["summary"] = summary
-
-        if remediation is not None:
-            document["remediation"] = remediation.model_dump()
 
         try:
             response = await self.client.index(index=index_name, body=document, id=report_id)

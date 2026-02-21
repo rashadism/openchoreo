@@ -63,6 +63,16 @@ class TOOLS:
         server=OPENCHOREO,
         active_form="Loading release bindings...",
     )
+    LIST_COMPONENT_TRAITS = Tool(
+        "list_component_traits",
+        server=OPENCHOREO,
+        active_form="Loading component traits...",
+    )
+    GET_TRAIT_SCHEMA = Tool(
+        "get_trait_schema",
+        server=OPENCHOREO,
+        active_form="Fetching trait schema...",
+    )
 
 
 _ALL = [v for v in vars(TOOLS).values() if isinstance(v, Tool)]
