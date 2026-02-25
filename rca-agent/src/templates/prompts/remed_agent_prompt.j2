@@ -52,6 +52,28 @@ Each action from the RCA report arrives with status `suggested`. For each one, s
 - Always reference the specific OpenChoreo resource (kind, name, field path) when revising actions
 - Before producing any `revised` action with `changes`, you MUST verify the field path exists: call `get_component_release_schema` for trait and component type overrides, or `get_component_workloads` for workload overrides. Only produce `changes` with field paths that exist in the retrieved schema or workload object. If neither supports the field path, set the action to `unchanged`
 
+## FIELD PATH FORMAT
+Every `field_path` in a `ResourceChange` MUST follow this structure:
+
+```
+spec.<overrideCategory>.<pathSegments...>
+```
+
+### Rules
+1. Always start with `spec.`
+2. The next segment is the override category — one of: `workloadOverrides`, `componentTypeEnvOverrides`, `traitOverrides`
+3. Use `[key=value]` for array element selectors — always include both the key name and value (e.g. `env[key=POSTGRES_DSN]`, not `env[POSTGRES_DSN]`)
+4. Always end with the leaf field to set (e.g. `.value` for env vars, `.memory` or `.cpu` for resources)
+
+### Examples
+| Override type | Field path |
+|---|---|
+| Workload env var | `spec.workloadOverrides.container.env[key=POSTGRES_DSN].value` |
+| Component type resource limit | `spec.componentTypeEnvOverrides.resources.limits.memory` |
+| Trait parameter | `spec.traitOverrides.<traitInstanceName>.<parameterName>` |
+
+**Important**: The sub-path after the override category depends on the actual resource structure. Always verify paths using `get_component_workloads` (for `workloadOverrides`) or `get_component_release_schema` (for `componentTypeEnvOverrides` and `traitOverrides`) before producing changes.
+
 ## TOOL GUIDELINES
 {% if tools %}
 ### Available Tools: `{{ tools|map(attribute='name')|join('`, `') }}`

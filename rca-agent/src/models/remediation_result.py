@@ -21,8 +21,9 @@ class ResourceChange(BaseModel):
     field_path: str = Field(
         ...,
         description=(
-            "Field path to update"
-            " (e.g. 'spec.workloadOverrides.container.env[name=POSTGRES_DSN].value')"
+            "Field path starting with 'spec.' followed by override category and path segments. "
+            "Array selectors use [key=value] syntax. "
+            "Example: 'spec.workloadOverrides.container.env[key=POSTGRES_DSN].value'"
         ),
     )
     value: str = Field(..., description="Recommended value to set")

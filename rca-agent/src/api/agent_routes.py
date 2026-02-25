@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
@@ -11,6 +11,7 @@ from pydantic import Field
 
 from src.agent import run_analysis, stream_chat
 from src.agent.helpers import resolve_project_scope
+from src.agent.patch import stream_patch
 from src.auth import require_authn, require_chat_authz
 from src.auth.authz_models import SubjectContext
 from src.auth.bearer import BearerTokenAuth
@@ -58,12 +59,19 @@ class AnalyzeRequest(BaseModel):
     meta: dict[str, Any] | None = None
 
 
+class PatchContext(BaseModel):
+    actions: list[dict[str, Any]]
+
+
 class ChatRequest(BaseModel):
     report_id: str = Field(alias="reportId")
     version: int | None = None
     project_uid: UUID = Field(alias="projectUid")
     environment_uid: UUID = Field(alias="environmentUid")
     messages: list[dict[str, str]]
+
+    action: Literal["apply_fix"] | None = None
+    patch_context: PatchContext | None = Field(alias="patchContext", default=None)
 
 
 @router.post("/rca")
@@ -121,6 +129,26 @@ async def chat(
         logger.debug("Received chat request: %s", body)
 
     token = http_request.state.bearer_token
+
+    if request.action == "apply_fix":
+        if request.patch_context is None:
+            raise HTTPException(
+                status_code=422, detail="patchContext is required when action is 'apply_fix'"
+            )
+
+        scope = await resolve_project_scope(
+            str(request.project_uid), str(request.environment_uid), auth=BearerTokenAuth(token)
+        )
+
+        return StreamingResponse(
+            stream_patch(
+                patch_context=request.patch_context,
+                token=token,
+                scope=scope,
+            ),
+            media_type="application/x-ndjson",
+            headers={"Cache-Control": "no-cache"},
+        )
 
     # Fetch report context for the chat
     opensearch_client = get_opensearch_client()

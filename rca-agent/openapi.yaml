@@ -58,16 +58,21 @@ paths:
     post:
       tags:
         - Agent
-      summary: Chat about an RCA report
+      summary: Chat about an RCA report or apply remediation patches
       description: |
-        Conversational Q&A about an RCA report with streaming NDJSON response.
+        Multi-purpose streaming endpoint. The `action` field determines the behavior:
 
-        The agent can query observability data (logs, traces, metrics) to answer
-        follow-up questions about the report.
+        - **`action` omitted/null** — Conversational Q&A about an RCA report (default).
+          The agent queries observability data to answer follow-up questions.
+          Events: `tool_call`* → `message_chunk`* → `actions`? → `done`
+
+        - **`action: "apply_fix"`** — Deterministic patch flow that directly applies revised
+          remediation actions via MCP tools. No LLM involved — the user has already reviewed
+          and approved the changes in the UI before clicking "apply".
+          Events: `patch_started` → (`patch_progress` → `patch_result`)* → `patch_done`
 
         **Streaming Response Format (NDJSON):**
         Each line is a JSON object with a `type` field indicating the event type.
-        Events are streamed in order: `message_chunk`* → `tool_call`* → `actions`? → `done`
       operationId: chat
       requestBody:
         required: true
@@ -75,26 +80,89 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/ChatRequest'
+            examples:
+              chat:
+                summary: Regular chat
+                value:
+                  reportId: 'alert-789_1704067200'
+                  projectUid: '1c4e7a9b-3f6d-4e2a-8b5c-7d9f1e3a4c6b'
+                  environmentUid: '2f5a8c1e-7d9b-4e3f-6a4c-8e1f2d7a9b5c'
+                  messages:
+                    - role: 'user'
+                      content: 'What caused the memory spike?'
+              apply_single_fix:
+                summary: Apply a single fix
+                value:
+                  reportId: 'alert-789_1704067200'
+                  projectUid: '1c4e7a9b-3f6d-4e2a-8b5c-7d9f1e3a4c6b'
+                  environmentUid: '2f5a8c1e-7d9b-4e3f-6a4c-8e1f2d7a9b5c'
+                  messages: []
+                  action: 'apply_fix'
+                  patchContext:
+                    actions:
+                      - index: 1
+                        description: 'Update env var POSTGRES_DSN'
+                        status: 'revised'
+                        changes:
+                          - resource: 'ReleaseBinding api-service-development'
+                            field_path: 'spec.workloadOverrides.container.env[key=POSTGRES_DSN].value'
+                            value: 'postgres://postgres:postgres@postgres:5432/urlshortener?sslmode=disable'
+              apply_all_fixes:
+                summary: Apply all fixes (fix all)
+                value:
+                  reportId: 'alert-789_1704067200'
+                  projectUid: '1c4e7a9b-3f6d-4e2a-8b5c-7d9f1e3a4c6b'
+                  environmentUid: '2f5a8c1e-7d9b-4e3f-6a4c-8e1f2d7a9b5c'
+                  messages: []
+                  action: 'apply_fix'
+                  patchContext:
+                    actions:
+                      - index: 0
+                        description: 'Increase memory limit to 512Mi'
+                        status: 'revised'
+                        changes:
+                          - resource: 'ReleaseBinding api-service-development'
+                            field_path: 'spec.workloadOverrides.container.resources.limits.memory'
+                            value: '512Mi'
+                      - index: 1
+                        description: 'Update env var POSTGRES_DSN'
+                        status: 'revised'
+                        changes:
+                          - resource: 'ReleaseBinding api-service-development'
+                            field_path: 'spec.workloadOverrides.container.env[key=POSTGRES_DSN].value'
+                            value: 'postgres://postgres:postgres@postgres:5432/urlshortener?sslmode=disable'
       responses:
         '200':
-          description: Streaming NDJSON response with chat events
+          description: Streaming NDJSON response with events
           content:
             application/x-ndjson:
               schema:
                 $ref: '#/components/schemas/StreamEvent'
               examples:
                 message_chunk:
-                  summary: Message chunk event
+                  summary: Message chunk event (chat)
                   value: '{"type": "message_chunk", "content": "Based on the logs"}'
                 tool_call:
                   summary: Tool call event
                   value: '{"type": "tool_call", "tool": "get_component_logs", "activeForm": "Fetching component logs...", "args": "{\"componentUid\": \"...\"}"}'
                 actions:
-                  summary: Actions event
+                  summary: Actions event (chat)
                   value: '{"type": "actions", "actions": [{"type": "suggest_amend", "reason": "Found new root cause"}]}'
                 done:
-                  summary: Done event
+                  summary: Done event (chat)
                   value: '{"type": "done", "message": "The issue was caused by..."}'
+                patch_started:
+                  summary: Patch started event (apply_fix)
+                  value: '{"type": "patch_started"}'
+                patch_progress:
+                  summary: Patch progress event — starting to apply an action
+                  value: '{"type": "patch_progress", "index": 1, "action": "Update env var POSTGRES_DSN", "status": "applying"}'
+                patch_result:
+                  summary: Patch result event — action completed
+                  value: '{"type": "patch_result", "index": 1, "action": "Update env var POSTGRES_DSN", "status": "success", "details": "Applied to ReleaseBinding api-service-development"}'
+                patch_done:
+                  summary: Patch done event (apply_fix)
+                  value: '{"type": "patch_done", "summary": "Applied 1/1 fixes"}'
                 error:
                   summary: Error event
                   value: '{"type": "error", "message": "Failed to fetch logs"}'
@@ -106,6 +174,12 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized - invalid or missing authentication
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation error (e.g., `apply_fix` without `patchContext`)
           content:
             application/json:
               schema:
@@ -425,11 +499,11 @@ components:
       properties:
         reportId:
           type: string
-          description: The ID of the RCA report to chat about
+          description: The ID of the RCA report
           example: 'alert-789_1704067200'
         version:
           type: integer
-          description: Specific report version to fetch. If not provided, fetches the latest version.
+          description: Specific report version to fetch (chat only). If not provided, fetches the latest version.
           minimum: 1
           example: 1
         projectUid:
@@ -449,17 +523,23 @@ components:
           example: '8a4c5e2f-9d3b-4a7e-b1f6-2c8d4e9f3a7b'
         messages:
           type: array
-          description: Chat message history
-          minItems: 1
+          description: Chat message history. Can be empty `[]` for patch actions.
           items:
             $ref: '#/components/schemas/ChatMessage'
           example:
             - role: 'user'
               content: 'What caused the memory spike at 08:15?'
-            - role: 'assistant'
-              content: 'The memory spike was caused by a memory leak in the connection pool.'
-            - role: 'user'
-              content: 'Can you show me the relevant logs?'
+        action:
+          type: string
+          nullable: true
+          enum: [apply_fix]
+          description: |
+            Determines endpoint behavior. When omitted or null, uses the default chat agent.
+            - `apply_fix`: Deterministic patch flow that applies revised remediation actions via MCP tools
+        patchContext:
+          nullable: true
+          description: Remediation actions to apply. Required when `action` is `apply_fix`.
+          $ref: '#/components/schemas/PatchContext'
 
     ChatMessage:
       type: object
@@ -481,11 +561,18 @@ components:
       description: |
         A streaming event. Events are sent as newline-delimited JSON (NDJSON).
         Use the `type` field to determine the event type.
+
+        **Chat events:** `message_chunk`, `tool_call`, `actions`, `done`, `error`
+        **Patch events:** `patch_started`, `patch_progress`, `patch_result`, `patch_done`, `error`
       oneOf:
         - $ref: '#/components/schemas/MessageChunkEvent'
         - $ref: '#/components/schemas/ToolCallEvent'
         - $ref: '#/components/schemas/ActionsEvent'
         - $ref: '#/components/schemas/DoneEvent'
+        - $ref: '#/components/schemas/PatchStartedEvent'
+        - $ref: '#/components/schemas/PatchProgressEvent'
+        - $ref: '#/components/schemas/PatchResultEvent'
+        - $ref: '#/components/schemas/PatchDoneEvent'
         - $ref: '#/components/schemas/ErrorEvent'
       discriminator:
         propertyName: type
@@ -494,6 +581,10 @@ components:
           tool_call: '#/components/schemas/ToolCallEvent'
           actions: '#/components/schemas/ActionsEvent'
           done: '#/components/schemas/DoneEvent'
+          patch_started: '#/components/schemas/PatchStartedEvent'
+          patch_progress: '#/components/schemas/PatchProgressEvent'
+          patch_result: '#/components/schemas/PatchResultEvent'
+          patch_done: '#/components/schemas/PatchDoneEvent'
           error: '#/components/schemas/ErrorEvent'
 
     MessageChunkEvent:
@@ -588,6 +679,121 @@ components:
           type: string
           description: Error message describing what went wrong
           example: 'Failed to fetch component logs: connection timeout'
+
+    PatchStartedEvent:
+      type: object
+      description: Emitted once at the start of an `apply_fix` request.
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum: [patch_started]
+          description: Event type discriminator
+
+    PatchProgressEvent:
+      type: object
+      description: Emitted when starting to apply a remediation action.
+      required:
+        - type
+        - index
+        - action
+        - status
+      properties:
+        type:
+          type: string
+          enum: [patch_progress]
+          description: Event type discriminator
+        index:
+          type: integer
+          description: Index of the action in the original report's recommended_actions list. Echoed from the request.
+          example: 0
+        action:
+          type: string
+          description: Description of the action being applied
+          example: 'Update env var POSTGRES_DSN'
+        status:
+          type: string
+          enum: [applying]
+          description: Always "applying" for progress events
+          example: 'applying'
+
+    PatchResultEvent:
+      type: object
+      description: Emitted after each action completes (success, failed, or skipped).
+      required:
+        - type
+        - index
+        - action
+        - status
+      properties:
+        type:
+          type: string
+          enum: [patch_result]
+          description: Event type discriminator
+        index:
+          type: integer
+          description: Index of the action in the original report's recommended_actions list. Echoed from the request.
+          example: 0
+        action:
+          type: string
+          description: Description of the action that was applied
+          example: 'Update env var POSTGRES_DSN'
+        status:
+          type: string
+          enum: [success, failed, skipped]
+          description: Result of applying this action
+          example: 'success'
+        details:
+          type: string
+          description: Additional details about the result
+          example: 'Applied to ReleaseBinding api-service-development'
+
+    PatchDoneEvent:
+      type: object
+      description: Emitted when all actions have been processed. This is the **final event** in the stream.
+      required:
+        - type
+        - summary
+      properties:
+        type:
+          type: string
+          enum: [patch_done]
+          description: Event type discriminator
+        summary:
+          type: string
+          description: Summary of what was applied
+          example: 'Applied 1/1 fixes'
+
+    PatchContext:
+      type: object
+      description: Remediation actions to apply via the patch flow
+      required:
+        - actions
+      properties:
+        actions:
+          type: array
+          description: |
+            Revised remediation actions from the RCA report. Only actions with `status: "revised"` and
+            non-empty `changes` will be applied. Each action should include an `index` field matching its
+            position in the original report's `recommended_actions` list, so the UI can map events back
+            to the correct fix card. If `index` is omitted, the array position is used as fallback.
+          items:
+            type: object
+            additionalProperties: true
+            description: A remediation action dict (same shape as `RecommendedAction` in the RCA report, plus an `index` field)
+            properties:
+              index:
+                type: integer
+                description: Position of this action in the original report's recommended_actions list
+          example:
+            - index: 0
+              description: 'Update env var POSTGRES_DSN'
+              status: 'revised'
+              changes:
+                - resource: 'ReleaseBinding api-service-development'
+                  field_path: 'spec.workloadOverrides.container.env[key=POSTGRES_DSN].value'
+                  value: 'postgres://postgres:postgres@postgres:5432/urlshortener?sslmode=disable'
 
     ErrorResponse:
       type: object

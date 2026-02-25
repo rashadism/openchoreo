@@ -78,9 +78,7 @@ class Agent:
 
         middleware = [m() for m in self._middleware_classes]
         if self._use_summarization:
-            middleware.append(
-                SummarizationMiddleware(model=self.model, trigger=("fraction", 0.8))
-            )
+            middleware.append(SummarizationMiddleware(model=self.model, trigger=("fraction", 0.8)))
 
         agent = create_agent(
             model=self.model,

@@ -44,7 +44,7 @@ class TOOLS:
         "list_components", server=OPENCHOREO, active_form="Loading components..."
     )
     PATCH_RELEASEBINDING = Tool(
-        "patch_releasebinding", server=OPENCHOREO, active_form="Patching release binding..."
+        "patch_release_binding", server=OPENCHOREO, active_form="Patching release binding..."
     )
     GET_RESOURCE = Tool("get_resource", server=OPENCHOREO, active_form="Fetching resource...")
     GET_COMPONENT_RELEASE_SCHEMA = Tool(
