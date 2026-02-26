@@ -9,7 +9,8 @@ from urllib.parse import urlparse
 from opensearchpy import AsyncOpenSearch
 from opensearchpy.exceptions import OpenSearchException
 
-from src.config import LABEL_COMPONENT_UIDS, LABEL_ENVIRONMENT_UID, LABEL_PROJECT_UID, settings
+from src.clients.backend.report_backend import ReportBackend
+from src.config import LABEL_ENVIRONMENT_UID, LABEL_PROJECT_UID, settings
 
 logger = logging.getLogger(__name__)
 
@@ -17,10 +18,10 @@ logger = logging.getLogger(__name__)
 _DEFAULT_OPENSEARCH_PORT = 9200
 
 # Module-level singleton
-_client: AsyncOpenSearchClient | None = None
+_client: OpenSearchReportBackend | None = None
 
 
-class AsyncOpenSearchClient:
+class OpenSearchReportBackend(ReportBackend):
     def __init__(self) -> None:
         self.client = self._create_client()
         self.index_prefix = "rca-reports"
@@ -51,22 +52,18 @@ class AsyncOpenSearchClient:
         timestamp: datetime | None = None,
         environment_uid: str | None = None,
         project_uid: str | None = None,
-        component_uids: list[str] | None = None,
-        version: int = 1,
     ) -> dict[str, Any]:
         doc_timestamp = timestamp or datetime.now(UTC)
         index_name = f"{self.index_prefix}-{doc_timestamp.strftime('%Y.%m')}"
 
-        document = {
+        document: dict[str, Any] = {
             "@timestamp": doc_timestamp.isoformat(),
             "reportId": report_id,
             "alertId": alert_id,
             "status": status,
-            "version": version,
             "resource": {
                 LABEL_ENVIRONMENT_UID: environment_uid,
                 LABEL_PROJECT_UID: project_uid,
-                LABEL_COMPONENT_UIDS: component_uids,
             },
         }
 
@@ -79,7 +76,7 @@ class AsyncOpenSearchClient:
         try:
             response = await self.client.index(index=index_name, body=document, id=report_id)
             logger.info(
-                f"Successfully upserted RCA report {report_id} to {index_name} with status={status}, version={version}"
+                f"Successfully upserted RCA report {report_id} to {index_name} with status={status}"
             )
             return response
         except OpenSearchException as e:
@@ -89,16 +86,11 @@ class AsyncOpenSearchClient:
     async def get_rca_report(
         self,
         report_id: str,
-        version: int | None = None,
     ) -> dict[str, Any] | None:
         query: dict[str, Any] = {
-            "query": {"bool": {"must": [{"term": {"reportId": report_id}}]}},
-            "sort": [{"version": {"order": "desc"}}],
+            "query": {"term": {"reportId": report_id}},
             "size": 1,
         }
-
-        if version is not None:
-            query["query"]["bool"]["must"].append({"term": {"version": version}})
 
         try:
             response = await self.client.search(
@@ -113,15 +105,15 @@ class AsyncOpenSearchClient:
             logger.error(f"Failed to fetch RCA report {report_id}: {e}")
             raise
 
-    async def get_rca_reports_by_project(
+    async def list_rca_reports(
         self,
         project_uid: str,
         environment_uid: str,
         start_time: str,
         end_time: str,
-        component_uids: list[str] | None = None,
         status: str | None = None,
         limit: int = 100,
+        sort: str = "desc",
     ) -> dict[str, Any]:
         must_clauses: list[dict[str, Any]] = [
             {"term": {f"resource.{LABEL_PROJECT_UID}": project_uid}},
@@ -135,15 +127,8 @@ class AsyncOpenSearchClient:
         query: dict[str, Any] = {
             "size": limit,
             "query": {"bool": {"must": must_clauses}},
-            "sort": [{"@timestamp": {"order": "desc"}}],
+            "sort": [{"@timestamp": {"order": sort}}],
         }
-
-        # Add component filter if specified
-        if component_uids:
-            query["query"]["bool"]["should"] = [
-                {"terms": {f"resource.{LABEL_COMPONENT_UIDS}": component_uids}}
-            ]
-            query["query"]["bool"]["minimum_should_match"] = 1
 
         try:
             response = await self.client.search(
@@ -180,69 +165,6 @@ class AsyncOpenSearchClient:
             logger.error(f"Failed to fetch RCA reports for project {project_uid}: {e}")
             raise
 
-    async def get_rca_report_by_alert(
-        self,
-        alert_id: str,
-        version: int | None = None,
-    ) -> dict[str, Any] | None:
-        # First query: Get all versions for this alertId
-        versions_query: dict[str, Any] = {
-            "size": 0,
-            "query": {"term": {"alertId": alert_id}},
-            "aggs": {
-                "versions": {"terms": {"field": "version", "order": {"_key": "desc"}, "size": 100}}
-            },
-        }
-
-        try:
-            versions_response = await self.client.search(
-                index=f"{self.index_prefix}-*",
-                body=versions_query,
-            )
-            buckets = (
-                versions_response.get("aggregations", {}).get("versions", {}).get("buckets", [])
-            )
-            available_versions = [b["key"] for b in buckets]
-
-            if not available_versions:
-                return None
-
-            # Second query: Get specific version or latest
-            report_query: dict[str, Any] = {
-                "query": {"bool": {"must": [{"term": {"alertId": alert_id}}]}},
-                "sort": [{"version": {"order": "desc"}}],
-                "size": 1,
-            }
-
-            if version is not None:
-                report_query["query"]["bool"]["must"].append({"term": {"version": version}})
-
-            response = await self.client.search(
-                index=f"{self.index_prefix}-*",
-                body=report_query,
-            )
-
-            hits = response.get("hits", {}).get("hits", [])
-            if not hits:
-                return None
-
-            source = hits[0]["_source"]
-            resource = source.get("resource", {})
-
-            return {
-                "alertId": source.get("alertId"),
-                "projectUid": resource.get(LABEL_PROJECT_UID),
-                "reportVersion": source.get("version"),
-                "reportId": source.get("reportId"),
-                "timestamp": source.get("@timestamp"),
-                "status": source.get("status"),
-                "availableVersions": available_versions,
-                "report": source.get("report"),
-            }
-        except OpenSearchException as e:
-            logger.error(f"Failed to fetch RCA report for alert {alert_id}: {e}")
-            raise
-
     async def check_connection(self) -> bool:
         try:
             await self.client.info()
@@ -255,8 +177,8 @@ class AsyncOpenSearchClient:
         await self.client.close()
 
 
-def get_opensearch_client() -> AsyncOpenSearchClient:
+def get_report_backend() -> ReportBackend:
     global _client
     if _client is None:
-        _client = AsyncOpenSearchClient()
+        _client = OpenSearchReportBackend()
     return _client

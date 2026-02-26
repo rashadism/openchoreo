@@ -9,7 +9,7 @@ from fastapi import FastAPI
 
 from src.api import agent_router, report_router
 from src.auth import check_oauth2_connection, get_oauth2_auth
-from src.clients import MCPClient, get_model, get_opensearch_client
+from src.clients import MCPClient, get_model, get_report_backend
 from src.config import settings
 from src.logging_config import setup_logging
 
@@ -35,8 +35,8 @@ async def lifespan(_app: FastAPI):
 
     logger.info("Testing OpenSearch connection...")
     try:
-        opensearch_client = get_opensearch_client()
-        if await opensearch_client.check_connection():
+        report_backend = get_report_backend()
+        if await report_backend.check_connection():
             logger.info("OpenSearch connection successful")
         else:
             logger.error("OpenSearch connection check failed")
@@ -67,7 +67,7 @@ async def lifespan(_app: FastAPI):
     yield
 
     logger.info("Shutting down...")
-    await opensearch_client.close()
+    await report_backend.close()
 
 
 app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)

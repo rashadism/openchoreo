@@ -27,7 +27,7 @@ from src.agent.stream_parser import ChatResponseParser
 from src.agent.tool_registry import OBSERVABILITY_TOOLS, OPENCHOREO_TOOLS, TOOL_ACTIVE_FORMS, TOOLS
 from src.auth.bearer import BearerTokenAuth
 from src.auth.oauth_client import get_oauth2_auth
-from src.clients import MCPClient, get_model, get_opensearch_client
+from src.clients import MCPClient, ReportBackend, get_model, get_report_backend
 from src.config import settings
 from src.logging_config import request_id_context
 from src.models import ChatResponse, RCAReport
@@ -78,9 +78,7 @@ class Agent:
 
         middleware = [m() for m in self._middleware_classes]
         if self._use_summarization:
-            middleware.append(
-                SummarizationMiddleware(model=self.model, trigger=("fraction", 0.8))
-            )
+            middleware.append(SummarizationMiddleware(model=self.model, trigger=("fraction", 0.8)))
 
         agent = create_agent(
             model=self.model,
@@ -254,7 +252,7 @@ async def run_analysis(
     request_id_context.set(report_id)
 
     semaphore = _get_semaphore()
-    opensearch_client = get_opensearch_client()
+    report_backend = get_report_backend()
 
     logger.info("Analysis task queued")
 
@@ -334,7 +332,7 @@ async def run_analysis(
                 except Exception as e:
                     logger.error("Remediation agent failed, saving RCA report without it: %s", e)
 
-            response = await opensearch_client.upsert_rca_report(
+            response = await report_backend.upsert_rca_report(
                 report_id=report_id,
                 alert_id=alert_id,
                 status="completed",
@@ -355,7 +353,7 @@ async def run_analysis(
                 settings.analysis_timeout_seconds,
             )
             await _update_failed_status(
-                opensearch_client,
+                report_backend,
                 report_id,
                 alert_id,
                 environment_uid,
@@ -367,7 +365,7 @@ async def run_analysis(
         except Exception as e:
             logger.error("Analysis failed: error=%s", e, exc_info=True)
             await _update_failed_status(
-                opensearch_client,
+                report_backend,
                 report_id,
                 alert_id,
                 environment_uid,
@@ -378,7 +376,7 @@ async def run_analysis(
 
 
 async def _update_failed_status(
-    opensearch_client: Any,
+    report_backend: ReportBackend,
     report_id: str,
     alert_id: str,
     environment_uid: UUID,
@@ -387,7 +385,7 @@ async def _update_failed_status(
     summary: str,
 ) -> None:
     try:
-        await opensearch_client.upsert_rca_report(
+        await report_backend.upsert_rca_report(
             report_id=report_id,
             alert_id=alert_id,
             status="failed",

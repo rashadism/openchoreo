@@ -14,7 +14,7 @@ from src.agent.helpers import resolve_project_scope
 from src.auth import require_authn, require_chat_authz
 from src.auth.authz_models import SubjectContext
 from src.auth.bearer import BearerTokenAuth
-from src.clients import get_opensearch_client
+from src.clients import get_report_backend
 from src.models import BaseModel, get_current_utc
 
 logger = logging.getLogger(__name__)
@@ -77,10 +77,10 @@ async def rca(
 
     timestamp = int(get_current_utc().timestamp())
     report_id = f"{request.alert.id}_{timestamp}"
-    opensearch_client = get_opensearch_client()
+    report_backend = get_report_backend()
 
     try:
-        await opensearch_client.upsert_rca_report(
+        await report_backend.upsert_rca_report(
             report_id=report_id,
             alert_id=request.alert.id,
             status="pending",
@@ -123,8 +123,8 @@ async def chat(
     token = http_request.state.bearer_token
 
     # Fetch report context for the chat
-    opensearch_client = get_opensearch_client()
-    report_context = await opensearch_client.get_rca_report(
+    report_backend = get_report_backend()
+    report_context = await report_backend.get_rca_report(
         report_id=request.report_id,
         version=request.version,
     )

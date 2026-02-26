@@ -11,7 +11,7 @@ from pydantic import ConfigDict, Field
 
 from src.auth import require_authn, require_reports_authz
 from src.auth.authz_models import SubjectContext
-from src.clients import get_opensearch_client
+from src.clients import get_report_backend
 from src.models import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -95,8 +95,8 @@ async def get_rca_reports_by_project(
 ):
     validate_time_range(start_time, end_time)
 
-    opensearch_client = get_opensearch_client()
-    result = await opensearch_client.get_rca_reports_by_project(
+    report_backend = get_report_backend()
+    result = await report_backend.get_rca_reports_by_project(
         project_uid=str(project_id),
         environment_uid=str(environment_uid),
         start_time=start_time,
@@ -124,8 +124,8 @@ async def get_rca_report_by_alert(
     _authz: Annotated[SubjectContext, Depends(require_reports_authz)],
     version: Annotated[int | None, Query(ge=1)] = None,
 ):
-    opensearch_client = get_opensearch_client()
-    result = await opensearch_client.get_rca_report_by_alert(alert_id, version)
+    report_backend = get_report_backend()
+    result = await report_backend.get_rca_report_by_alert(alert_id, version)
 
     if not result:
         raise HTTPException(status_code=404, detail="Report not found")
