@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -404,7 +405,12 @@ func (r *Reconciler) createWorkloadFromWorkflowRun(
 // extractWorkloadCRFromRunResource extracts workload CR from run resource outputs.
 func extractWorkloadCRFromRunResource(runResource *argoproj.Workflow) string {
 	for _, node := range runResource.Status.Nodes {
-		if node.TemplateName == generateWorkloadTaskName && node.Phase == argoproj.NodeSucceeded {
+		nodeTaskName := node.DisplayName
+		if nodeTaskName == "" {
+			nodeTaskName = extractTaskNameFromArgoNodeName(node.Name)
+		}
+
+		if nodeTaskName == generateWorkloadTaskName && node.Phase == argoproj.NodeSucceeded {
 			if node.Outputs != nil {
 				for _, param := range node.Outputs.Parameters {
 					if param.Name == workloadCRParamName && param.Value != nil {
@@ -738,8 +744,14 @@ func extractArgoTasksFromWorkflowNodes(nodes argoproj.Nodes) []openchoreodevv1al
 		// Extract order from node name (e.g., "workflow-name[0].step-name" -> 0)
 		order := extractArgoStepOrderFromNodeName(node.Name)
 
+		// Extract task name: prefer DisplayName, fallback to parsing node name
+		taskName := node.DisplayName
+		if taskName == "" {
+			taskName = extractTaskNameFromArgoNodeName(node.Name)
+		}
+
 		task := openchoreodevv1alpha1.WorkflowTask{
-			Name:    node.TemplateName,
+			Name:    taskName,
 			Phase:   string(node.Phase),
 			Message: node.Message,
 		}
@@ -806,6 +818,17 @@ func extractArgoStepOrderFromNodeName(nodeName string) int {
 	}
 
 	return order
+}
+
+// extractTaskNameFromArgoNodeName extracts the task name from an Argo node name.
+// Node names follow the pattern: "workflow-name[N].step-name" where step-name is the task name.
+// Returns empty string if the pattern doesn't match.
+func extractTaskNameFromArgoNodeName(nodeName string) string {
+	lastDotIdx := strings.LastIndex(nodeName, ".")
+	if lastDotIdx == -1 || lastDotIdx >= len(nodeName)-1 {
+		return ""
+	}
+	return nodeName[lastDotIdx+1:]
 }
 
 // checkTTLExpiration checks if the TTL has expired and deletes the WorkflowRun if needed.
