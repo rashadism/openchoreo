@@ -11,7 +11,6 @@ import (
 func (t *Toolsets) namespaceToolRegistrations() []RegisterFunc {
 	return []RegisterFunc{
 		t.RegisterListNamespaces,
-		t.RegisterGetNamespace,
 		t.RegisterCreateNamespace,
 		t.RegisterListSecretReferences,
 	}
@@ -21,7 +20,6 @@ func (t *Toolsets) namespaceToolRegistrations() []RegisterFunc {
 func (t *Toolsets) projectToolRegistrations() []RegisterFunc {
 	return []RegisterFunc{
 		t.RegisterListProjects,
-		t.RegisterGetProject,
 		t.RegisterCreateProject,
 	}
 }
@@ -33,41 +31,37 @@ func (t *Toolsets) componentToolRegistrations() []RegisterFunc {
 		t.RegisterListComponents,
 		t.RegisterGetComponent,
 		t.RegisterPatchComponent,
-		t.RegisterUpdateComponentBinding,
 		t.RegisterGetComponentWorkloads,
+		t.RegisterGetComponentWorkload,
 		t.RegisterListComponentReleases,
 		t.RegisterCreateComponentRelease,
 		t.RegisterGetComponentRelease,
 		t.RegisterGetComponentSchema,
-		t.RegisterGetComponentReleaseSchema,
 		t.RegisterListReleaseBindings,
+		t.RegisterGetReleaseBinding,
 		t.RegisterPatchReleaseBinding,
 		t.RegisterDeployRelease,
 		t.RegisterPromoteComponent,
 		t.RegisterCreateWorkload,
-		t.RegisterListComponentTraits,
-		t.RegisterUpdateComponentTraits,
 		t.RegisterGetEnvironmentRelease,
-		t.RegisterTriggerWorkflowRunForComponent,
-	}
-}
-
-// buildToolRegistrations returns the list of build toolset registration functions
-func (t *Toolsets) buildToolRegistrations() []RegisterFunc {
-	return []RegisterFunc{
-		t.RegisterListBuildTemplates,
-		t.RegisterTriggerBuild,
-		t.RegisterListBuilds,
-		t.RegisterGetBuildObserverURL,
-		t.RegisterListBuildPlanes,
-	}
-}
-
-// deploymentToolRegistrations returns the list of deployment toolset registration functions
-func (t *Toolsets) deploymentToolRegistrations() []RegisterFunc {
-	return []RegisterFunc{
-		t.RegisterGetDeploymentPipeline,
-		t.RegisterGetComponentObserverURL,
+		t.RegisterUpdateReleaseBindingState,
+		t.RegisterGetComponentReleaseSchema,
+		t.RegisterTriggerWorkflowRun,
+		t.RegisterListComponentTypes,
+		t.RegisterGetComponentTypeSchema,
+		t.RegisterListTraits,
+		t.RegisterGetTraitSchema,
+		t.RegisterCreateWorkflowRun,
+		t.RegisterListWorkflowRuns,
+		t.RegisterGetWorkflowRun,
+		t.RegisterListClusterComponentTypes,
+		t.RegisterGetClusterComponentType,
+		t.RegisterGetClusterComponentTypeSchema,
+		t.RegisterListClusterTraits,
+		t.RegisterGetClusterTrait,
+		t.RegisterGetClusterTraitSchema,
+		t.RegisterListWorkflows,
+		t.RegisterGetWorkflowSchema,
 	}
 }
 
@@ -76,49 +70,26 @@ func (t *Toolsets) infrastructureToolRegistrations() []RegisterFunc {
 	return []RegisterFunc{
 		t.RegisterListEnvironments,
 		t.RegisterGetEnvironments,
+		t.RegisterGetDeploymentPipeline,
+		t.RegisterListDeploymentPipelines,
+		t.RegisterGetObserverURL,
+	}
+}
+
+// peToolRegistrations returns the list of pe toolset registration functions
+func (t *Toolsets) peToolRegistrations() []RegisterFunc {
+	return []RegisterFunc{
 		t.RegisterCreateEnvironment,
 		t.RegisterListDataPlanes,
 		t.RegisterGetDataPlane,
 		t.RegisterCreateDataPlane,
-		t.RegisterListComponentTypes,
-		t.RegisterGetComponentTypeSchema,
-		t.RegisterListWorkflows,
-		t.RegisterGetWorkflowSchema,
-		t.RegisterCreateWorkflowRun,
-		t.RegisterListWorkflowRuns,
-		t.RegisterGetWorkflowRun,
-		t.RegisterGetWorkflowRunLogs,
-		t.RegisterGetWorkflowRunEvents,
-		t.RegisterListTraits,
-		t.RegisterGetTraitSchema,
 		t.RegisterListObservabilityPlanes,
+		t.RegisterListBuildPlanes,
 		t.RegisterListClusterDataPlanes,
 		t.RegisterGetClusterDataPlane,
 		t.RegisterCreateClusterDataPlane,
 		t.RegisterListClusterBuildPlanes,
 		t.RegisterListClusterObservabilityPlanes,
-		t.RegisterListClusterComponentTypes,
-		t.RegisterGetClusterComponentType,
-		t.RegisterGetClusterComponentTypeSchema,
-		t.RegisterListClusterTraits,
-		t.RegisterGetClusterTrait,
-		t.RegisterGetClusterTraitSchema,
-	}
-}
-
-// schemaToolRegistrations returns the list of schema toolset registration functions
-func (t *Toolsets) schemaToolRegistrations() []RegisterFunc {
-	return []RegisterFunc{
-		t.RegisterExplainSchema,
-	}
-}
-
-// resourceToolRegistrations returns the list of resource toolset registration functions
-func (t *Toolsets) resourceToolRegistrations() []RegisterFunc {
-	return []RegisterFunc{
-		t.RegisterApplyResource,
-		t.RegisterDeleteResource,
-		t.RegisterGetResource,
 	}
 }
 
@@ -144,20 +115,6 @@ func (t *Toolsets) Register(s *mcp.Server) {
 		}
 	}
 
-	// Register build tools if BuildToolset is enabled
-	if t.BuildToolset != nil {
-		for _, registerFunc := range t.buildToolRegistrations() {
-			registerFunc(s)
-		}
-	}
-
-	// Register deployment tools if DeploymentToolset is enabled
-	if t.DeploymentToolset != nil {
-		for _, registerFunc := range t.deploymentToolRegistrations() {
-			registerFunc(s)
-		}
-	}
-
 	// Register infrastructure tools if InfrastructureToolset is enabled
 	if t.InfrastructureToolset != nil {
 		for _, registerFunc := range t.infrastructureToolRegistrations() {
@@ -165,16 +122,9 @@ func (t *Toolsets) Register(s *mcp.Server) {
 		}
 	}
 
-	// Register schema tools if SchemaToolset is enabled
-	if t.SchemaToolset != nil {
-		for _, registerFunc := range t.schemaToolRegistrations() {
-			registerFunc(s)
-		}
-	}
-
-	// Register resource tools if ResourceToolset is enabled
-	if t.ResourceToolset != nil {
-		for _, registerFunc := range t.resourceToolRegistrations() {
+	// Register platform engineering tools if PEToolset is enabled
+	if t.PEToolset != nil {
+		for _, registerFunc := range t.peToolRegistrations() {
 			registerFunc(s)
 		}
 	}

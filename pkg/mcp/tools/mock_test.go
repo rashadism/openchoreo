@@ -11,7 +11,7 @@ import (
 
 const emptyObjectSchema = `{"type":"object","properties":{}}`
 
-// MockCoreToolsetHandler implements CoreToolsetHandler for testing
+// MockCoreToolsetHandler implements all toolset handler interfaces for testing.
 type MockCoreToolsetHandler struct {
 	// Track which methods were called and with what parameters
 	calls map[string][]interface{}
@@ -27,13 +27,10 @@ func (m *MockCoreToolsetHandler) recordCall(method string, args ...interface{}) 
 	m.calls[method] = append(m.calls[method], args)
 }
 
-func (m *MockCoreToolsetHandler) GetNamespace(ctx context.Context, name string) (any, error) {
-	m.recordCall("GetNamespace", name)
-	return `{"name":"test-namespace"}`, nil
-}
+// NamespaceToolsetHandler methods
 
-func (m *MockCoreToolsetHandler) ListNamespaces(ctx context.Context) (any, error) {
-	m.recordCall("ListNamespaces")
+func (m *MockCoreToolsetHandler) ListNamespaces(ctx context.Context, opts ListOpts) (any, error) {
+	m.recordCall("ListNamespaces", opts)
 	return `[{"name":"test-namespace"}]`, nil
 }
 
@@ -44,19 +41,18 @@ func (m *MockCoreToolsetHandler) CreateNamespace(
 	return `{"name":"new-namespace"}`, nil
 }
 
-func (m *MockCoreToolsetHandler) ListSecretReferences(ctx context.Context, namespaceName string) (any, error) {
-	m.recordCall("ListSecretReferences", namespaceName)
+func (m *MockCoreToolsetHandler) ListSecretReferences(
+	ctx context.Context, namespaceName string, opts ListOpts,
+) (any, error) {
+	m.recordCall("ListSecretReferences", namespaceName, opts)
 	return `[{"name":"secret-ref-1"}]`, nil
 }
 
-func (m *MockCoreToolsetHandler) ListProjects(ctx context.Context, namespaceName string) (any, error) {
-	m.recordCall("ListProjects", namespaceName)
-	return `[{"name":"project1"}]`, nil
-}
+// ProjectToolsetHandler methods
 
-func (m *MockCoreToolsetHandler) GetProject(ctx context.Context, namespaceName, projectName string) (any, error) {
-	m.recordCall("GetProject", namespaceName, projectName)
-	return `{"name":"project1"}`, nil
+func (m *MockCoreToolsetHandler) ListProjects(ctx context.Context, namespaceName string, opts ListOpts) (any, error) {
+	m.recordCall("ListProjects", namespaceName, opts)
+	return `[{"name":"project1"}]`, nil
 }
 
 func (m *MockCoreToolsetHandler) CreateProject(
@@ -66,6 +62,8 @@ func (m *MockCoreToolsetHandler) CreateProject(
 	return `{"name":"new-project"}`, nil
 }
 
+// ComponentToolsetHandler methods
+
 func (m *MockCoreToolsetHandler) CreateComponent(
 	ctx context.Context, namespaceName, projectName string, req *models.CreateComponentRequest,
 ) (any, error) {
@@ -73,8 +71,10 @@ func (m *MockCoreToolsetHandler) CreateComponent(
 	return `{"name":"new-component"}`, nil
 }
 
-func (m *MockCoreToolsetHandler) ListComponents(ctx context.Context, namespaceName, projectName string) (any, error) {
-	m.recordCall("ListComponents", namespaceName, projectName)
+func (m *MockCoreToolsetHandler) ListComponents(
+	ctx context.Context, namespaceName, projectName string, opts ListOpts,
+) (any, error) {
+	m.recordCall("ListComponents", namespaceName, projectName, opts)
 	return `[{"name":"component1"}]`, nil
 }
 
@@ -85,35 +85,6 @@ func (m *MockCoreToolsetHandler) GetComponent(
 	return `{"name":"component1"}`, nil
 }
 
-func (m *MockCoreToolsetHandler) GetComponentBinding(
-	ctx context.Context, namespaceName, projectName, componentName, environment string,
-) (any, error) {
-	m.recordCall("GetComponentBinding", namespaceName, projectName, componentName, environment)
-	return `{"environment":"dev"}`, nil
-}
-
-func (m *MockCoreToolsetHandler) UpdateComponentBinding(
-	ctx context.Context, namespaceName, projectName, componentName, bindingName string,
-	req *models.UpdateBindingRequest,
-) (any, error) {
-	m.recordCall("UpdateComponentBinding", namespaceName, projectName, componentName, bindingName, req)
-	return `{"status":"updated"}`, nil
-}
-
-func (m *MockCoreToolsetHandler) GetComponentObserverURL(
-	ctx context.Context, namespaceName, projectName, componentName, environmentName string,
-) (any, error) {
-	m.recordCall("GetComponentObserverURL", namespaceName, projectName, componentName, environmentName)
-	return `{"url":"http://observer.example.com"}`, nil
-}
-
-func (m *MockCoreToolsetHandler) GetBuildObserverURL(
-	ctx context.Context, namespaceName, projectName, componentName string,
-) (any, error) {
-	m.recordCall("GetBuildObserverURL", namespaceName, projectName, componentName)
-	return `{"url":"http://build-observer.example.com"}`, nil
-}
-
 func (m *MockCoreToolsetHandler) GetComponentWorkloads(
 	ctx context.Context, namespaceName, projectName, componentName string,
 ) (any, error) {
@@ -121,80 +92,17 @@ func (m *MockCoreToolsetHandler) GetComponentWorkloads(
 	return `[{"name":"workload1"}]`, nil
 }
 
-func (m *MockCoreToolsetHandler) ListEnvironments(ctx context.Context, namespaceName string) (any, error) {
-	m.recordCall("ListEnvironments", namespaceName)
-	return `[{"name":"dev"}]`, nil
-}
-
-func (m *MockCoreToolsetHandler) GetEnvironment(ctx context.Context, namespaceName, envName string) (any, error) {
-	m.recordCall("GetEnvironment", namespaceName, envName)
-	return `{"name":"dev"}`, nil
-}
-
-func (m *MockCoreToolsetHandler) CreateEnvironment(
-	ctx context.Context, namespaceName string, req *models.CreateEnvironmentRequest,
+func (m *MockCoreToolsetHandler) GetComponentWorkload(
+	ctx context.Context, namespaceName, projectName, componentName, workloadName string,
 ) (any, error) {
-	m.recordCall("CreateEnvironment", namespaceName, req)
-	return `{"name":"new-env"}`, nil
-}
-
-func (m *MockCoreToolsetHandler) ListDataPlanes(ctx context.Context, namespaceName string) (any, error) {
-	m.recordCall("ListDataPlanes", namespaceName)
-	return `[{"name":"dp1"}]`, nil
-}
-
-func (m *MockCoreToolsetHandler) GetDataPlane(ctx context.Context, namespaceName, dpName string) (any, error) {
-	m.recordCall("GetDataPlane", namespaceName, dpName)
-	return `{"name":"dp1"}`, nil
-}
-
-func (m *MockCoreToolsetHandler) CreateDataPlane(
-	ctx context.Context, namespaceName string, req *models.CreateDataPlaneRequest,
-) (any, error) {
-	m.recordCall("CreateDataPlane", namespaceName, req)
-	return `{"name":"new-dp"}`, nil
-}
-
-func (m *MockCoreToolsetHandler) ListBuildTemplates(ctx context.Context, namespaceName string) (any, error) {
-	m.recordCall("ListBuildTemplates", namespaceName)
-	return `[{"name":"template1"}]`, nil
-}
-
-func (m *MockCoreToolsetHandler) TriggerBuild(
-	ctx context.Context, namespaceName, projectName, componentName, commit string,
-) (any, error) {
-	m.recordCall("TriggerBuild", namespaceName, projectName, componentName, commit)
-	return `{"buildId":"build-123"}`, nil
-}
-
-func (m *MockCoreToolsetHandler) ListBuilds(
-	ctx context.Context, namespaceName, projectName, componentName string,
-) (any, error) {
-	m.recordCall("ListBuilds", namespaceName, projectName, componentName)
-	return `[{"id":"build-123"}]`, nil
-}
-
-func (m *MockCoreToolsetHandler) ListBuildPlanes(ctx context.Context, namespaceName string) (any, error) {
-	m.recordCall("ListBuildPlanes", namespaceName)
-	return `[{"name":"bp1"}]`, nil
-}
-
-func (m *MockCoreToolsetHandler) GetProjectDeploymentPipeline(
-	ctx context.Context, namespaceName, projectName string,
-) (any, error) {
-	m.recordCall("GetProjectDeploymentPipeline", namespaceName, projectName)
-	return `{"stages":[]}`, nil
-}
-
-func (m *MockCoreToolsetHandler) ExplainSchema(ctx context.Context, kind, path string) (any, error) {
-	m.recordCall("ExplainSchema", kind, path)
-	return `{"group":"openchoreo.dev","kind":"Component","version":"v1alpha1","type":"Object"}`, nil
+	m.recordCall("GetComponentWorkload", namespaceName, projectName, componentName, workloadName)
+	return `{"name":"workload1"}`, nil
 }
 
 func (m *MockCoreToolsetHandler) ListComponentReleases(
-	ctx context.Context, namespaceName, projectName, componentName string,
+	ctx context.Context, namespaceName, projectName, componentName string, opts ListOpts,
 ) (any, error) {
-	m.recordCall("ListComponentReleases", namespaceName, projectName, componentName)
+	m.recordCall("ListComponentReleases", namespaceName, projectName, componentName, opts)
 	return `[{"name":"release-1"}]`, nil
 }
 
@@ -213,10 +121,17 @@ func (m *MockCoreToolsetHandler) GetComponentRelease(
 }
 
 func (m *MockCoreToolsetHandler) ListReleaseBindings(
-	ctx context.Context, namespaceName, projectName, componentName string, environments []string,
+	ctx context.Context, namespaceName, projectName, componentName string, environments []string, opts ListOpts,
 ) (any, error) {
-	m.recordCall("ListReleaseBindings", namespaceName, projectName, componentName, environments)
+	m.recordCall("ListReleaseBindings", namespaceName, projectName, componentName, environments, opts)
 	return `[{"environment":"dev"}]`, nil
+}
+
+func (m *MockCoreToolsetHandler) GetReleaseBinding(
+	ctx context.Context, namespaceName, projectName, componentName, bindingName string,
+) (any, error) {
+	m.recordCall("GetReleaseBinding", namespaceName, projectName, componentName, bindingName)
+	return `{"name":"binding-dev","environment":"dev"}`, nil
 }
 
 func (m *MockCoreToolsetHandler) PatchReleaseBinding(
@@ -255,27 +170,6 @@ func (m *MockCoreToolsetHandler) GetComponentSchema(
 	return emptyObjectSchema, nil
 }
 
-func (m *MockCoreToolsetHandler) GetComponentReleaseSchema(
-	ctx context.Context, namespaceName, projectName, componentName, releaseName string,
-) (any, error) {
-	m.recordCall("GetComponentReleaseSchema", namespaceName, projectName, componentName, releaseName)
-	return emptyObjectSchema, nil
-}
-
-func (m *MockCoreToolsetHandler) ListComponentTraits(
-	ctx context.Context, namespaceName, projectName, componentName string,
-) (any, error) {
-	m.recordCall("ListComponentTraits", namespaceName, projectName, componentName)
-	return `[{"name":"autoscaling","instanceName":"hpa-1","parameters":{"minReplicas":1,"maxReplicas":10}}]`, nil
-}
-
-func (m *MockCoreToolsetHandler) UpdateComponentTraits(
-	ctx context.Context, namespaceName, projectName, componentName string, req *models.UpdateComponentTraitsRequest,
-) (any, error) {
-	m.recordCall("UpdateComponentTraits", namespaceName, projectName, componentName, req)
-	return `[{"name":"autoscaling","instanceName":"hpa-1","parameters":{"minReplicas":2,"maxReplicas":20}}]`, nil
-}
-
 func (m *MockCoreToolsetHandler) GetEnvironmentRelease(
 	ctx context.Context, namespaceName, projectName, componentName, environmentName string,
 ) (any, error) {
@@ -290,15 +184,32 @@ func (m *MockCoreToolsetHandler) PatchComponent(
 	return `{"name":"patched-component"}`, nil
 }
 
-func (m *MockCoreToolsetHandler) TriggerWorkflowRunForComponent(
-	ctx context.Context, namespaceName, projectName, componentName, commit string,
+func (m *MockCoreToolsetHandler) UpdateReleaseBindingState(
+	ctx context.Context, namespaceName, projectName, componentName, bindingName string,
+	req *models.UpdateBindingRequest,
 ) (any, error) {
-	m.recordCall("TriggerWorkflowRunForComponent", namespaceName, projectName, componentName, commit)
-	return `{"name":"my-component-workflow-abcd1234","status":"Running"}`, nil
+	m.recordCall("UpdateReleaseBindingState", namespaceName, projectName, componentName, bindingName, req)
+	return `{"status":"updated","state":"` + string(req.ReleaseState) + `"}`, nil
 }
 
-func (m *MockCoreToolsetHandler) ListComponentTypes(ctx context.Context, namespaceName string) (any, error) {
-	m.recordCall("ListComponentTypes", namespaceName)
+func (m *MockCoreToolsetHandler) GetComponentReleaseSchema(
+	ctx context.Context, namespaceName, projectName, componentName, releaseName string,
+) (any, error) {
+	m.recordCall("GetComponentReleaseSchema", namespaceName, projectName, componentName, releaseName)
+	return emptyObjectSchema, nil
+}
+
+func (m *MockCoreToolsetHandler) TriggerWorkflowRun(
+	ctx context.Context, namespaceName, projectName, componentName, commit string,
+) (any, error) {
+	m.recordCall("TriggerWorkflowRun", namespaceName, projectName, componentName, commit)
+	return `{"name":"my-component-workflow-run","status":"Running"}`, nil
+}
+
+func (m *MockCoreToolsetHandler) ListComponentTypes(
+	ctx context.Context, namespaceName string, opts ListOpts,
+) (any, error) {
+	m.recordCall("ListComponentTypes", namespaceName, opts)
 	return `[{"name":"WebApplication"}]`, nil
 }
 
@@ -309,9 +220,65 @@ func (m *MockCoreToolsetHandler) GetComponentTypeSchema(
 	return emptyObjectSchema, nil
 }
 
-func (m *MockCoreToolsetHandler) ListWorkflows(ctx context.Context, namespaceName string) (any, error) {
-	m.recordCall("ListWorkflows", namespaceName)
-	return `[{"name":"workflow-1"}]`, nil
+func (m *MockCoreToolsetHandler) ListTraits(ctx context.Context, namespaceName string, opts ListOpts) (any, error) {
+	m.recordCall("ListTraits", namespaceName, opts)
+	return `[{"name":"autoscaling"}]`, nil
+}
+
+func (m *MockCoreToolsetHandler) GetTraitSchema(ctx context.Context, namespaceName, traitName string) (any, error) {
+	m.recordCall("GetTraitSchema", namespaceName, traitName)
+	return emptyObjectSchema, nil
+}
+
+func (m *MockCoreToolsetHandler) CreateWorkflowRun(
+	ctx context.Context, namespaceName, workflowName string,
+	parameters map[string]interface{},
+) (any, error) {
+	m.recordCall("CreateWorkflowRun", namespaceName, workflowName, parameters)
+	return `{"name":"workflow-run-1"}`, nil
+}
+
+func (m *MockCoreToolsetHandler) ListWorkflowRuns(
+	ctx context.Context, namespaceName, projectName, componentName string,
+	opts ListOpts,
+) (any, error) {
+	m.recordCall("ListWorkflowRuns", namespaceName, projectName, componentName, opts)
+	return `[{"name":"workflow-run-1"}]`, nil
+}
+
+func (m *MockCoreToolsetHandler) GetWorkflowRun(ctx context.Context, namespaceName, runName string) (any, error) {
+	m.recordCall("GetWorkflowRun", namespaceName, runName)
+	return `{"name":"workflow-run-1"}`, nil
+}
+
+func (m *MockCoreToolsetHandler) ListClusterComponentTypes(ctx context.Context, opts ListOpts) (any, error) {
+	m.recordCall("ListClusterComponentTypes", opts)
+	return `[{"name":"go-service"}]`, nil
+}
+
+func (m *MockCoreToolsetHandler) GetClusterComponentType(ctx context.Context, cctName string) (any, error) {
+	m.recordCall("GetClusterComponentType", cctName)
+	return `{"name":"go-service"}`, nil
+}
+
+func (m *MockCoreToolsetHandler) GetClusterComponentTypeSchema(ctx context.Context, cctName string) (any, error) {
+	m.recordCall("GetClusterComponentTypeSchema", cctName)
+	return emptyObjectSchema, nil
+}
+
+func (m *MockCoreToolsetHandler) ListClusterTraits(ctx context.Context, opts ListOpts) (any, error) {
+	m.recordCall("ListClusterTraits", opts)
+	return `[{"name":"autoscaler"}]`, nil
+}
+
+func (m *MockCoreToolsetHandler) GetClusterTrait(ctx context.Context, ctName string) (any, error) {
+	m.recordCall("GetClusterTrait", ctName)
+	return `{"name":"autoscaler"}`, nil
+}
+
+func (m *MockCoreToolsetHandler) ListWorkflows(ctx context.Context, namespaceName string, opts ListOpts) (any, error) {
+	m.recordCall("ListWorkflows", namespaceName, opts)
+	return `[{"name":"build-workflow"}]`, nil
 }
 
 func (m *MockCoreToolsetHandler) GetWorkflowSchema(
@@ -321,58 +288,88 @@ func (m *MockCoreToolsetHandler) GetWorkflowSchema(
 	return emptyObjectSchema, nil
 }
 
-func (m *MockCoreToolsetHandler) CreateWorkflowRun(
-	ctx context.Context, namespaceName string, req *models.CreateWorkflowRunRequest,
-) (any, error) {
-	m.recordCall("CreateWorkflowRun", namespaceName, req)
-	return `{"name":"workflow-run-1","status":"Pending"}`, nil
-}
-
-func (m *MockCoreToolsetHandler) ListWorkflowRuns(
-	ctx context.Context, namespaceName, projectName, componentName string,
-) (any, error) {
-	m.recordCall("ListWorkflowRuns", namespaceName, projectName, componentName)
-	return `[{"name":"workflow-run-1","status":"Running"}]`, nil
-}
-
-func (m *MockCoreToolsetHandler) GetWorkflowRun(
-	ctx context.Context, namespaceName, runName string,
-) (any, error) {
-	m.recordCall("GetWorkflowRun", namespaceName, runName)
-	return `{"name":"workflow-run-1","status":"Succeeded"}`, nil
-}
-
-func (m *MockCoreToolsetHandler) GetWorkflowRunLogs(
-	ctx context.Context, namespaceName, runName, stepName string, sinceSeconds *int64,
-) (any, error) {
-	m.recordCall("GetWorkflowRunLogs", namespaceName, runName, stepName, sinceSeconds)
-	return `[{"timestamp":"2026-02-20T10:00:00Z","log":"build started"}]`, nil
-}
-
-func (m *MockCoreToolsetHandler) GetWorkflowRunEvents(
-	ctx context.Context, namespaceName, runName, stepName string,
-) (any, error) {
-	m.recordCall("GetWorkflowRunEvents", namespaceName, runName, stepName)
-	return `[{"timestamp":"2026-02-20T10:00:01Z","type":"Normal","reason":"Scheduled","message":"Pod scheduled"}]`, nil
-}
-
-func (m *MockCoreToolsetHandler) ListTraits(ctx context.Context, namespaceName string) (any, error) {
-	m.recordCall("ListTraits", namespaceName)
-	return `[{"name":"autoscaling"}]`, nil
-}
-
-func (m *MockCoreToolsetHandler) GetTraitSchema(ctx context.Context, namespaceName, traitName string) (any, error) {
-	m.recordCall("GetTraitSchema", namespaceName, traitName)
+func (m *MockCoreToolsetHandler) GetClusterTraitSchema(ctx context.Context, ctName string) (any, error) {
+	m.recordCall("GetClusterTraitSchema", ctName)
 	return emptyObjectSchema, nil
 }
 
-func (m *MockCoreToolsetHandler) ListObservabilityPlanes(ctx context.Context, namespaceName string) (any, error) {
-	m.recordCall("ListObservabilityPlanes", namespaceName)
+// InfrastructureToolsetHandler methods
+
+func (m *MockCoreToolsetHandler) ListEnvironments(
+	ctx context.Context, namespaceName string, opts ListOpts,
+) (any, error) {
+	m.recordCall("ListEnvironments", namespaceName, opts)
+	return `[{"name":"dev"}]`, nil
+}
+
+func (m *MockCoreToolsetHandler) GetEnvironment(ctx context.Context, namespaceName, envName string) (any, error) {
+	m.recordCall("GetEnvironment", namespaceName, envName)
+	return `{"name":"dev"}`, nil
+}
+
+func (m *MockCoreToolsetHandler) CreateEnvironment(
+	ctx context.Context, namespaceName string, req *models.CreateEnvironmentRequest,
+) (any, error) {
+	m.recordCall("CreateEnvironment", namespaceName, req)
+	return `{"name":"new-env"}`, nil
+}
+
+func (m *MockCoreToolsetHandler) ListDataPlanes(ctx context.Context, namespaceName string, opts ListOpts) (any, error) {
+	m.recordCall("ListDataPlanes", namespaceName, opts)
+	return `[{"name":"dp1"}]`, nil
+}
+
+func (m *MockCoreToolsetHandler) GetDataPlane(ctx context.Context, namespaceName, dpName string) (any, error) {
+	m.recordCall("GetDataPlane", namespaceName, dpName)
+	return `{"name":"dp1"}`, nil
+}
+
+func (m *MockCoreToolsetHandler) CreateDataPlane(
+	ctx context.Context, namespaceName string, req *models.CreateDataPlaneRequest,
+) (any, error) {
+	m.recordCall("CreateDataPlane", namespaceName, req)
+	return `{"name":"new-dp"}`, nil
+}
+
+func (m *MockCoreToolsetHandler) ListObservabilityPlanes(
+	ctx context.Context, namespaceName string, opts ListOpts,
+) (any, error) {
+	m.recordCall("ListObservabilityPlanes", namespaceName, opts)
 	return `[{"name":"observability-plane-1"}]`, nil
 }
 
-func (m *MockCoreToolsetHandler) ListClusterDataPlanes(ctx context.Context) (any, error) {
-	m.recordCall("ListClusterDataPlanes")
+func (m *MockCoreToolsetHandler) GetDeploymentPipeline(
+	ctx context.Context, namespaceName, pipelineName string,
+) (any, error) {
+	m.recordCall("GetDeploymentPipeline", namespaceName, pipelineName)
+	return `{"name":"default-pipeline"}`, nil
+}
+
+func (m *MockCoreToolsetHandler) ListDeploymentPipelines(
+	ctx context.Context, namespaceName string, opts ListOpts,
+) (any, error) {
+	m.recordCall("ListDeploymentPipelines", namespaceName, opts)
+	return `[{"name":"default-pipeline"}]`, nil
+}
+
+func (m *MockCoreToolsetHandler) ListBuildPlanes(
+	ctx context.Context, namespaceName string, opts ListOpts,
+) (any, error) {
+	m.recordCall("ListBuildPlanes", namespaceName, opts)
+	return `[{"name":"bp1"}]`, nil
+}
+
+func (m *MockCoreToolsetHandler) GetObserverURL(
+	ctx context.Context, namespaceName, envName string,
+) (any, error) {
+	m.recordCall("GetObserverURL", namespaceName, envName)
+	return `{"observerURL":"https://observer.example.com"}`, nil
+}
+
+// ClusterPlaneHandler methods
+
+func (m *MockCoreToolsetHandler) ListClusterDataPlanes(ctx context.Context, opts ListOpts) (any, error) {
+	m.recordCall("ListClusterDataPlanes", opts)
 	return `[{"name":"cdp1"}]`, nil
 }
 
@@ -388,59 +385,12 @@ func (m *MockCoreToolsetHandler) CreateClusterDataPlane(
 	return `{"name":"new-cdp"}`, nil
 }
 
-func (m *MockCoreToolsetHandler) ListClusterBuildPlanes(ctx context.Context) (any, error) {
-	m.recordCall("ListClusterBuildPlanes")
+func (m *MockCoreToolsetHandler) ListClusterBuildPlanes(ctx context.Context, opts ListOpts) (any, error) {
+	m.recordCall("ListClusterBuildPlanes", opts)
 	return `[{"name":"cbp1"}]`, nil
 }
 
-func (m *MockCoreToolsetHandler) ListClusterObservabilityPlanes(ctx context.Context) (any, error) {
-	m.recordCall("ListClusterObservabilityPlanes")
+func (m *MockCoreToolsetHandler) ListClusterObservabilityPlanes(ctx context.Context, opts ListOpts) (any, error) {
+	m.recordCall("ListClusterObservabilityPlanes", opts)
 	return `[{"name":"cop1"}]`, nil
-}
-
-func (m *MockCoreToolsetHandler) ListClusterComponentTypes(ctx context.Context) (any, error) {
-	m.recordCall("ListClusterComponentTypes")
-	return `[{"name":"go-service"}]`, nil
-}
-
-func (m *MockCoreToolsetHandler) GetClusterComponentType(ctx context.Context, cctName string) (any, error) {
-	m.recordCall("GetClusterComponentType", cctName)
-	return `{"name":"go-service"}`, nil
-}
-
-func (m *MockCoreToolsetHandler) GetClusterComponentTypeSchema(ctx context.Context, cctName string) (any, error) {
-	m.recordCall("GetClusterComponentTypeSchema", cctName)
-	return emptyObjectSchema, nil
-}
-
-func (m *MockCoreToolsetHandler) ListClusterTraits(ctx context.Context) (any, error) {
-	m.recordCall("ListClusterTraits")
-	return `[{"name":"autoscaler"}]`, nil
-}
-
-func (m *MockCoreToolsetHandler) GetClusterTrait(ctx context.Context, ctName string) (any, error) {
-	m.recordCall("GetClusterTrait", ctName)
-	return `{"name":"autoscaler"}`, nil
-}
-
-func (m *MockCoreToolsetHandler) GetClusterTraitSchema(ctx context.Context, ctName string) (any, error) {
-	m.recordCall("GetClusterTraitSchema", ctName)
-	return emptyObjectSchema, nil
-}
-
-func (m *MockCoreToolsetHandler) ApplyResource(ctx context.Context, resource map[string]interface{}) (any, error) {
-	m.recordCall("ApplyResource", resource)
-	return `{"operation":"created"}`, nil
-}
-
-func (m *MockCoreToolsetHandler) DeleteResource(ctx context.Context, resource map[string]interface{}) (any, error) {
-	m.recordCall("DeleteResource", resource)
-	return `{"operation":"deleted"}`, nil
-}
-
-func (m *MockCoreToolsetHandler) GetResource(
-	ctx context.Context, namespaceName, kind, resourceName string,
-) (any, error) {
-	m.recordCall("GetResource", namespaceName, kind, resourceName)
-	return `{"kind":"Component","metadata":{"name":"test-component"}}`, nil
 }

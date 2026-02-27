@@ -1185,6 +1185,32 @@ openchoreoApi:
     # identity.oidc and identity.clients come from security.oidc.* and security.oidc.externalClients
     # @schema
     # type: object
+    # description: Legacy Model Context Protocol (MCP) server configuration
+    # @schema
+    legacy_mcp:
+      # @schema
+      # type: boolean
+      # description: Enable the MCP server for AI-friendly tool interfaces
+      # default: true
+      # @schema
+      enabled: true
+      # @schema
+      # type: array
+      # description: List of enabled MCP legacy toolsets. Each toolset exposes a group of related operations.
+      # items:
+      #   type: string
+      # default: ["namespace", "project", "component", "deployment", "infrastructure", "schema", "resource"]
+      # @schema
+      toolsets:
+        - "namespace"
+        - "project"
+        - "component"
+        - "deployment"
+        - "infrastructure"
+        - "schema"
+        - "resource"
+    # @schema
+    # type: object
     # description: Model Context Protocol (MCP) server configuration
     # @schema
     mcp:
@@ -1196,20 +1222,16 @@ openchoreoApi:
       enabled: true
       # @schema
       # type: array
-      # description: List of enabled MCP toolsets. Each toolset exposes a group of related operations.
+      # description: "List of enabled MCP toolsets. Each toolset exposes a group of related operations. Allowed toolsets: namespace, project, component, infrastructure, pe"
       # items:
       #   type: string
-      # default: ["namespace", "project", "component", "build", "deployment", "infrastructure", "schema", "resource"]
+      # default: ["namespace", "project", "component", "infrastructure"]
       # @schema
       toolsets:
         - "namespace"
         - "project"
         - "component"
-        - "build"
-        - "deployment"
         - "infrastructure"
-        - "schema"
-        - "resource"
     # @schema
     # type: object
     # description: Logging configuration

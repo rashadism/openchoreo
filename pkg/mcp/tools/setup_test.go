@@ -11,12 +11,11 @@ import (
 )
 
 const (
-	testNamespaceName   = "my-namespace"
-	testProjectName     = "my-project"
-	testComponentName   = "my-component"
-	testEnvName         = "dev"
-	testKindProject     = "Project"
-	testWorkflowRunName = "workflow-run-1"
+	testNamespaceName = "my-namespace"
+	testProjectName   = "my-project"
+	testComponentName = "my-component"
+	testEnvName       = "dev"
+	testKindProject   = "Project"
 )
 
 func setupTestServer(t *testing.T) (*mcp.ClientSession, *MockCoreToolsetHandler) {
@@ -26,11 +25,8 @@ func setupTestServer(t *testing.T) (*mcp.ClientSession, *MockCoreToolsetHandler)
 		NamespaceToolset:      mockHandler,
 		ProjectToolset:        mockHandler,
 		ComponentToolset:      mockHandler,
-		BuildToolset:          mockHandler,
-		DeploymentToolset:     mockHandler,
 		InfrastructureToolset: mockHandler,
-		SchemaToolset:         mockHandler,
-		ResourceToolset:       mockHandler,
+		PEToolset:             mockHandler,
 	}
 	clientSession := setupTestServerWithToolset(t, toolsets)
 	return clientSession, mockHandler
@@ -74,7 +70,7 @@ type toolTestSpec struct {
 	name string
 
 	// Toolset association
-	toolset string // "namespace", "project", "component", "build", "deployment", "infrastructure", "schema", "resource"
+	toolset string // "namespace", "project", "component", "infrastructure"
 
 	// Description validation
 	descriptionKeywords []string
@@ -96,10 +92,7 @@ var allToolSpecs = func() []toolTestSpec {
 	specs = append(specs, namespaceToolSpecs()...)
 	specs = append(specs, projectToolSpecs()...)
 	specs = append(specs, componentToolSpecs()...)
-	specs = append(specs, buildToolSpecs()...)
-	specs = append(specs, deploymentToolSpecs()...)
 	specs = append(specs, infrastructureToolSpecs()...)
-	specs = append(specs, schemaToolSpecs()...)
-	specs = append(specs, resourceToolSpecs()...)
+	specs = append(specs, peToolSpecs()...)
 	return specs
 }()

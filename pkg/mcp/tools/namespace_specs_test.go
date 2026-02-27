@@ -14,28 +14,13 @@ func namespaceToolSpecs() []toolTestSpec {
 			descriptionKeywords: []string{"namespace"},
 			descriptionMinLen:   10,
 			requiredParams:      []string{},
-			optionalParams:      []string{},
+			optionalParams:      []string{"limit", "cursor"},
 			testArgs:            map[string]any{},
 			expectedMethod:      "ListNamespaces",
 			validateCall: func(t *testing.T, args []interface{}) {
-				// ListNamespaces takes no arguments
-				if len(args) != 0 {
-					t.Errorf("Expected no arguments for ListNamespaces, got %d", len(args))
-				}
-			},
-		},
-		{
-			name:                "get_namespace",
-			toolset:             "namespace",
-			descriptionKeywords: []string{"namespace"},
-			descriptionMinLen:   10,
-			requiredParams:      []string{"name"},
-			optionalParams:      []string{},
-			testArgs:            map[string]any{"name": "test-namespace"},
-			expectedMethod:      "GetNamespace",
-			validateCall: func(t *testing.T, args []interface{}) {
-				if args[0] != "test-namespace" {
-					t.Errorf("Expected namespace 'test-namespace', got %v", args[0])
+				// ListNamespaces takes only ListOpts
+				if len(args) != 1 {
+					t.Errorf("Expected 1 argument (ListOpts) for ListNamespaces, got %d", len(args))
 				}
 			},
 		},
@@ -62,6 +47,7 @@ func namespaceToolSpecs() []toolTestSpec {
 			descriptionKeywords: []string{"list", "secret", "reference"},
 			descriptionMinLen:   10,
 			requiredParams:      []string{"namespace_name"},
+			optionalParams:      []string{"limit", "cursor"},
 			testArgs: map[string]any{
 				"namespace_name": testNamespaceName,
 			},

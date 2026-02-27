@@ -16,14 +16,17 @@ func (t *Toolsets) RegisterListEnvironments(s *mcp.Server) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "list_environments",
 		Description: "List all environments in an namespace. Environments are deployment targets representing " +
-			"pipeline stages (dev, staging, production) or isolated tenants.",
-		InputSchema: createSchema(map[string]any{
+			"pipeline stages (dev, staging, production) or isolated tenants. Supports pagination via limit and cursor.",
+		InputSchema: createSchema(addPaginationProperties(map[string]any{
 			"namespace_name": defaultStringProperty(),
-		}, []string{"namespace_name"}),
+		}), []string{"namespace_name"}),
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
 		NamespaceName string `json:"namespace_name"`
+		Limit         int    `json:"limit,omitempty"`
+		Cursor        string `json:"cursor,omitempty"`
 	}) (*mcp.CallToolResult, any, error) {
-		result, err := t.InfrastructureToolset.ListEnvironments(ctx, args.NamespaceName)
+		result, err := t.InfrastructureToolset.ListEnvironments(
+			ctx, args.NamespaceName, ListOpts{Limit: args.Limit, Cursor: args.Cursor})
 		return handleToolResult(result, err)
 	})
 }
@@ -89,7 +92,7 @@ func (t *Toolsets) RegisterCreateEnvironment(s *mcp.Server) {
 			IsProduction: args.IsProduction,
 			DNSPrefix:    args.DNSPrefix,
 		}
-		result, err := t.InfrastructureToolset.CreateEnvironment(ctx, args.NamespaceName, envReq)
+		result, err := t.PEToolset.CreateEnvironment(ctx, args.NamespaceName, envReq)
 		return handleToolResult(result, err)
 	})
 }
@@ -98,14 +101,16 @@ func (t *Toolsets) RegisterListDataPlanes(s *mcp.Server) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "list_dataplanes",
 		Description: "List all data planes in an namespace. Data planes are Kubernetes clusters or cluster " +
-			"regions where component workloads actually execute.",
-		InputSchema: createSchema(map[string]any{
+			"regions where component workloads actually execute. Supports pagination via limit and cursor.",
+		InputSchema: createSchema(addPaginationProperties(map[string]any{
 			"namespace_name": defaultStringProperty(),
-		}, []string{"namespace_name"}),
+		}), []string{"namespace_name"}),
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
 		NamespaceName string `json:"namespace_name"`
+		Limit         int    `json:"limit,omitempty"`
+		Cursor        string `json:"cursor,omitempty"`
 	}) (*mcp.CallToolResult, any, error) {
-		result, err := t.InfrastructureToolset.ListDataPlanes(ctx, args.NamespaceName)
+		result, err := t.PEToolset.ListDataPlanes(ctx, args.NamespaceName, ListOpts{Limit: args.Limit, Cursor: args.Cursor})
 		return handleToolResult(result, err)
 	})
 }
@@ -123,7 +128,7 @@ func (t *Toolsets) RegisterGetDataPlane(s *mcp.Server) {
 		NamespaceName string `json:"namespace_name"`
 		DpName        string `json:"dp_name"`
 	}) (*mcp.CallToolResult, any, error) {
-		result, err := t.InfrastructureToolset.GetDataPlane(ctx, args.NamespaceName, args.DpName)
+		result, err := t.PEToolset.GetDataPlane(ctx, args.NamespaceName, args.DpName)
 		return handleToolResult(result, err)
 	})
 }
@@ -156,9 +161,7 @@ func (t *Toolsets) RegisterCreateDataPlane(s *mcp.Server) {
 					},
 				},
 			},
-		}, []string{
-			"namespace_name", "name", "cluster_agent_client_ca",
-		}),
+		}, []string{"namespace_name", "name", "cluster_agent_client_ca"}),
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
 		NamespaceName         string `json:"namespace_name"`
 		Name                  string `json:"name"`
@@ -193,7 +196,7 @@ func (t *Toolsets) RegisterCreateDataPlane(s *mcp.Server) {
 				Name: args.ObservabilityPlaneRef.Name,
 			}
 		}
-		result, err := t.InfrastructureToolset.CreateDataPlane(ctx, args.NamespaceName, dataPlaneReq)
+		result, err := t.PEToolset.CreateDataPlane(ctx, args.NamespaceName, dataPlaneReq)
 		return handleToolResult(result, err)
 	})
 }
@@ -202,14 +205,18 @@ func (t *Toolsets) RegisterListComponentTypes(s *mcp.Server) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "list_component_types",
 		Description: "List all available component types in an namespace. Component types define the " +
-			"structure and capabilities of components (e.g., WebApplication, Service, ScheduledTask).",
-		InputSchema: createSchema(map[string]any{
+			"structure and capabilities of components (e.g., WebApplication, Service, ScheduledTask). " +
+			"Supports pagination via limit and cursor.",
+		InputSchema: createSchema(addPaginationProperties(map[string]any{
 			"namespace_name": defaultStringProperty(),
-		}, []string{"namespace_name"}),
+		}), []string{"namespace_name"}),
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
 		NamespaceName string `json:"namespace_name"`
+		Limit         int    `json:"limit,omitempty"`
+		Cursor        string `json:"cursor,omitempty"`
 	}) (*mcp.CallToolResult, any, error) {
-		result, err := t.InfrastructureToolset.ListComponentTypes(ctx, args.NamespaceName)
+		result, err := t.ComponentToolset.ListComponentTypes(
+			ctx, args.NamespaceName, ListOpts{Limit: args.Limit, Cursor: args.Cursor})
 		return handleToolResult(result, err)
 	})
 }
@@ -227,152 +234,7 @@ func (t *Toolsets) RegisterGetComponentTypeSchema(s *mcp.Server) {
 		NamespaceName string `json:"namespace_name"`
 		CtName        string `json:"ct_name"`
 	}) (*mcp.CallToolResult, any, error) {
-		result, err := t.InfrastructureToolset.GetComponentTypeSchema(ctx, args.NamespaceName, args.CtName)
-		return handleToolResult(result, err)
-	})
-}
-
-func (t *Toolsets) RegisterListWorkflows(s *mcp.Server) {
-	mcp.AddTool(s, &mcp.Tool{
-		Name: "list_workflows",
-		Description: "List all available workflows in a namespace. Workflows define build and deployment " +
-			"processes for components.",
-		InputSchema: createSchema(map[string]any{
-			"namespace_name": defaultStringProperty(),
-		}, []string{"namespace_name"}),
-	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
-		NamespaceName string `json:"namespace_name"`
-	}) (*mcp.CallToolResult, any, error) {
-		result, err := t.InfrastructureToolset.ListWorkflows(ctx, args.NamespaceName)
-		return handleToolResult(result, err)
-	})
-}
-
-func (t *Toolsets) RegisterGetWorkflowSchema(s *mcp.Server) {
-	mcp.AddTool(s, &mcp.Tool{
-		Name: "get_workflow_schema",
-		Description: "Get the schema definition for a workflow. Returns the JSON schema showing workflow " +
-			"configuration options and parameters.",
-		InputSchema: createSchema(map[string]any{
-			"namespace_name": defaultStringProperty(),
-			"workflow_name":  stringProperty("Workflow name. Use list_workflows to discover valid names"),
-		}, []string{"namespace_name", "workflow_name"}),
-	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
-		NamespaceName string `json:"namespace_name"`
-		WorkflowName  string `json:"workflow_name"`
-	}) (*mcp.CallToolResult, any, error) {
-		result, err := t.InfrastructureToolset.GetWorkflowSchema(ctx, args.NamespaceName, args.WorkflowName)
-		return handleToolResult(result, err)
-	})
-}
-
-func (t *Toolsets) RegisterCreateWorkflowRun(s *mcp.Server) {
-	mcp.AddTool(s, &mcp.Tool{
-		Name:        "create_workflow_run",
-		Description: "Create a workflow run directly from a workflow template name and optional parameters.",
-		InputSchema: createSchema(map[string]any{
-			"namespace_name": defaultStringProperty(),
-			"workflow_name":  stringProperty("Workflow name. Use list_workflows to discover valid names"),
-			"parameters": map[string]any{
-				"type":        "object",
-				"description": "Optional: workflow parameter values for this run",
-			},
-		}, []string{"namespace_name", "workflow_name"}),
-	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
-		NamespaceName string                 `json:"namespace_name"`
-		WorkflowName  string                 `json:"workflow_name"`
-		Parameters    map[string]interface{} `json:"parameters"`
-	}) (*mcp.CallToolResult, any, error) {
-		createReq := &models.CreateWorkflowRunRequest{
-			WorkflowName: args.WorkflowName,
-			Parameters:   args.Parameters,
-		}
-		result, err := t.InfrastructureToolset.CreateWorkflowRun(ctx, args.NamespaceName, createReq)
-		return handleToolResult(result, err)
-	})
-}
-
-func (t *Toolsets) RegisterListWorkflowRuns(s *mcp.Server) {
-	mcp.AddTool(s, &mcp.Tool{
-		Name:        "list_workflow_runs",
-		Description: "List workflow runs in a namespace, optionally filtered by project and component labels.",
-		InputSchema: createSchema(map[string]any{
-			"namespace_name": defaultStringProperty(),
-			"project_name":   stringProperty("Optional: filter runs by project label"),
-			"component_name": stringProperty("Optional: filter runs by component label"),
-		}, []string{"namespace_name"}),
-	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
-		NamespaceName string `json:"namespace_name"`
-		ProjectName   string `json:"project_name"`
-		ComponentName string `json:"component_name"`
-	}) (*mcp.CallToolResult, any, error) {
-		result, err := t.InfrastructureToolset.ListWorkflowRuns(
-			ctx, args.NamespaceName, args.ProjectName, args.ComponentName)
-		return handleToolResult(result, err)
-	})
-}
-
-func (t *Toolsets) RegisterGetWorkflowRun(s *mcp.Server) {
-	mcp.AddTool(s, &mcp.Tool{
-		Name:        "get_workflow_run",
-		Description: "Get detailed status and metadata for a specific workflow run by name.",
-		InputSchema: createSchema(map[string]any{
-			"namespace_name": defaultStringProperty(),
-			"run_name":       stringProperty("Workflow run name. Use list_workflow_runs to discover valid names"),
-		}, []string{"namespace_name", "run_name"}),
-	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
-		NamespaceName string `json:"namespace_name"`
-		RunName       string `json:"run_name"`
-	}) (*mcp.CallToolResult, any, error) {
-		result, err := t.InfrastructureToolset.GetWorkflowRun(ctx, args.NamespaceName, args.RunName)
-		return handleToolResult(result, err)
-	})
-}
-
-func (t *Toolsets) RegisterGetWorkflowRunLogs(s *mcp.Server) {
-	mcp.AddTool(s, &mcp.Tool{
-		Name:        "get_workflow_run_logs",
-		Description: "Get workflow run logs, optionally limited to a specific step and recent time window.",
-		InputSchema: createSchema(map[string]any{
-			"namespace_name": defaultStringProperty(),
-			"run_name":       stringProperty("Workflow run name. Use list_workflow_runs to discover valid names"),
-			"step":           stringProperty("Optional: workflow step/template name"),
-			"since_seconds": map[string]any{
-				"type":        "integer",
-				"description": "Optional: only return logs newer than this many seconds",
-			},
-		}, []string{"namespace_name", "run_name"}),
-	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
-		NamespaceName string `json:"namespace_name"`
-		RunName       string `json:"run_name"`
-		Step          string `json:"step"`
-		SinceSeconds  *int64 `json:"since_seconds"`
-	}) (*mcp.CallToolResult, any, error) {
-		if args.SinceSeconds != nil && *args.SinceSeconds < 0 {
-			return nil, nil, fmt.Errorf("since_seconds must be a non-negative integer")
-		}
-		result, err := t.InfrastructureToolset.GetWorkflowRunLogs(
-			ctx, args.NamespaceName, args.RunName, args.Step, args.SinceSeconds)
-		return handleToolResult(result, err)
-	})
-}
-
-func (t *Toolsets) RegisterGetWorkflowRunEvents(s *mcp.Server) {
-	mcp.AddTool(s, &mcp.Tool{
-		Name:        "get_workflow_run_events",
-		Description: "Get events emitted by a workflow run, optionally filtered to a specific step.",
-		InputSchema: createSchema(map[string]any{
-			"namespace_name": defaultStringProperty(),
-			"run_name":       stringProperty("Workflow run name. Use list_workflow_runs to discover valid names"),
-			"step":           stringProperty("Optional: workflow step/template name"),
-		}, []string{"namespace_name", "run_name"}),
-	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
-		NamespaceName string `json:"namespace_name"`
-		RunName       string `json:"run_name"`
-		Step          string `json:"step"`
-	}) (*mcp.CallToolResult, any, error) {
-		result, err := t.InfrastructureToolset.GetWorkflowRunEvents(
-			ctx, args.NamespaceName, args.RunName, args.Step)
+		result, err := t.ComponentToolset.GetComponentTypeSchema(ctx, args.NamespaceName, args.CtName)
 		return handleToolResult(result, err)
 	})
 }
@@ -381,14 +243,17 @@ func (t *Toolsets) RegisterListTraits(s *mcp.Server) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "list_traits",
 		Description: "List all available traits in an namespace. Traits add capabilities to components " +
-			"(e.g., autoscaling, ingress, service mesh).",
-		InputSchema: createSchema(map[string]any{
+			"(e.g., autoscaling, ingress, service mesh). Supports pagination via limit and cursor.",
+		InputSchema: createSchema(addPaginationProperties(map[string]any{
 			"namespace_name": defaultStringProperty(),
-		}, []string{"namespace_name"}),
+		}), []string{"namespace_name"}),
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
 		NamespaceName string `json:"namespace_name"`
+		Limit         int    `json:"limit,omitempty"`
+		Cursor        string `json:"cursor,omitempty"`
 	}) (*mcp.CallToolResult, any, error) {
-		result, err := t.InfrastructureToolset.ListTraits(ctx, args.NamespaceName)
+		result, err := t.ComponentToolset.ListTraits(
+			ctx, args.NamespaceName, ListOpts{Limit: args.Limit, Cursor: args.Cursor})
 		return handleToolResult(result, err)
 	})
 }
@@ -406,7 +271,186 @@ func (t *Toolsets) RegisterGetTraitSchema(s *mcp.Server) {
 		NamespaceName string `json:"namespace_name"`
 		TraitName     string `json:"trait_name"`
 	}) (*mcp.CallToolResult, any, error) {
-		result, err := t.InfrastructureToolset.GetTraitSchema(ctx, args.NamespaceName, args.TraitName)
+		result, err := t.ComponentToolset.GetTraitSchema(ctx, args.NamespaceName, args.TraitName)
+		return handleToolResult(result, err)
+	})
+}
+
+func (t *Toolsets) RegisterGetDeploymentPipeline(s *mcp.Server) {
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "get_deployment_pipeline",
+		Description: "Get detailed information about a deployment pipeline including its stages, promotion " +
+			"order, and associated environments.",
+		InputSchema: createSchema(map[string]any{
+			"namespace_name": defaultStringProperty(),
+			"pipeline_name":  stringProperty("Use list_deployment_pipelines to discover valid names"),
+		}, []string{"namespace_name", "pipeline_name"}),
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
+		NamespaceName string `json:"namespace_name"`
+		PipelineName  string `json:"pipeline_name"`
+	}) (*mcp.CallToolResult, any, error) {
+		result, err := t.InfrastructureToolset.GetDeploymentPipeline(ctx, args.NamespaceName, args.PipelineName)
+		return handleToolResult(result, err)
+	})
+}
+
+func (t *Toolsets) RegisterListDeploymentPipelines(s *mcp.Server) {
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "list_deployment_pipelines",
+		Description: "List all deployment pipelines in a namespace. Deployment pipelines define the promotion " +
+			"order between environments (e.g., dev → staging → production). Supports pagination via limit and cursor.",
+		InputSchema: createSchema(addPaginationProperties(map[string]any{
+			"namespace_name": defaultStringProperty(),
+		}), []string{"namespace_name"}),
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
+		NamespaceName string `json:"namespace_name"`
+		Limit         int    `json:"limit,omitempty"`
+		Cursor        string `json:"cursor,omitempty"`
+	}) (*mcp.CallToolResult, any, error) {
+		result, err := t.InfrastructureToolset.ListDeploymentPipelines(
+			ctx, args.NamespaceName, ListOpts{Limit: args.Limit, Cursor: args.Cursor})
+		return handleToolResult(result, err)
+	})
+}
+
+func (t *Toolsets) RegisterListBuildPlanes(s *mcp.Server) {
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "list_buildplanes",
+		Description: "List all build planes in a namespace. Build planes are infrastructure that handles " +
+			"continuous integration and container image building. Supports pagination via limit and cursor.",
+		InputSchema: createSchema(addPaginationProperties(map[string]any{
+			"namespace_name": defaultStringProperty(),
+		}), []string{"namespace_name"}),
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
+		NamespaceName string `json:"namespace_name"`
+		Limit         int    `json:"limit,omitempty"`
+		Cursor        string `json:"cursor,omitempty"`
+	}) (*mcp.CallToolResult, any, error) {
+		result, err := t.PEToolset.ListBuildPlanes(
+			ctx, args.NamespaceName, ListOpts{Limit: args.Limit, Cursor: args.Cursor})
+		return handleToolResult(result, err)
+	})
+}
+
+func (t *Toolsets) RegisterGetObserverURL(s *mcp.Server) {
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "get_observer_url",
+		Description: "Get the observer URL for an environment. The observer URL provides access to monitoring, " +
+			"logging, and observability data for components deployed in the environment.",
+		InputSchema: createSchema(map[string]any{
+			"namespace_name": defaultStringProperty(),
+			"env_name":       stringProperty("Use list_environments to discover valid names"),
+		}, []string{"namespace_name", "env_name"}),
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
+		NamespaceName string `json:"namespace_name"`
+		EnvName       string `json:"env_name"`
+	}) (*mcp.CallToolResult, any, error) {
+		result, err := t.InfrastructureToolset.GetObserverURL(ctx, args.NamespaceName, args.EnvName)
+		return handleToolResult(result, err)
+	})
+}
+
+func (t *Toolsets) RegisterCreateWorkflowRun(s *mcp.Server) {
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "create_workflow_run",
+		Description: "Create a new workflow run by specifying a workflow name and optional parameters. " +
+			"Workflows define automated processes like CI/CD pipelines that execute on the build plane.",
+		InputSchema: createSchema(map[string]any{
+			"namespace_name": defaultStringProperty(),
+			"workflow_name":  stringProperty("Name of the Workflow CR to execute"),
+			"parameters": map[string]any{
+				"type":        "object",
+				"description": "Optional: Parameters to pass to the workflow execution",
+			},
+		}, []string{"namespace_name", "workflow_name"}),
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
+		NamespaceName string                 `json:"namespace_name"`
+		WorkflowName  string                 `json:"workflow_name"`
+		Parameters    map[string]interface{} `json:"parameters"`
+	}) (*mcp.CallToolResult, any, error) {
+		result, err := t.ComponentToolset.CreateWorkflowRun(ctx, args.NamespaceName, args.WorkflowName, args.Parameters)
+		return handleToolResult(result, err)
+	})
+}
+
+func (t *Toolsets) RegisterListWorkflowRuns(s *mcp.Server) {
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "list_workflow_runs",
+		Description: "List workflow runs in a namespace, optionally filtered by project and component. " +
+			"Shows execution history including status, timestamps, and workflow references. " +
+			"Supports pagination via limit and cursor.",
+		InputSchema: createSchema(addPaginationProperties(map[string]any{
+			"namespace_name": defaultStringProperty(),
+			"project_name":   stringProperty("Optional: filter by project name"),
+			"component_name": stringProperty("Optional: filter by component name"),
+		}), []string{"namespace_name"}),
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
+		NamespaceName string `json:"namespace_name"`
+		ProjectName   string `json:"project_name"`
+		ComponentName string `json:"component_name"`
+		Limit         int    `json:"limit,omitempty"`
+		Cursor        string `json:"cursor,omitempty"`
+	}) (*mcp.CallToolResult, any, error) {
+		result, err := t.ComponentToolset.ListWorkflowRuns(
+			ctx, args.NamespaceName, args.ProjectName, args.ComponentName, ListOpts{Limit: args.Limit, Cursor: args.Cursor})
+		return handleToolResult(result, err)
+	})
+}
+
+func (t *Toolsets) RegisterGetWorkflowRun(s *mcp.Server) {
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "get_workflow_run",
+		Description: "Get detailed information about a specific workflow run including its status, tasks, " +
+			"timestamps, and referenced resources.",
+		InputSchema: createSchema(map[string]any{
+			"namespace_name": defaultStringProperty(),
+			"run_name":       stringProperty("Use list_workflow_runs to discover valid names"),
+		}, []string{"namespace_name", "run_name"}),
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
+		NamespaceName string `json:"namespace_name"`
+		RunName       string `json:"run_name"`
+	}) (*mcp.CallToolResult, any, error) {
+		result, err := t.ComponentToolset.GetWorkflowRun(ctx, args.NamespaceName, args.RunName)
+		return handleToolResult(result, err)
+	})
+}
+
+func (t *Toolsets) RegisterListWorkflows(s *mcp.Server) {
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "list_workflows",
+		Description: "List all workflows in a namespace. Workflows are reusable templates that define " +
+			"automated processes such as CI/CD pipelines executed on the build plane. " +
+			"Use this to discover available workflow names for use with create_component or create_workflow_run. " +
+			"Supports pagination via limit and cursor.",
+		InputSchema: createSchema(addPaginationProperties(map[string]any{
+			"namespace_name": defaultStringProperty(),
+		}), []string{"namespace_name"}),
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
+		NamespaceName string `json:"namespace_name"`
+		Limit         int    `json:"limit,omitempty"`
+		Cursor        string `json:"cursor,omitempty"`
+	}) (*mcp.CallToolResult, any, error) {
+		result, err := t.ComponentToolset.ListWorkflows(
+			ctx, args.NamespaceName, ListOpts{Limit: args.Limit, Cursor: args.Cursor})
+		return handleToolResult(result, err)
+	})
+}
+
+func (t *Toolsets) RegisterGetWorkflowSchema(s *mcp.Server) {
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "get_workflow_schema",
+		Description: "Get the parameter schema for a specific workflow. Use this to inspect what parameters " +
+			"a workflow accepts before configuring a component's workflow field or triggering a workflow run. " +
+			"Use list_workflows to discover valid workflow names.",
+		InputSchema: createSchema(map[string]any{
+			"namespace_name": defaultStringProperty(),
+			"workflow_name":  stringProperty("Name of the workflow. Use list_workflows to discover valid names"),
+		}, []string{"namespace_name", "workflow_name"}),
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
+		NamespaceName string `json:"namespace_name"`
+		WorkflowName  string `json:"workflow_name"`
+	}) (*mcp.CallToolResult, any, error) {
+		result, err := t.ComponentToolset.GetWorkflowSchema(ctx, args.NamespaceName, args.WorkflowName)
 		return handleToolResult(result, err)
 	})
 }
@@ -415,14 +459,18 @@ func (t *Toolsets) RegisterListObservabilityPlanes(s *mcp.Server) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "list_observability_planes",
 		Description: "List all ObservabilityPlanes in an namespace. ObservabilityPlanes provide monitoring, " +
-			"logging, tracing, and metrics collection capabilities for deployed components.",
-		InputSchema: createSchema(map[string]any{
+			"logging, tracing, and metrics collection capabilities for deployed components. " +
+			"Supports pagination via limit and cursor.",
+		InputSchema: createSchema(addPaginationProperties(map[string]any{
 			"namespace_name": defaultStringProperty(),
-		}, []string{"namespace_name"}),
+		}), []string{"namespace_name"}),
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
 		NamespaceName string `json:"namespace_name"`
+		Limit         int    `json:"limit,omitempty"`
+		Cursor        string `json:"cursor,omitempty"`
 	}) (*mcp.CallToolResult, any, error) {
-		result, err := t.InfrastructureToolset.ListObservabilityPlanes(ctx, args.NamespaceName)
+		result, err := t.PEToolset.ListObservabilityPlanes(
+			ctx, args.NamespaceName, ListOpts{Limit: args.Limit, Cursor: args.Cursor})
 		return handleToolResult(result, err)
 	})
 }
@@ -433,17 +481,16 @@ func (t *Toolsets) RegisterListObservabilityPlanes(s *mcp.Server) {
 // when InfrastructureToolset also implements ClusterPlaneHandler; otherwise it
 // is a no-op. Added in v0.12.0 (non-breaking, additive).
 func (t *Toolsets) RegisterListClusterDataPlanes(s *mcp.Server) {
-	cp, ok := t.InfrastructureToolset.(ClusterPlaneHandler)
-	if !ok {
-		return
-	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "list_cluster_dataplanes",
 		Description: "List all cluster-scoped data planes. These are shared infrastructure managed by " +
-			"platform admins, not scoped to any namespace.",
-		InputSchema: createSchema(map[string]any{}, nil),
-	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct{}) (*mcp.CallToolResult, any, error) {
-		result, err := cp.ListClusterDataPlanes(ctx)
+			"platform admins, not scoped to any namespace. Supports pagination via limit and cursor.",
+		InputSchema: createSchema(addPaginationProperties(map[string]any{}), nil),
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
+		Limit  int    `json:"limit,omitempty"`
+		Cursor string `json:"cursor,omitempty"`
+	}) (*mcp.CallToolResult, any, error) {
+		result, err := t.PEToolset.ListClusterDataPlanes(ctx, ListOpts{Limit: args.Limit, Cursor: args.Cursor})
 		return handleToolResult(result, err)
 	})
 }
@@ -455,10 +502,6 @@ func (t *Toolsets) RegisterListClusterDataPlanes(s *mcp.Server) {
 // Only registered when InfrastructureToolset also implements ClusterPlaneHandler;
 // otherwise it is a no-op. Added in v0.12.0 (non-breaking, additive).
 func (t *Toolsets) RegisterGetClusterDataPlane(s *mcp.Server) {
-	cp, ok := t.InfrastructureToolset.(ClusterPlaneHandler)
-	if !ok {
-		return
-	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "get_cluster_dataplane",
 		Description: "Get detailed information about a cluster-scoped data plane including cluster details, " +
@@ -469,16 +512,12 @@ func (t *Toolsets) RegisterGetClusterDataPlane(s *mcp.Server) {
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
 		CdpName string `json:"cdp_name"`
 	}) (*mcp.CallToolResult, any, error) {
-		result, err := cp.GetClusterDataPlane(ctx, args.CdpName)
+		result, err := t.PEToolset.GetClusterDataPlane(ctx, args.CdpName)
 		return handleToolResult(result, err)
 	})
 }
 
 func (t *Toolsets) RegisterCreateClusterDataPlane(s *mcp.Server) {
-	cp, ok := t.InfrastructureToolset.(ClusterPlaneHandler)
-	if !ok {
-		return
-	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "create_cluster_dataplane",
 		Description: "Create a new cluster-scoped data plane. Cluster data planes are shared infrastructure " +
@@ -486,10 +525,28 @@ func (t *Toolsets) RegisterCreateClusterDataPlane(s *mcp.Server) {
 		InputSchema: createSchema(map[string]any{
 			"name": stringProperty(
 				"DNS-compatible identifier (lowercase, alphanumeric, hyphens only, max 63 chars)"),
-			"display_name":            stringProperty("Human-readable display name"),
-			"description":             stringProperty("Human-readable description"),
-			"plane_id":                stringProperty("Logical plane identifier for the physical cluster"),
-			"cluster_agent_client_ca": stringProperty("CA certificate to verify cluster agent's client certificate"),
+			"display_name":              stringProperty("Human-readable display name"),
+			"description":               stringProperty("Human-readable description"),
+			"plane_id":                  stringProperty("Logical plane identifier for the physical cluster"),
+			"cluster_agent_client_ca":   stringProperty("CA certificate to verify cluster agent's client certificate"),
+			"public_virtual_host":       stringProperty("Public virtual host for the data plane"),
+			"organization_virtual_host": stringProperty("Organization-specific virtual host"),
+			"public_http_port": map[string]any{
+				"type":        "integer",
+				"description": "Public HTTP port",
+			},
+			"public_https_port": map[string]any{
+				"type":        "integer",
+				"description": "Public HTTPS port",
+			},
+			"organization_http_port": map[string]any{
+				"type":        "integer",
+				"description": "Organization HTTP port",
+			},
+			"organization_https_port": map[string]any{
+				"type":        "integer",
+				"description": "Organization HTTPS port",
+			},
 			"observability_plane_ref": map[string]any{
 				"type":        "object",
 				"description": "Optional: Reference to a ClusterObservabilityPlane resource",
@@ -533,72 +590,63 @@ func (t *Toolsets) RegisterCreateClusterDataPlane(s *mcp.Server) {
 		if err := cdpReq.Validate(); err != nil {
 			return nil, nil, fmt.Errorf("invalid cluster dataplane request: %w", err)
 		}
-		result, err := cp.CreateClusterDataPlane(ctx, cdpReq)
+		result, err := t.PEToolset.CreateClusterDataPlane(ctx, cdpReq)
 		return handleToolResult(result, err)
 	})
 }
 
 func (t *Toolsets) RegisterListClusterBuildPlanes(s *mcp.Server) {
-	cp, ok := t.InfrastructureToolset.(ClusterPlaneHandler)
-	if !ok {
-		return
-	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "list_cluster_buildplanes",
 		Description: "List all cluster-scoped build planes. These are shared build infrastructure managed by " +
-			"platform admins, not scoped to any namespace.",
-		InputSchema: createSchema(map[string]any{}, nil),
-	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct{}) (*mcp.CallToolResult, any, error) {
-		result, err := cp.ListClusterBuildPlanes(ctx)
+			"platform admins, not scoped to any namespace. Supports pagination via limit and cursor.",
+		InputSchema: createSchema(addPaginationProperties(map[string]any{}), nil),
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
+		Limit  int    `json:"limit,omitempty"`
+		Cursor string `json:"cursor,omitempty"`
+	}) (*mcp.CallToolResult, any, error) {
+		result, err := t.PEToolset.ListClusterBuildPlanes(ctx, ListOpts{Limit: args.Limit, Cursor: args.Cursor})
 		return handleToolResult(result, err)
 	})
 }
 
 func (t *Toolsets) RegisterListClusterObservabilityPlanes(s *mcp.Server) {
-	cp, ok := t.InfrastructureToolset.(ClusterPlaneHandler)
-	if !ok {
-		return
-	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "list_cluster_observability_planes",
 		Description: "List all cluster-scoped observability planes. These are shared observability infrastructure " +
-			"managed by platform admins, not scoped to any namespace.",
-		InputSchema: createSchema(map[string]any{}, nil),
-	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct{}) (*mcp.CallToolResult, any, error) {
-		result, err := cp.ListClusterObservabilityPlanes(ctx)
+			"managed by platform admins, not scoped to any namespace. Supports pagination via limit and cursor.",
+		InputSchema: createSchema(addPaginationProperties(map[string]any{}), nil),
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
+		Limit  int    `json:"limit,omitempty"`
+		Cursor string `json:"cursor,omitempty"`
+	}) (*mcp.CallToolResult, any, error) {
+		result, err := t.PEToolset.ListClusterObservabilityPlanes(ctx, ListOpts{Limit: args.Limit, Cursor: args.Cursor})
 		return handleToolResult(result, err)
 	})
 }
 
 // RegisterListClusterComponentTypes registers the "list_cluster_component_types" MCP tool
 // which lists all cluster-scoped component types (shared templates managed by platform
-// admins, not scoped to any namespace). Only registered when InfrastructureToolset also
-// implements ClusterPlaneHandler; otherwise it is a no-op.
+// admins, not scoped to any namespace).
 func (t *Toolsets) RegisterListClusterComponentTypes(s *mcp.Server) {
-	cp, ok := t.InfrastructureToolset.(ClusterPlaneHandler)
-	if !ok {
-		return
-	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "list_cluster_component_types",
 		Description: "List all cluster-scoped component types. These are shared component type templates managed " +
-			"by platform admins that define the structure and capabilities of components across all namespaces.",
-		InputSchema: createSchema(map[string]any{}, nil),
-	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct{}) (*mcp.CallToolResult, any, error) {
-		result, err := cp.ListClusterComponentTypes(ctx)
+			"by platform admins that define the structure and capabilities of components across all namespaces. " +
+			"Supports pagination via limit and cursor.",
+		InputSchema: createSchema(addPaginationProperties(map[string]any{}), nil),
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
+		Limit  int    `json:"limit,omitempty"`
+		Cursor string `json:"cursor,omitempty"`
+	}) (*mcp.CallToolResult, any, error) {
+		result, err := t.ComponentToolset.ListClusterComponentTypes(ctx, ListOpts{Limit: args.Limit, Cursor: args.Cursor})
 		return handleToolResult(result, err)
 	})
 }
 
 // RegisterGetClusterComponentType registers the "get_cluster_component_type" MCP tool
 // which returns detailed information about a specific cluster-scoped component type.
-// Only registered when InfrastructureToolset also implements ClusterPlaneHandler;
-// otherwise it is a no-op.
 func (t *Toolsets) RegisterGetClusterComponentType(s *mcp.Server) {
-	cp, ok := t.InfrastructureToolset.(ClusterPlaneHandler)
-	if !ok {
-		return
-	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "get_cluster_component_type",
 		Description: "Get detailed information about a cluster-scoped component type including workload type, " +
@@ -609,20 +657,14 @@ func (t *Toolsets) RegisterGetClusterComponentType(s *mcp.Server) {
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
 		CctName string `json:"cct_name"`
 	}) (*mcp.CallToolResult, any, error) {
-		result, err := cp.GetClusterComponentType(ctx, args.CctName)
+		result, err := t.ComponentToolset.GetClusterComponentType(ctx, args.CctName)
 		return handleToolResult(result, err)
 	})
 }
 
 // RegisterGetClusterComponentTypeSchema registers the "get_cluster_component_type_schema" MCP tool
 // which returns the JSON schema for a specific cluster-scoped component type.
-// Only registered when InfrastructureToolset also implements ClusterPlaneHandler;
-// otherwise it is a no-op.
 func (t *Toolsets) RegisterGetClusterComponentTypeSchema(s *mcp.Server) {
-	cp, ok := t.InfrastructureToolset.(ClusterPlaneHandler)
-	if !ok {
-		return
-	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "get_cluster_component_type_schema",
 		Description: "Get the schema definition for a cluster-scoped component type. Returns the JSON schema " +
@@ -633,40 +675,33 @@ func (t *Toolsets) RegisterGetClusterComponentTypeSchema(s *mcp.Server) {
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
 		CctName string `json:"cct_name"`
 	}) (*mcp.CallToolResult, any, error) {
-		result, err := cp.GetClusterComponentTypeSchema(ctx, args.CctName)
+		result, err := t.ComponentToolset.GetClusterComponentTypeSchema(ctx, args.CctName)
 		return handleToolResult(result, err)
 	})
 }
 
 // RegisterListClusterTraits registers the "list_cluster_traits" MCP tool
 // which lists all cluster-scoped traits (shared trait definitions managed by platform
-// admins, not scoped to any namespace). Only registered when InfrastructureToolset also
-// implements ClusterPlaneHandler; otherwise it is a no-op.
+// admins, not scoped to any namespace).
 func (t *Toolsets) RegisterListClusterTraits(s *mcp.Server) {
-	cp, ok := t.InfrastructureToolset.(ClusterPlaneHandler)
-	if !ok {
-		return
-	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "list_cluster_traits",
 		Description: "List all cluster-scoped traits. These are shared trait definitions managed by platform " +
-			"admins that add capabilities to components across all namespaces (e.g., autoscaling, ingress).",
-		InputSchema: createSchema(map[string]any{}, nil),
-	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct{}) (*mcp.CallToolResult, any, error) {
-		result, err := cp.ListClusterTraits(ctx)
+			"admins that add capabilities to components across all namespaces (e.g., autoscaling, ingress). " +
+			"Supports pagination via limit and cursor.",
+		InputSchema: createSchema(addPaginationProperties(map[string]any{}), nil),
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
+		Limit  int    `json:"limit,omitempty"`
+		Cursor string `json:"cursor,omitempty"`
+	}) (*mcp.CallToolResult, any, error) {
+		result, err := t.ComponentToolset.ListClusterTraits(ctx, ListOpts{Limit: args.Limit, Cursor: args.Cursor})
 		return handleToolResult(result, err)
 	})
 }
 
 // RegisterGetClusterTrait registers the "get_cluster_trait" MCP tool
 // which returns detailed information about a specific cluster-scoped trait.
-// Only registered when InfrastructureToolset also implements ClusterPlaneHandler;
-// otherwise it is a no-op.
 func (t *Toolsets) RegisterGetClusterTrait(s *mcp.Server) {
-	cp, ok := t.InfrastructureToolset.(ClusterPlaneHandler)
-	if !ok {
-		return
-	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "get_cluster_trait",
 		Description: "Get detailed information about a cluster-scoped trait including its name, " +
@@ -677,20 +712,14 @@ func (t *Toolsets) RegisterGetClusterTrait(s *mcp.Server) {
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
 		CtName string `json:"ct_name"`
 	}) (*mcp.CallToolResult, any, error) {
-		result, err := cp.GetClusterTrait(ctx, args.CtName)
+		result, err := t.ComponentToolset.GetClusterTrait(ctx, args.CtName)
 		return handleToolResult(result, err)
 	})
 }
 
 // RegisterGetClusterTraitSchema registers the "get_cluster_trait_schema" MCP tool
 // which returns the JSON schema for a specific cluster-scoped trait.
-// Only registered when InfrastructureToolset also implements ClusterPlaneHandler;
-// otherwise it is a no-op.
 func (t *Toolsets) RegisterGetClusterTraitSchema(s *mcp.Server) {
-	cp, ok := t.InfrastructureToolset.(ClusterPlaneHandler)
-	if !ok {
-		return
-	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "get_cluster_trait_schema",
 		Description: "Get the schema definition for a cluster-scoped trait. Returns the JSON schema " +
@@ -701,7 +730,7 @@ func (t *Toolsets) RegisterGetClusterTraitSchema(s *mcp.Server) {
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
 		CtName string `json:"ct_name"`
 	}) (*mcp.CallToolResult, any, error) {
-		result, err := cp.GetClusterTraitSchema(ctx, args.CtName)
+		result, err := t.ComponentToolset.GetClusterTraitSchema(ctx, args.CtName)
 		return handleToolResult(result, err)
 	})
 }

@@ -1,4 +1,4 @@
-// Copyright 2025 The OpenChoreo Authors
+// Copyright 2026 The OpenChoreo Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package mcphandlers
@@ -6,95 +6,41 @@ package mcphandlers
 import (
 	"context"
 
-	"github.com/openchoreo/openchoreo/internal/openchoreo-api/models"
+	"github.com/openchoreo/openchoreo/pkg/mcp/tools"
 )
 
-type ListComponentTypesResponse struct {
-	ComponentTypes any `json:"component_types"`
-}
-
-type ListWorkflowsResponse struct {
-	Workflows any `json:"workflows"`
-}
-
-type ListTraitsResponse struct {
-	Traits any `json:"traits"`
-}
-
-type ListWorkflowRunsResponse struct {
-	WorkflowRuns any `json:"workflow_runs"`
-}
-
-func (h *MCPHandler) ListComponentTypes(ctx context.Context, namespaceName string) (any, error) {
-	componentTypes, err := h.Services.ComponentTypeService.ListComponentTypes(ctx, namespaceName)
+func (h *MCPHandler) ListObservabilityPlanes(ctx context.Context, namespaceName string, opts tools.ListOpts) (any, error) {
+	result, err := h.services.ObservabilityPlaneService.ListObservabilityPlanes(ctx, namespaceName, toServiceListOptions(opts))
 	if err != nil {
-		return ListComponentTypesResponse{}, err
+		return nil, err
 	}
-	return ListComponentTypesResponse{
-		ComponentTypes: componentTypes,
-	}, nil
+	return wrapTransformedList("observability_planes", result.Items, result.NextCursor, observabilityPlaneSummary), nil
 }
 
-func (h *MCPHandler) GetComponentTypeSchema(ctx context.Context, namespaceName, ctName string) (any, error) {
-	return h.Services.ComponentTypeService.GetComponentTypeSchema(ctx, namespaceName, ctName)
-}
-
-func (h *MCPHandler) ListWorkflows(ctx context.Context, namespaceName string) (any, error) {
-	workflows, err := h.Services.WorkflowService.ListWorkflows(ctx, namespaceName)
+func (h *MCPHandler) GetDeploymentPipeline(ctx context.Context, namespaceName, pipelineName string) (any, error) {
+	dp, err := h.services.DeploymentPipelineService.GetDeploymentPipeline(ctx, namespaceName, pipelineName)
 	if err != nil {
-		return ListWorkflowsResponse{}, err
+		return nil, err
 	}
-	return ListWorkflowsResponse{
-		Workflows: workflows,
-	}, nil
+	return deploymentPipelineDetail(dp), nil
 }
 
-func (h *MCPHandler) GetWorkflowSchema(ctx context.Context, namespaceName, workflowName string) (any, error) {
-	return h.Services.WorkflowService.GetWorkflowSchema(ctx, namespaceName, workflowName)
-}
-
-func (h *MCPHandler) CreateWorkflowRun(ctx context.Context, namespaceName string, req *models.CreateWorkflowRunRequest) (any, error) {
-	return h.Services.WorkflowRunService.CreateWorkflowRun(ctx, namespaceName, req)
-}
-
-func (h *MCPHandler) ListWorkflowRuns(ctx context.Context, namespaceName, projectName, componentName string) (any, error) {
-	workflowRuns, err := h.Services.WorkflowRunService.ListWorkflowRuns(ctx, namespaceName, projectName, componentName)
+func (h *MCPHandler) ListDeploymentPipelines(ctx context.Context, namespaceName string, opts tools.ListOpts) (any, error) {
+	result, err := h.services.DeploymentPipelineService.ListDeploymentPipelines(ctx, namespaceName, toServiceListOptions(opts))
 	if err != nil {
-		return ListWorkflowRunsResponse{}, err
+		return nil, err
 	}
-	return ListWorkflowRunsResponse{
-		WorkflowRuns: workflowRuns,
-	}, nil
+	return wrapTransformedList("deployment_pipelines", result.Items, result.NextCursor, deploymentPipelineSummary), nil
 }
 
-func (h *MCPHandler) GetWorkflowRun(ctx context.Context, namespaceName, runName string) (any, error) {
-	return h.Services.WorkflowRunService.GetWorkflowRun(ctx, namespaceName, runName)
-}
-
-func (h *MCPHandler) GetWorkflowRunLogs(ctx context.Context, namespaceName, runName, stepName string, sinceSeconds *int64) (any, error) {
-	return h.Services.WorkflowRunService.GetWorkflowRunLogs(
-		ctx, namespaceName, runName, stepName, h.GatewayURL, sinceSeconds)
-}
-
-func (h *MCPHandler) GetWorkflowRunEvents(ctx context.Context, namespaceName, runName, stepName string) (any, error) {
-	return h.Services.WorkflowRunService.GetWorkflowRunEvents(
-		ctx, namespaceName, runName, stepName, h.GatewayURL)
-}
-
-func (h *MCPHandler) ListTraits(ctx context.Context, namespaceName string) (any, error) {
-	traits, err := h.Services.TraitService.ListTraits(ctx, namespaceName)
+func (h *MCPHandler) ListBuildPlanes(ctx context.Context, namespaceName string, opts tools.ListOpts) (any, error) {
+	result, err := h.services.BuildPlaneService.ListBuildPlanes(ctx, namespaceName, toServiceListOptions(opts))
 	if err != nil {
-		return ListTraitsResponse{}, err
+		return nil, err
 	}
-	return ListTraitsResponse{
-		Traits: traits,
-	}, nil
+	return wrapTransformedList("build_planes", result.Items, result.NextCursor, buildPlaneSummary), nil
 }
 
-func (h *MCPHandler) GetTraitSchema(ctx context.Context, namespaceName, traitName string) (any, error) {
-	return h.Services.TraitService.GetTraitSchema(ctx, namespaceName, traitName)
-}
-
-func (h *MCPHandler) ListObservabilityPlanes(ctx context.Context, namespaceName string) (any, error) {
-	return h.Services.ObservabilityPlaneService.ListObservabilityPlanes(ctx, namespaceName)
+func (h *MCPHandler) GetObserverURL(ctx context.Context, namespaceName, envName string) (any, error) {
+	return h.services.EnvironmentService.GetObserverURL(ctx, namespaceName, envName)
 }

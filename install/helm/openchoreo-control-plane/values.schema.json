@@ -2419,6 +2419,38 @@
           "additionalProperties": false,
           "description": "OpenChoreo API specific configuration. Shared settings come from global security.* values.",
           "properties": {
+            "legacy_mcp": {
+              "additionalProperties": false,
+              "description": "Legacy Model Context Protocol (MCP) server configuration",
+              "properties": {
+                "enabled": {
+                  "default": true,
+                  "description": "Enable the MCP server for AI-friendly tool interfaces",
+                  "title": "enabled",
+                  "type": "boolean"
+                },
+                "toolsets": {
+                  "default": [
+                    "namespace",
+                    "project",
+                    "component",
+                    "deployment",
+                    "infrastructure",
+                    "schema",
+                    "resource"
+                  ],
+                  "description": "List of enabled MCP legacy toolsets. Each toolset exposes a group of related operations.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "title": "toolsets",
+                  "type": "array"
+                }
+              },
+              "required": [],
+              "title": "legacy_mcp",
+              "type": "object"
+            },
             "logging": {
               "additionalProperties": false,
               "description": "Logging configuration",
@@ -2471,13 +2503,9 @@
                     "namespace",
                     "project",
                     "component",
-                    "build",
-                    "deployment",
-                    "infrastructure",
-                    "schema",
-                    "resource"
+                    "infrastructure"
                   ],
-                  "description": "List of enabled MCP toolsets. Each toolset exposes a group of related operations.",
+                  "description": "List of enabled MCP toolsets. Each toolset exposes a group of related operations. Allowed toolsets: namespace, project, component, infrastructure, pe",
                   "items": {
                     "type": "string"
                   },

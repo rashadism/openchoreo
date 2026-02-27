@@ -5,6 +5,7 @@ package tools
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -46,6 +47,23 @@ func arrayProperty(description, itemType string) map[string]any {
 			"type": itemType,
 		},
 	}
+}
+
+func intProperty(description string) map[string]any {
+	return map[string]any{
+		"type":        "integer",
+		"description": description,
+	}
+}
+
+// addPaginationProperties adds optional "limit" and "cursor" properties to a
+// property map used for list tool input schemas.
+func addPaginationProperties(properties map[string]any) map[string]any {
+	properties["limit"] = intProperty(
+		fmt.Sprintf("Maximum number of items to return per page (default %d)", DefaultPageSize))
+	properties["cursor"] = stringProperty(
+		"Opaque pagination cursor from a previous response's next_cursor field")
+	return properties
 }
 
 func createSchema(properties map[string]any, required []string) map[string]any {

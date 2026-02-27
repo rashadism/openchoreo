@@ -14,31 +14,12 @@ func projectToolSpecs() []toolTestSpec {
 			descriptionKeywords: []string{"list", "project"},
 			descriptionMinLen:   10,
 			requiredParams:      []string{"namespace_name"},
+			optionalParams:      []string{"limit", "cursor"},
 			testArgs:            map[string]any{"namespace_name": testNamespaceName},
 			expectedMethod:      "ListProjects",
 			validateCall: func(t *testing.T, args []interface{}) {
 				if args[0] != testNamespaceName {
 					t.Errorf("Expected namespace %q, got %v", testNamespaceName, args[0])
-				}
-			},
-		},
-		{
-			name:                "get_project",
-			toolset:             "project",
-			descriptionKeywords: []string{"project"},
-			descriptionMinLen:   10,
-			requiredParams:      []string{"namespace_name", "project_name"},
-			testArgs: map[string]any{
-				"namespace_name": testNamespaceName,
-				"project_name":   testProjectName,
-			},
-			expectedMethod: "GetProject",
-			validateCall: func(t *testing.T, args []interface{}) {
-				if args[0] != testNamespaceName {
-					t.Errorf("Expected namespace %q, got %v", testNamespaceName, args[0])
-				}
-				if args[1] != testProjectName {
-					t.Errorf("Expected project name %q, got %v", testProjectName, args[1])
 				}
 			},
 		},
