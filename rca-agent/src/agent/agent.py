@@ -7,7 +7,6 @@ import logging
 import uuid
 from collections.abc import AsyncIterator
 from typing import Any
-from uuid import UUID
 
 import httpx
 from langchain.agents import create_agent
@@ -17,7 +16,6 @@ from langchain_core.callbacks import BaseCallbackHandler, UsageMetadataCallbackH
 from langchain_core.runnables import Runnable, RunnableConfig
 from pydantic import BaseModel
 
-from src.agent.helpers import AlertScope, resolve_component_scope
 from src.agent.middleware import (
     LoggingMiddleware,
     OutputTransformerMiddleware,
@@ -27,8 +25,9 @@ from src.agent.stream_parser import ChatResponseParser
 from src.agent.tool_registry import OBSERVABILITY_TOOLS, OPENCHOREO_TOOLS, TOOL_ACTIVE_FORMS, TOOLS
 from src.auth.bearer import BearerTokenAuth
 from src.auth.oauth_client import get_oauth2_auth
-from src.clients import MCPClient, get_model, get_opensearch_client
+from src.clients import MCPClient, get_model, get_report_backend
 from src.config import settings
+from src.helpers import AlertScope, resolve_component_scope
 from src.logging_config import request_id_context
 from src.models import ChatResponse, RCAReport
 from src.models.rca_report import RootCauseIdentified
@@ -78,9 +77,7 @@ class Agent:
 
         middleware = [m() for m in self._middleware_classes]
         if self._use_summarization:
-            middleware.append(
-                SummarizationMiddleware(model=self.model, trigger=("fraction", 0.8))
-            )
+            middleware.append(SummarizationMiddleware(model=self.model, trigger=("fraction", 0.8)))
 
         agent = create_agent(
             model=self.model,
@@ -245,21 +242,29 @@ async def run_analysis(
     report_id: str,
     alert_id: str,
     alert: Any,
-    component_uid: UUID,
-    project_uid: UUID,
-    environment_uid: UUID,
+    namespace: str,
+    project: str,
+    component: str,
+    environment: str,
     meta: dict[str, Any] | None = None,
 ) -> None:
     # Set request_id in context for logging (use report_id as it's unique per request)
     request_id_context.set(report_id)
 
     semaphore = _get_semaphore()
-    opensearch_client = get_opensearch_client()
+    report_backend = get_report_backend()
 
     logger.info("Analysis task queued")
 
     async with semaphore:
         logger.info("Analysis task started")
+
+        scope = await resolve_component_scope(
+            namespace=namespace,
+            project=project,
+            component=component,
+            environment=environment,
+        )
 
         try:
             usage_callback = UsageMetadataCallbackHandler()
@@ -267,9 +272,6 @@ async def run_analysis(
             rca_agent = await RCA_AGENT.create(
                 auth=get_oauth2_auth(), usage_callback=usage_callback
             )
-
-            ## TODO: Remove once namespace/environment info is received from upstream
-            scope = await resolve_component_scope(component_uid, environment_uid)
 
             content = render(
                 "api/rca_request.j2",
@@ -334,14 +336,13 @@ async def run_analysis(
                 except Exception as e:
                     logger.error("Remediation agent failed, saving RCA report without it: %s", e)
 
-            response = await opensearch_client.upsert_rca_report(
+            response = await report_backend.upsert_rca_report(
                 report_id=report_id,
                 alert_id=alert_id,
                 status="completed",
                 report=report_data,
-                environment_uid=str(environment_uid),
-                project_uid=str(project_uid),
-                component_uids=[str(component_uid)],
+                environment_uid=scope.environment_uid,
+                project_uid=scope.project_uid,
             )
             logger.info(
                 "Updated RCA report to completed: index=%s, status=%s",
@@ -354,52 +355,28 @@ async def run_analysis(
                 "Analysis timed out after %d seconds",
                 settings.analysis_timeout_seconds,
             )
-            await _update_failed_status(
-                opensearch_client,
-                report_id,
-                alert_id,
-                environment_uid,
-                project_uid,
-                component_uid,
-                f"Analysis timed out (report_id: {report_id})",
-            )
+            try:
+                await report_backend.upsert_rca_report(
+                    report_id=report_id,
+                    alert_id=alert_id,
+                    status="failed",
+                    summary=f"Analysis timed out (report_id: {report_id})",
+                    environment_uid=scope.environment_uid,
+                    project_uid=scope.project_uid,
+                )
+            except Exception as update_error:
+                logger.error("Failed to update status: %s", update_error, exc_info=True)
 
         except Exception as e:
             logger.error("Analysis failed: error=%s", e, exc_info=True)
-            await _update_failed_status(
-                opensearch_client,
-                report_id,
-                alert_id,
-                environment_uid,
-                project_uid,
-                component_uid,
-                f"Analysis failed (report_id: {report_id})",
-            )
-
-
-async def _update_failed_status(
-    opensearch_client: Any,
-    report_id: str,
-    alert_id: str,
-    environment_uid: UUID,
-    project_uid: UUID,
-    component_uid: UUID,
-    summary: str,
-) -> None:
-    try:
-        await opensearch_client.upsert_rca_report(
-            report_id=report_id,
-            alert_id=alert_id,
-            status="failed",
-            summary=summary,
-            environment_uid=str(environment_uid),
-            project_uid=str(project_uid),
-            component_uids=[str(component_uid)],
-        )
-        logger.info("Updated RCA report status to failed")
-    except Exception as update_error:
-        logger.error(
-            "Failed to update failed status to OpenSearch: error=%s",
-            update_error,
-            exc_info=True,
-        )
+            try:
+                await report_backend.upsert_rca_report(
+                    report_id=report_id,
+                    alert_id=alert_id,
+                    status="failed",
+                    summary=f"Analysis failed (report_id: {report_id})",
+                    environment_uid=scope.environment_uid,
+                    project_uid=scope.project_uid,
+                )
+            except Exception as update_error:
+                logger.error("Failed to update status: %s", update_error, exc_info=True)

@@ -60,10 +60,10 @@ Users work with **names** (namespace, project, component names), not UUIDs. When
 {% if scope -%}
 ## Current Context
 
-The user is viewing the report below under the project {{ scope.project_name }} (`{{ scope.project_uid }}`).
-{%- if scope.component_name %} The RCA report was generated for an alert set up in the component {{ scope.component_name }} (`{{ scope.component_uid }}`).{% endif %}
+The user is viewing the report below under the project {{ scope.project }} (`{{ scope.project_uid }}`).
+{%- if scope.component %} The RCA report was generated for an alert set up in the component {{ scope.component }} (`{{ scope.component_uid }}`).{% endif %}
 
-Scope for your interactions: namespace={{ scope.namespace_name }}, environment={{ scope.environment_name }} (`{{ scope.environment_uid }}`)
+Scope for your interactions: namespace={{ scope.namespace }}, environment={{ scope.environment }} (`{{ scope.environment_uid }}`)
 
 {% if report_context -%}
 ### Report Details

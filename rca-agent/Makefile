@@ -12,10 +12,10 @@ clean:
 	find . -type d -name "logs" -exec rm -rf {} +
 
 fix:
-	uv run ruff check --fix . && uv run ruff format .
+	uvx ruff check --fix . && uvx ruff format .
 
 check:
-	uv run ruff check . && uv run ruff format --check .
+	uvx ruff check . && uvx ruff format --check .
 
 format:
-	uv run ruff format .
+	uvx ruff format .
