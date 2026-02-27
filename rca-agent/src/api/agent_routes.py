@@ -17,7 +17,7 @@ from src.models import BaseModel, get_current_utc
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/agent", tags=["Agent"])
+router = APIRouter(prefix="/api/v1alpha1/rca-agent", tags=["RCA Agent"])
 
 
 class AlertRuleSource(BaseModel):
@@ -57,16 +57,23 @@ class AnalyzeRequest(BaseModel):
     meta: dict[str, Any] | None = None
 
 
+class ChatMessage(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    role: str
+    content: str = Field(max_length=10000)
+
+
 class ChatRequest(BaseModel):
     report_id: str = Field(alias="reportId")
     namespace: str
     project: str
     environment: str
-    messages: list[dict[str, str]]
+    messages: list[ChatMessage] = Field(min_length=1, max_length=50)
 
 
-@router.post("/rca")
-async def rca(
+@router.post("/analyze")
+async def analyze(
     request: AnalyzeRequest,
     background_tasks: BackgroundTasks,
 ):
@@ -144,7 +151,7 @@ async def chat(
 
     return StreamingResponse(
         stream_chat(
-            messages=request.messages,
+            messages=[m.model_dump() for m in request.messages],
             token=token,
             report_context=report_context,
             scope=scope,

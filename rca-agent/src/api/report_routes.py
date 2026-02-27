@@ -60,6 +60,7 @@ async def list_rca_reports(
     _authz: Annotated[SubjectContext, Depends(require_reports_authz)],
     limit: Annotated[int, Query(ge=1, le=10000)] = 100,
     sort: Literal["asc", "desc"] = "desc",
+    status: Literal["pending", "completed", "failed"] | None = None,
 ):
     validate_time_range(start_time, end_time)
 
@@ -75,6 +76,7 @@ async def list_rca_reports(
         environment_uid=scope.environment_uid,
         start_time=start_time,
         end_time=end_time,
+        status=status,
         limit=limit,
         sort=sort,
     )
