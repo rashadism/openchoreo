@@ -75,7 +75,9 @@ class LoggingMiddleware(AgentMiddleware):
             if isinstance(result.content, str):
                 content_len = len(result.content)
             elif isinstance(result.content, list):
-                content_len = sum(len(b.get("text", "")) for b in result.content if isinstance(b, dict))
+                content_len = sum(
+                    len(b.get("text", "")) for b in result.content if isinstance(b, dict)
+                )
             else:
                 content_len = 0
         else:

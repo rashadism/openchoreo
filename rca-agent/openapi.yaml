@@ -117,32 +117,36 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-  /api/v1/rca-reports/projects/{projectId}:
+  /api/v1/rca-agent/reports:
     get:
       tags:
         - RCA Reports
-      summary: List RCA reports by project
+      summary: List RCA reports
       description: |
-        Retrieves a list of RCA reports filtered by project, environment, and time range.
-        Optionally filter by component UIDs and status.
-      operationId: getRCAReportsByProject
+        Retrieves a list of RCA reports filtered by project, environment, namespace, and time range.
+      operationId: listRCAReports
       parameters:
-        - name: projectId
-          in: path
-          required: true
-          description: The project UUID
-          schema:
-            type: string
-            format: uuid
-          example: '1c4e7a9b-3f6d-4e2a-8b5c-7d9f1e3a4c6b'
-        - name: environmentUid
+        - name: project
           in: query
           required: true
-          description: The environment UUID
+          description: The project name
           schema:
             type: string
-            format: uuid
-          example: '2f5a8c1e-7d9b-4e3f-6a4c-8e1f2d7a9b5c'
+          example: 'my-project'
+        - name: environment
+          in: query
+          required: true
+          description: The environment name
+          schema:
+            type: string
+          example: 'development'
+        - name: namespace
+          in: query
+          required: true
+          description: The namespace name
+          schema:
+            type: string
+          example: 'my-namespace'
         - name: startTime
           in: query
           required: true
@@ -159,24 +163,6 @@ paths:
             type: string
             format: date-time
           example: '2025-01-31T23:59:59Z'
-        - name: componentUids
-          in: query
-          required: false
-          description: Filter by component UIDs
-          schema:
-            type: array
-            items:
-              type: string
-              format: uuid
-          example: ['8a4c5e2f-9d3b-4a7e-b1f6-2c8d4e9f3a7b']
-        - name: status
-          in: query
-          required: false
-          description: Filter by report status
-          schema:
-            type: string
-            enum: [pending, completed, failed]
-          example: 'completed'
         - name: limit
           in: query
           required: false
@@ -187,6 +173,15 @@ paths:
             maximum: 10000
             default: 100
           example: 50
+        - name: sort
+          in: query
+          required: false
+          description: Sort order by timestamp
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+          example: 'desc'
       responses:
         '200':
           description: List of RCA reports
@@ -219,34 +214,22 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-  /api/v1/rca-reports/alerts/{alertId}:
+  /api/v1/rca-agent/reports/{reportId}:
     get:
       tags:
         - RCA Reports
-      summary: Get RCA report by alert ID
+      summary: Get RCA report by report ID
       description: |
-        Retrieves a single RCA report by alert ID. Optionally specify a version
-        to retrieve a specific report version. If no version is specified,
-        returns the latest version.
-
-        The response includes a list of all available versions for the alert.
-      operationId: getRCAReportByAlert
+        Retrieves a single RCA report by its report ID.
+      operationId: getRCAReport
       parameters:
-        - name: alertId
+        - name: reportId
           in: path
           required: true
-          description: The alert ID
+          description: The report ID
           schema:
             type: string
-          example: 'alert-789'
-        - name: version
-          in: query
-          required: false
-          description: Specific report version to retrieve. If not provided, returns the latest version.
-          schema:
-            type: integer
-            minimum: 1
-          example: 1
+          example: 'alert-789_1704067200'
       responses:
         '200':
           description: RCA report details
@@ -604,7 +587,6 @@ components:
       description: Summary of an RCA report for list views
       required:
         - alertId
-        - projectUid
         - reportId
         - timestamp
         - status
@@ -613,10 +595,6 @@ components:
           type: string
           description: The alert ID that triggered this report
           example: 'alert-789'
-        projectUid:
-          type: string
-          description: The project UUID
-          example: '1c4e7a9b-3f6d-4e2a-8b5c-7d9f1e3a4c6b'
         reportId:
           type: string
           description: The unique report ID
@@ -643,7 +621,6 @@ components:
       required:
         - reports
         - totalCount
-        - tookMs
       properties:
         reports:
           type: array
@@ -654,35 +631,20 @@ components:
           type: integer
           description: Total number of matching reports
           example: 42
-        tookMs:
-          type: integer
-          description: Query execution time in milliseconds
-          example: 15
 
     RCAReportDetailed:
       type: object
       description: Detailed RCA report with full content
       required:
         - alertId
-        - projectUid
-        - reportVersion
         - reportId
         - timestamp
         - status
-        - availableVersions
       properties:
         alertId:
           type: string
           description: The alert ID that triggered this report
           example: 'alert-789'
-        projectUid:
-          type: string
-          description: The project UUID
-          example: '1c4e7a9b-3f6d-4e2a-8b5c-7d9f1e3a4c6b'
-        reportVersion:
-          type: integer
-          description: The version number of this report
-          example: 1
         reportId:
           type: string
           description: The unique report ID
@@ -697,12 +659,6 @@ components:
           enum: [pending, completed, failed]
           description: The report status
           example: 'completed'
-        availableVersions:
-          type: array
-          description: List of all available versions for this alert (descending order)
-          items:
-            type: integer
-          example: [3, 2, 1]
         report:
           nullable: true
           description: The full RCA report content (null if status is pending or failed)
