@@ -21,6 +21,7 @@ import (
 	"github.com/openchoreo/openchoreo/internal/occ/cmd/pagination"
 	"github.com/openchoreo/openchoreo/internal/occ/cmd/utils"
 	"github.com/openchoreo/openchoreo/internal/occ/cmd/workflow"
+	"github.com/openchoreo/openchoreo/internal/occ/cmd/workflowrun"
 	"github.com/openchoreo/openchoreo/internal/occ/resources/client"
 	"github.com/openchoreo/openchoreo/internal/occ/validation"
 	"github.com/openchoreo/openchoreo/internal/openchoreo-api/api/gen"
@@ -109,7 +110,29 @@ func (l *Component) StartWorkflow(params StartWorkflowParams) error {
 		RunName:      fmt.Sprintf("%s-build-%d", params.ComponentName, time.Now().Unix()),
 		Parameters:   baseParams,
 		Set:          params.Set,
+		Labels: map[string]string{
+			"openchoreo.dev/component": params.ComponentName,
+			"openchoreo.dev/project":   params.Project,
+		},
 	})
+}
+
+// ListWorkflowRuns lists workflow runs filtered by component name.
+func (l *Component) ListWorkflowRuns(params ListWorkflowRunsParams) error {
+	if params.Namespace == "" {
+		return fmt.Errorf("namespace is required")
+	}
+	if params.ComponentName == "" {
+		return fmt.Errorf("component name is required")
+	}
+
+	items, err := workflowrun.FetchAll(params.Namespace)
+	if err != nil {
+		return err
+	}
+
+	filtered := workflowrun.FilterByComponent(items, params.ComponentName)
+	return workflowrun.PrintList(filtered)
 }
 
 // Get retrieves a single component and outputs it as YAML
