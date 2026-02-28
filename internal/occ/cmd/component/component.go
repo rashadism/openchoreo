@@ -20,6 +20,7 @@ import (
 
 	"github.com/openchoreo/openchoreo/internal/occ/cmd/pagination"
 	"github.com/openchoreo/openchoreo/internal/occ/cmd/utils"
+	"github.com/openchoreo/openchoreo/internal/occ/cmd/workflow"
 	"github.com/openchoreo/openchoreo/internal/occ/resources/client"
 	"github.com/openchoreo/openchoreo/internal/occ/validation"
 	"github.com/openchoreo/openchoreo/internal/openchoreo-api/api/gen"
@@ -69,6 +70,46 @@ func (l *Component) List(params ListParams) error {
 	}
 
 	return printList(items, params.Project == "")
+}
+
+// StartWorkflow gets the component, resolves its workflow name, and starts a workflow run.
+func (l *Component) StartWorkflow(params StartWorkflowParams) error {
+	if params.Namespace == "" {
+		return fmt.Errorf("namespace is required")
+	}
+	if params.ComponentName == "" {
+		return fmt.Errorf("component name is required")
+	}
+
+	ctx := context.Background()
+
+	c, err := client.NewClient()
+	if err != nil {
+		return fmt.Errorf("failed to create API client: %w", err)
+	}
+
+	comp, err := c.GetComponent(ctx, params.Namespace, params.ComponentName)
+	if err != nil {
+		return err
+	}
+
+	if comp.Spec == nil || comp.Spec.Workflow == nil || comp.Spec.Workflow.Name == nil {
+		return fmt.Errorf("component %q has no workflow configured", params.ComponentName)
+	}
+
+	wfConfig := comp.Spec.Workflow
+	var baseParams map[string]interface{}
+	if wfConfig.Parameters != nil {
+		baseParams = *wfConfig.Parameters
+	}
+
+	return workflow.New().StartRun(workflow.StartRunParams{
+		Namespace:    params.Namespace,
+		WorkflowName: *wfConfig.Name,
+		RunName:      fmt.Sprintf("%s-build-%d", params.ComponentName, time.Now().Unix()),
+		Parameters:   baseParams,
+		Set:          params.Set,
+	})
 }
 
 // Get retrieves a single component and outputs it as YAML

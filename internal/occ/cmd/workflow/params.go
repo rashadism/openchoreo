@@ -10,8 +10,19 @@ type ListParams struct {
 
 func (p ListParams) GetNamespace() string { return p.Namespace }
 
+// GetParams defines parameters for getting a single workflow
+type GetParams struct {
+	Namespace    string
+	WorkflowName string
+}
+
+func (p GetParams) GetNamespace() string { return p.Namespace }
+
 // StartRunParams defines parameters for starting a workflow run
 type StartRunParams struct {
 	Namespace    string
 	WorkflowName string
+	RunName      string                 // optional; auto-generated if empty
+	Parameters   map[string]interface{} // base parameters (e.g., from component workflow config)
+	Set          []string               // --set overrides applied on top of Parameters
 }
