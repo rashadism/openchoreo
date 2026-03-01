@@ -15,7 +15,6 @@ import (
 	"sigs.k8s.io/yaml"
 
 	openchoreov1alpha1 "github.com/openchoreo/openchoreo/api/v1alpha1"
-	"github.com/openchoreo/openchoreo/internal/labels"
 	"github.com/openchoreo/openchoreo/internal/openchoreo-api/services"
 	"github.com/openchoreo/openchoreo/internal/schema"
 	"github.com/openchoreo/openchoreo/internal/schema/extractor"
@@ -61,12 +60,6 @@ func (s *traitService) CreateTrait(ctx context.Context, namespaceName string, t 
 		APIVersion: "openchoreo.dev/v1alpha1",
 	}
 	t.Namespace = namespaceName
-	if t.Labels == nil {
-		t.Labels = make(map[string]string)
-	}
-	t.Labels[labels.LabelKeyNamespaceName] = namespaceName
-	t.Labels[labels.LabelKeyName] = t.Name
-
 	if err := s.k8sClient.Create(ctx, t); err != nil {
 		if apierrors.IsAlreadyExists(err) {
 			s.logger.Warn("Trait already exists", "namespace", namespaceName, "trait", t.Name)
@@ -97,17 +90,18 @@ func (s *traitService) UpdateTrait(ctx context.Context, namespaceName string, t 
 		return nil, fmt.Errorf("failed to get trait: %w", err)
 	}
 
-	// Apply incoming spec directly from the request body, preserving server-managed fields
-	t.ResourceVersion = existing.ResourceVersion
-	t.Namespace = namespaceName
+	// Only apply user-mutable fields to the existing object, preserving server-managed fields
+	existing.Spec = t.Spec
+	existing.Labels = t.Labels
+	existing.Annotations = t.Annotations
 
-	if err := s.k8sClient.Update(ctx, t); err != nil {
+	if err := s.k8sClient.Update(ctx, existing); err != nil {
 		s.logger.Error("Failed to update trait CR", "error", err)
 		return nil, fmt.Errorf("failed to update trait: %w", err)
 	}
 
 	s.logger.Debug("Trait updated successfully", "namespace", namespaceName, "trait", t.Name)
-	return t, nil
+	return existing, nil
 }
 
 func (s *traitService) ListTraits(ctx context.Context, namespaceName string, opts services.ListOptions) (*services.ListResult[openchoreov1alpha1.Trait], error) {

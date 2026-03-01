@@ -16,7 +16,6 @@ import (
 	openchoreov1alpha1 "github.com/openchoreo/openchoreo/api/v1alpha1"
 	kubernetesClient "github.com/openchoreo/openchoreo/internal/clients/kubernetes"
 	argoproj "github.com/openchoreo/openchoreo/internal/dataplane/kubernetes/types/argoproj.io/workflow/v1alpha1"
-	"github.com/openchoreo/openchoreo/internal/labels"
 	"github.com/openchoreo/openchoreo/internal/openchoreo-api/services"
 )
 
@@ -104,12 +103,6 @@ func (s *buildPlaneService) CreateBuildPlane(ctx context.Context, namespaceName 
 		APIVersion: "openchoreo.dev/v1alpha1",
 	}
 	bp.Namespace = namespaceName
-	if bp.Labels == nil {
-		bp.Labels = make(map[string]string)
-	}
-	bp.Labels[labels.LabelKeyNamespaceName] = namespaceName
-	bp.Labels[labels.LabelKeyName] = bp.Name
-
 	if err := s.k8sClient.Create(ctx, bp); err != nil {
 		if apierrors.IsAlreadyExists(err) {
 			return nil, ErrBuildPlaneAlreadyExists
@@ -139,21 +132,18 @@ func (s *buildPlaneService) UpdateBuildPlane(ctx context.Context, namespaceName 
 		return nil, fmt.Errorf("failed to get build plane: %w", err)
 	}
 
-	bp.ResourceVersion = existing.ResourceVersion
-	bp.Namespace = namespaceName
-	if bp.Labels == nil {
-		bp.Labels = make(map[string]string)
-	}
-	bp.Labels[labels.LabelKeyNamespaceName] = namespaceName
-	bp.Labels[labels.LabelKeyName] = bp.Name
+	// Only apply user-mutable fields to the existing object, preserving server-managed fields
+	existing.Spec = bp.Spec
+	existing.Labels = bp.Labels
+	existing.Annotations = bp.Annotations
 
-	if err := s.k8sClient.Update(ctx, bp); err != nil {
+	if err := s.k8sClient.Update(ctx, existing); err != nil {
 		s.logger.Error("Failed to update build plane CR", "error", err)
 		return nil, fmt.Errorf("failed to update build plane: %w", err)
 	}
 
 	s.logger.Debug("Build plane updated successfully", "namespace", namespaceName, "buildPlane", bp.Name)
-	return bp, nil
+	return existing, nil
 }
 
 // DeleteBuildPlane removes a build plane by name within a namespace.

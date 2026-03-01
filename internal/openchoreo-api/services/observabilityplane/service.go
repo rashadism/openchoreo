@@ -13,7 +13,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	openchoreov1alpha1 "github.com/openchoreo/openchoreo/api/v1alpha1"
-	"github.com/openchoreo/openchoreo/internal/labels"
 	"github.com/openchoreo/openchoreo/internal/openchoreo-api/services"
 )
 
@@ -99,12 +98,6 @@ func (s *observabilityPlaneService) CreateObservabilityPlane(ctx context.Context
 		APIVersion: "openchoreo.dev/v1alpha1",
 	}
 	op.Namespace = namespaceName
-	if op.Labels == nil {
-		op.Labels = make(map[string]string)
-	}
-	op.Labels[labels.LabelKeyNamespaceName] = namespaceName
-	op.Labels[labels.LabelKeyName] = op.Name
-
 	if err := s.k8sClient.Create(ctx, op); err != nil {
 		if apierrors.IsAlreadyExists(err) {
 			return nil, ErrObservabilityPlaneAlreadyExists
@@ -133,21 +126,18 @@ func (s *observabilityPlaneService) UpdateObservabilityPlane(ctx context.Context
 		return nil, fmt.Errorf("failed to get observability plane: %w", err)
 	}
 
-	op.ResourceVersion = existing.ResourceVersion
-	op.Namespace = namespaceName
-	if op.Labels == nil {
-		op.Labels = make(map[string]string)
-	}
-	op.Labels[labels.LabelKeyNamespaceName] = namespaceName
-	op.Labels[labels.LabelKeyName] = op.Name
+	// Only apply user-mutable fields to the existing object, preserving server-managed fields
+	existing.Spec = op.Spec
+	existing.Labels = op.Labels
+	existing.Annotations = op.Annotations
 
-	if err := s.k8sClient.Update(ctx, op); err != nil {
+	if err := s.k8sClient.Update(ctx, existing); err != nil {
 		s.logger.Error("Failed to update observability plane CR", "error", err)
 		return nil, fmt.Errorf("failed to update observability plane: %w", err)
 	}
 
 	s.logger.Debug("Observability plane updated successfully", "namespace", namespaceName, "observabilityPlane", op.Name)
-	return op, nil
+	return existing, nil
 }
 
 // DeleteObservabilityPlane removes an observability plane by name within a namespace.

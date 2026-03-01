@@ -13,7 +13,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	openchoreov1alpha1 "github.com/openchoreo/openchoreo/api/v1alpha1"
-	"github.com/openchoreo/openchoreo/internal/labels"
 	"github.com/openchoreo/openchoreo/internal/openchoreo-api/services"
 )
 
@@ -57,12 +56,6 @@ func (s *deploymentPipelineService) CreateDeploymentPipeline(ctx context.Context
 		APIVersion: "openchoreo.dev/v1alpha1",
 	}
 	dp.Namespace = namespaceName
-	if dp.Labels == nil {
-		dp.Labels = make(map[string]string)
-	}
-	dp.Labels[labels.LabelKeyNamespaceName] = namespaceName
-	dp.Labels[labels.LabelKeyName] = dp.Name
-
 	if err := s.k8sClient.Create(ctx, dp); err != nil {
 		if apierrors.IsAlreadyExists(err) {
 			s.logger.Warn("Deployment pipeline already exists", "namespace", namespaceName, "deploymentPipeline", dp.Name)
@@ -93,17 +86,18 @@ func (s *deploymentPipelineService) UpdateDeploymentPipeline(ctx context.Context
 		return nil, fmt.Errorf("failed to get deployment pipeline: %w", err)
 	}
 
-	// Apply incoming spec directly from the request body, preserving server-managed fields
-	dp.ResourceVersion = existing.ResourceVersion
-	dp.Namespace = namespaceName
+	// Only apply user-mutable fields to the existing object, preserving server-managed fields
+	existing.Spec = dp.Spec
+	existing.Labels = dp.Labels
+	existing.Annotations = dp.Annotations
 
-	if err := s.k8sClient.Update(ctx, dp); err != nil {
+	if err := s.k8sClient.Update(ctx, existing); err != nil {
 		s.logger.Error("Failed to update deployment pipeline CR", "error", err)
 		return nil, fmt.Errorf("failed to update deployment pipeline: %w", err)
 	}
 
 	s.logger.Debug("Deployment pipeline updated successfully", "namespace", namespaceName, "deploymentPipeline", dp.Name)
-	return dp, nil
+	return existing, nil
 }
 
 func (s *deploymentPipelineService) ListDeploymentPipelines(ctx context.Context, namespaceName string, opts services.ListOptions) (*services.ListResult[openchoreov1alpha1.DeploymentPipeline], error) {

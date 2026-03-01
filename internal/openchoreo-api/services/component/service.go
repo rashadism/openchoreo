@@ -75,8 +75,6 @@ func (s *componentService) CreateComponent(ctx context.Context, namespaceName st
 	if component.Labels == nil {
 		component.Labels = make(map[string]string)
 	}
-	component.Labels[labels.LabelKeyNamespaceName] = namespaceName
-	component.Labels[labels.LabelKeyName] = component.Name
 	component.Labels[labels.LabelKeyProjectName] = component.Spec.Owner.ProjectName
 
 	if err := s.k8sClient.Create(ctx, component); err != nil {
@@ -111,15 +109,22 @@ func (s *componentService) UpdateComponent(ctx context.Context, namespaceName st
 
 	// Prevent project reassignment: if the incoming component specifies a project,
 	// it must match the existing component's project
-	if component.Spec.Owner.ProjectName != "" && component.Spec.Owner.ProjectName != existing.Spec.Owner.ProjectName {
+	if component.Spec.Owner.ProjectName != existing.Spec.Owner.ProjectName {
 		return nil, &services.ValidationError{Msg: "spec.owner.projectName is immutable"}
 	}
 
-	// Apply incoming spec directly from the request body, preserving server-managed fields
-	component.ResourceVersion = existing.ResourceVersion
-	component.Namespace = namespaceName
+	// Only apply user-mutable fields to the existing object, preserving server-managed fields
+	existing.Spec = component.Spec
+	existing.Labels = component.Labels
+	existing.Annotations = component.Annotations
 
-	if err := s.k8sClient.Update(ctx, component); err != nil {
+	// Preserve special labels
+	if existing.Labels == nil {
+		existing.Labels = make(map[string]string)
+	}
+	existing.Labels[labels.LabelKeyProjectName] = existing.Spec.Owner.ProjectName
+
+	if err := s.k8sClient.Update(ctx, existing); err != nil {
 		if apierrors.IsInvalid(err) {
 			s.logger.Error("Component update rejected by validation", "error", err)
 			return nil, &services.ValidationError{Msg: services.ExtractValidationMessage(err)}
@@ -129,7 +134,7 @@ func (s *componentService) UpdateComponent(ctx context.Context, namespaceName st
 	}
 
 	s.logger.Debug("Component updated successfully", "namespace", namespaceName, "component", component.Name)
-	return component, nil
+	return existing, nil
 }
 
 func (s *componentService) ListComponents(ctx context.Context, namespaceName, projectName string, opts services.ListOptions) (*services.ListResult[openchoreov1alpha1.Component], error) {

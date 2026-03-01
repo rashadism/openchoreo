@@ -15,7 +15,6 @@ import (
 	"sigs.k8s.io/yaml"
 
 	openchoreov1alpha1 "github.com/openchoreo/openchoreo/api/v1alpha1"
-	"github.com/openchoreo/openchoreo/internal/labels"
 	"github.com/openchoreo/openchoreo/internal/openchoreo-api/services"
 	"github.com/openchoreo/openchoreo/internal/schema"
 	"github.com/openchoreo/openchoreo/internal/schema/extractor"
@@ -61,12 +60,6 @@ func (s *componentTypeService) CreateComponentType(ctx context.Context, namespac
 		APIVersion: "openchoreo.dev/v1alpha1",
 	}
 	ct.Namespace = namespaceName
-	if ct.Labels == nil {
-		ct.Labels = make(map[string]string)
-	}
-	ct.Labels[labels.LabelKeyNamespaceName] = namespaceName
-	ct.Labels[labels.LabelKeyName] = ct.Name
-
 	if err := s.k8sClient.Create(ctx, ct); err != nil {
 		if apierrors.IsAlreadyExists(err) {
 			s.logger.Warn("Component type already exists", "namespace", namespaceName, "componentType", ct.Name)
@@ -97,17 +90,18 @@ func (s *componentTypeService) UpdateComponentType(ctx context.Context, namespac
 		return nil, fmt.Errorf("failed to get component type: %w", err)
 	}
 
-	// Apply incoming spec directly from the request body, preserving server-managed fields
-	ct.ResourceVersion = existing.ResourceVersion
-	ct.Namespace = namespaceName
+	// Only apply user-mutable fields to the existing object, preserving server-managed fields
+	existing.Spec = ct.Spec
+	existing.Labels = ct.Labels
+	existing.Annotations = ct.Annotations
 
-	if err := s.k8sClient.Update(ctx, ct); err != nil {
+	if err := s.k8sClient.Update(ctx, existing); err != nil {
 		s.logger.Error("Failed to update component type CR", "error", err)
 		return nil, fmt.Errorf("failed to update component type: %w", err)
 	}
 
 	s.logger.Debug("Component type updated successfully", "namespace", namespaceName, "componentType", ct.Name)
-	return ct, nil
+	return existing, nil
 }
 
 func (s *componentTypeService) ListComponentTypes(ctx context.Context, namespaceName string, opts services.ListOptions) (*services.ListResult[openchoreov1alpha1.ComponentType], error) {

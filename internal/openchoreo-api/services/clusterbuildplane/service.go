@@ -13,7 +13,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	openchoreov1alpha1 "github.com/openchoreo/openchoreo/api/v1alpha1"
-	"github.com/openchoreo/openchoreo/internal/labels"
 	"github.com/openchoreo/openchoreo/internal/openchoreo-api/services"
 )
 
@@ -94,11 +93,6 @@ func (s *clusterBuildPlaneService) CreateClusterBuildPlane(ctx context.Context, 
 		Kind:       "ClusterBuildPlane",
 		APIVersion: "openchoreo.dev/v1alpha1",
 	}
-	if cbp.Labels == nil {
-		cbp.Labels = make(map[string]string)
-	}
-	cbp.Labels[labels.LabelKeyName] = cbp.Name
-
 	if err := s.k8sClient.Create(ctx, cbp); err != nil {
 		if apierrors.IsAlreadyExists(err) {
 			return nil, ErrClusterBuildPlaneAlreadyExists
@@ -128,19 +122,18 @@ func (s *clusterBuildPlaneService) UpdateClusterBuildPlane(ctx context.Context, 
 		return nil, fmt.Errorf("failed to get cluster build plane: %w", err)
 	}
 
-	cbp.ResourceVersion = existing.ResourceVersion
-	if cbp.Labels == nil {
-		cbp.Labels = make(map[string]string)
-	}
-	cbp.Labels[labels.LabelKeyName] = cbp.Name
+	// Only apply user-mutable fields to the existing object, preserving server-managed fields
+	existing.Spec = cbp.Spec
+	existing.Labels = cbp.Labels
+	existing.Annotations = cbp.Annotations
 
-	if err := s.k8sClient.Update(ctx, cbp); err != nil {
+	if err := s.k8sClient.Update(ctx, existing); err != nil {
 		s.logger.Error("Failed to update cluster build plane CR", "error", err)
 		return nil, fmt.Errorf("failed to update cluster build plane: %w", err)
 	}
 
 	s.logger.Debug("Cluster build plane updated successfully", "clusterBuildPlane", cbp.Name)
-	return cbp, nil
+	return existing, nil
 }
 
 // DeleteClusterBuildPlane removes a cluster-scoped build plane by name.

@@ -13,7 +13,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	openchoreov1alpha1 "github.com/openchoreo/openchoreo/api/v1alpha1"
-	"github.com/openchoreo/openchoreo/internal/labels"
 	"github.com/openchoreo/openchoreo/internal/openchoreo-api/services"
 )
 
@@ -94,11 +93,6 @@ func (s *clusterObservabilityPlaneService) CreateClusterObservabilityPlane(ctx c
 		Kind:       "ClusterObservabilityPlane",
 		APIVersion: "openchoreo.dev/v1alpha1",
 	}
-	if cop.Labels == nil {
-		cop.Labels = make(map[string]string)
-	}
-	cop.Labels[labels.LabelKeyName] = cop.Name
-
 	if err := s.k8sClient.Create(ctx, cop); err != nil {
 		if apierrors.IsAlreadyExists(err) {
 			return nil, ErrClusterObservabilityPlaneAlreadyExists
@@ -127,19 +121,18 @@ func (s *clusterObservabilityPlaneService) UpdateClusterObservabilityPlane(ctx c
 		return nil, fmt.Errorf("failed to get cluster observability plane: %w", err)
 	}
 
-	cop.ResourceVersion = existing.ResourceVersion
-	if cop.Labels == nil {
-		cop.Labels = make(map[string]string)
-	}
-	cop.Labels[labels.LabelKeyName] = cop.Name
+	// Only apply user-mutable fields to the existing object, preserving server-managed fields
+	existing.Spec = cop.Spec
+	existing.Labels = cop.Labels
+	existing.Annotations = cop.Annotations
 
-	if err := s.k8sClient.Update(ctx, cop); err != nil {
+	if err := s.k8sClient.Update(ctx, existing); err != nil {
 		s.logger.Error("Failed to update cluster observability plane CR", "error", err)
 		return nil, fmt.Errorf("failed to update cluster observability plane: %w", err)
 	}
 
 	s.logger.Debug("Cluster observability plane updated successfully", "clusterObservabilityPlane", cop.Name)
-	return cop, nil
+	return existing, nil
 }
 
 // DeleteClusterObservabilityPlane removes a cluster observability plane by name.
