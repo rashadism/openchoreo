@@ -177,12 +177,13 @@ const (
 
 // Defines values for ErrorResponseCode.
 const (
-	BADREQUEST    ErrorResponseCode = "BAD_REQUEST"
-	CONFLICT      ErrorResponseCode = "CONFLICT"
-	FORBIDDEN     ErrorResponseCode = "FORBIDDEN"
-	INTERNALERROR ErrorResponseCode = "INTERNAL_ERROR"
-	NOTFOUND      ErrorResponseCode = "NOT_FOUND"
-	UNAUTHORIZED  ErrorResponseCode = "UNAUTHORIZED"
+	BADREQUEST         ErrorResponseCode = "BAD_REQUEST"
+	CONFLICT           ErrorResponseCode = "CONFLICT"
+	FORBIDDEN          ErrorResponseCode = "FORBIDDEN"
+	INTERNALERROR      ErrorResponseCode = "INTERNAL_ERROR"
+	NOTFOUND           ErrorResponseCode = "NOT_FOUND"
+	UNAUTHORIZED       ErrorResponseCode = "UNAUTHORIZED"
+	UNKNOWNGITPROVIDER ErrorResponseCode = "UNKNOWN_GIT_PROVIDER"
 )
 
 // Defines values for NamespaceStatusPhase.
@@ -3881,14 +3882,20 @@ type ListWorkloadsParams struct {
 	Cursor *CursorParam `form:"cursor,omitempty" json:"cursor,omitempty"`
 }
 
-// HandleBitbucketWebhookJSONBody defines parameters for HandleBitbucketWebhook.
-type HandleBitbucketWebhookJSONBody map[string]interface{}
+// HandleAutoBuildJSONBody defines parameters for HandleAutoBuild.
+type HandleAutoBuildJSONBody map[string]interface{}
 
-// HandleGitHubWebhookJSONBody defines parameters for HandleGitHubWebhook.
-type HandleGitHubWebhookJSONBody map[string]interface{}
+// HandleAutoBuildParams defines parameters for HandleAutoBuild.
+type HandleAutoBuildParams struct {
+	// XHubSignature256 GitHub webhook signature header used to detect and validate GitHub events.
+	XHubSignature256 *string `json:"X-Hub-Signature-256,omitempty"`
 
-// HandleGitLabWebhookJSONBody defines parameters for HandleGitLabWebhook.
-type HandleGitLabWebhookJSONBody map[string]interface{}
+	// XGitlabToken GitLab webhook token header used to detect and validate GitLab events.
+	XGitlabToken *string `json:"X-Gitlab-Token,omitempty"`
+
+	// XEventKey Bitbucket webhook event-key header used to detect Bitbucket events.
+	XEventKey *string `json:"X-Event-Key,omitempty"`
+}
 
 // EvaluatesJSONRequestBody defines body for Evaluates for application/json ContentType.
 type EvaluatesJSONRequestBody = EvaluatesJSONBody
@@ -4049,14 +4056,8 @@ type CreateWorkloadJSONRequestBody = Workload
 // UpdateWorkloadJSONRequestBody defines body for UpdateWorkload for application/json ContentType.
 type UpdateWorkloadJSONRequestBody = Workload
 
-// HandleBitbucketWebhookJSONRequestBody defines body for HandleBitbucketWebhook for application/json ContentType.
-type HandleBitbucketWebhookJSONRequestBody HandleBitbucketWebhookJSONBody
-
-// HandleGitHubWebhookJSONRequestBody defines body for HandleGitHubWebhook for application/json ContentType.
-type HandleGitHubWebhookJSONRequestBody HandleGitHubWebhookJSONBody
-
-// HandleGitLabWebhookJSONRequestBody defines body for HandleGitLabWebhook for application/json ContentType.
-type HandleGitLabWebhookJSONRequestBody HandleGitLabWebhookJSONBody
+// HandleAutoBuildJSONRequestBody defines body for HandleAutoBuild for application/json ContentType.
+type HandleAutoBuildJSONRequestBody HandleAutoBuildJSONBody
 
 // CreateGitSecretJSONRequestBody defines body for CreateGitSecret for application/json ContentType.
 type CreateGitSecretJSONRequestBody = CreateGitSecretRequest
