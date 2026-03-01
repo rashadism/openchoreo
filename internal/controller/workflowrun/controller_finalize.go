@@ -48,11 +48,34 @@ func (r *Reconciler) finalize(ctx context.Context, cwRun *openchoreodevv1alpha1.
 		return ctrl.Result{}, nil
 	}
 
+	// Fetch the Workflow to get its BuildPlaneRef for build plane resolution.
+	// If the Workflow is already deleted, fall back to default build plane resolution
+	// so we can still clean up resources tracked in status.
+	var buildPlaneRef *openchoreodevv1alpha1.BuildPlaneRef
+	workflow := &openchoreodevv1alpha1.Workflow{}
+	if err := r.Get(ctx, types.NamespacedName{
+		Name:      cwRun.Spec.Workflow.Name,
+		Namespace: cwRun.Namespace,
+	}, workflow); err != nil {
+		if !errors.IsNotFound(err) {
+			return ctrl.Result{Requeue: true}, err
+		}
+		// Workflow is gone; if there are no resources to clean up, remove finalizer immediately
+		if !hasResourcesInStatus(cwRun) {
+			logger.Info("Workflow not found and no resources to clean up, removing finalizer", "workflow", cwRun.Spec.Workflow.Name)
+			return r.removeFinalizer(ctx, cwRun)
+		}
+		// Otherwise, proceed with nil ref (default build plane resolution) to attempt cleanup
+		logger.Info("Workflow not found, attempting cleanup with default build plane", "workflow", cwRun.Spec.Workflow.Name)
+	} else {
+		buildPlaneRef = workflow.Spec.BuildPlaneRef
+	}
+
 	// Get build plane client (supports both BuildPlane and ClusterBuildPlane)
-	buildPlaneResult, err := controller.ResolveBuildPlane(ctx, r.Client, cwRun)
+	buildPlaneResult, err := controller.ResolveBuildPlane(ctx, r.Client, cwRun.Namespace, buildPlaneRef)
 	if err != nil {
 		// If build plane doesn't exist, we can't clean up - remove finalizer anyway
-		if controller.IgnoreHierarchyNotFoundError(err) == nil || errors.IsNotFound(err) {
+		if errors.IsNotFound(err) {
 			logger.Info("BuildPlane not found, removing finalizer without cleanup", "error", err)
 			return r.removeFinalizer(ctx, cwRun)
 		}
@@ -118,6 +141,18 @@ func (r *Reconciler) deleteResource(ctx context.Context, bpClient client.Client,
 	}
 
 	return bpClient.Delete(ctx, obj)
+}
+
+// hasResourcesInStatus returns true if the WorkflowRun has resources or a run reference
+// that need to be cleaned up from the build plane.
+func hasResourcesInStatus(cwRun *openchoreodevv1alpha1.WorkflowRun) bool {
+	if cwRun.Status.RunReference != nil && cwRun.Status.RunReference.Name != "" {
+		return true
+	}
+	if cwRun.Status.Resources != nil && len(*cwRun.Status.Resources) > 0 {
+		return true
+	}
+	return false
 }
 
 // removeFinalizer removes the finalizer from the WorkflowRun.
