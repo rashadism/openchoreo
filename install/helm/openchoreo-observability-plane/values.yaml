@@ -857,6 +857,19 @@ observer:
   # default: openchoreo-observer-secret
   # @schema
   oauthClientSecret: "openchoreo-observer-secret"
+  # @schema
+  # type: object
+  # description: CORS configuration for the Observer service
+  # @schema
+  cors:
+    # @schema
+    # type: array
+    # description: List of allowed origins for CORS requests. Empty list disables CORS.
+    # items:
+    #   type: string
+    # @schema
+    allowedOrigins:
+    - "http://openchoreo.localhost:8080"
 
   # @schema
   # type: array
@@ -2881,6 +2894,20 @@ rca:
   # default: false
   # @schema
   remedAgent: false
+
+  # @schema
+  # type: object
+  # description: CORS configuration for the RCA agent
+  # @schema
+  cors:
+    # @schema
+    # type: array
+    # description: List of allowed origins for CORS requests. Empty list disables CORS.
+    # items:
+    #   type: string
+    # @schema
+    allowedOrigins:
+    - "http://openchoreo.localhost:8080"
 
   # @schema
   # type: object
