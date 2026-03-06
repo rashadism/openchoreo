@@ -62,7 +62,7 @@ async def list_rca_reports(
     sort: Literal["asc", "desc"] = "desc",
     status: Literal["pending", "completed", "failed"] | None = None,
 ):
-    validate_time_range(start_time, end_time)
+    norm_start, norm_end = validate_time_range(start_time, end_time)
 
     scope = await resolve_project_scope(
         namespace=namespace,
@@ -74,8 +74,8 @@ async def list_rca_reports(
     result = await report_backend.list_rca_reports(
         project_uid=scope.project_uid,
         environment_uid=scope.environment_uid,
-        start_time=start_time,
-        end_time=end_time,
+        start_time=norm_start,
+        end_time=norm_end,
         status=status,
         limit=limit,
         sort=sort,

@@ -30,3 +30,6 @@ Thumbs.db
 
 # Logs
 logs/
+
+# Local data (SQLite etc.)
+data/

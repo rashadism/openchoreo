@@ -3067,7 +3067,7 @@ rca:
   llm:
     # @schema
     # type: string
-    # description: LLM model name (e.g., claude-sonnet-4-5, gpt-5, gemini-2.0-flash-exp)
+    # description: LLM model name (e.g., gpt-5.2)
     # default: ""
     # @schema
     modelName: ""
@@ -3080,16 +3080,36 @@ rca:
     apiKey: ""
 
   # @schema
-  # type: object
-  # description: OpenSearch connection configuration for RCA agent
+  # description: Report storage backend type
+  # enum: [sqlite, postgresql]
+  # default: sqlite
   # @schema
-  opensearch:
+  reportBackend: "sqlite"
+
+  # @schema
+  # type: object
+  # description: Reference to an existing Secret containing the SQL connection URI (required for postgresql)
+  # @schema
+  sqlBackendSecret:
     # @schema
     # type: string
-    # description: OpenSearch cluster address
-    # default: https://opensearch:9200
+    # description: Name of the Secret containing the SQL backend URI
+    # default: ""
     # @schema
-    address: "https://opensearch:9200"
+    name: ""
+    # @schema
+    # type: string
+    # description: Key within the Secret that holds the URI
+    # default: uri
+    # @schema
+    key: uri
+
+  # @schema
+  # type: string
+  # description: PVC storage size for SQLite (only used when reportBackend is sqlite)
+  # default: 128Mi
+  # @schema
+  sqliteStorageSize: 128Mi
 
   # @schema
   # type: object

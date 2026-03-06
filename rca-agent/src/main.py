@@ -33,19 +33,13 @@ async def lifespan(_app: FastAPI):
         logger.error("LLM initialization failed: %s", e)
         raise RuntimeError(f"LLM initialization failed: {e}") from e
 
-    logger.info("Testing OpenSearch connection...")
+    logger.info("Initializing report backend...")
     try:
         report_backend = get_report_backend()
-        if await report_backend.check_connection():
-            logger.info("OpenSearch connection successful")
-        else:
-            logger.error("OpenSearch connection check failed")
-            raise RuntimeError("OpenSearch connection check failed")
-    except RuntimeError:
-        raise
+        await report_backend.initialize()
     except Exception as e:
-        logger.error("OpenSearch initialization failed: %s", e)
-        raise RuntimeError(f"OpenSearch initialization failed: {e}") from e
+        logger.error("Report backend initialization failed: %s", e)
+        raise RuntimeError(f"Report backend initialization failed: {e}") from e
 
     logger.info("Testing OAuth2 token endpoint...")
     try:

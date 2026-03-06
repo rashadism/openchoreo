@@ -1,4 +1,10 @@
 {{- if .Values.rca.enabled }}
+{{- if and (eq .Values.rca.reportBackend "sqlite") (gt (.Values.rca.replicas | int) 1) }}
+{{- fail "rca.replicas must be 1 when using sqlite backend (ReadWriteOnce PVC). Set rca.replicas=1 or use reportBackend=postgresql." }}
+{{- end }}
+{{- if and (eq .Values.rca.reportBackend "postgresql") (not .Values.rca.sqlBackendSecret.name) }}
+{{- fail "rca.sqlBackendSecret.name is required when reportBackend=postgresql. Create a Secret with the connection URI and set rca.sqlBackendSecret.name." }}
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -56,21 +62,17 @@ spec:
               name: {{ include "openchoreo-observability-plane.fullname" . }}-rca-llm-secret
               key: RCA_LLM_API_KEY
 
-        # OpenSearch Configuration
-        - name: OPENSEARCH_ADDRESS
-          value: {{ .Values.rca.opensearch.address | default "https://opensearch:9200" | quote }}
+        # Report Backend Configuration
+        - name: REPORT_BACKEND
+          value: {{ .Values.rca.reportBackend | quote }}
 
-        - name: OPENSEARCH_USERNAME
+        {{- if .Values.rca.sqlBackendSecret.name }}
+        - name: SQL_BACKEND_URI
           valueFrom:
             secretKeyRef:
-              name: {{ .Values.observer.openSearchSecretName }}
-              key: username
-
-        - name: OPENSEARCH_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: {{ .Values.observer.openSearchSecretName }}
-              key: password
+              name: {{ .Values.rca.sqlBackendSecret.name }}
+              key: {{ .Values.rca.sqlBackendSecret.key }}
+        {{- end }}
 
         # OAuth2 Client Credentials Configuration
         - name: OAUTH_TOKEN_URL
@@ -136,9 +138,21 @@ spec:
           timeoutSeconds: 3
           failureThreshold: 3
 
+        {{- if eq .Values.rca.reportBackend "sqlite" }}
+        volumeMounts:
+        - name: data
+          mountPath: /app/data
+        {{- end }}
+
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: false
           runAsNonRoot: true
           runAsUser: 12000
+      {{- if eq .Values.rca.reportBackend "sqlite" }}
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: {{ .Values.rca.name }}-data
+      {{- end }}
 {{- end }}
