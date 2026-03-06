@@ -392,6 +392,12 @@ type AuthMechanismConfig struct {
 // AuthzClusterRole Cluster-scoped authorization role (Kubernetes CRD).
 // Defines a set of actions that can be assigned to subjects via role bindings.
 type AuthzClusterRole struct {
+	// ApiVersion API version of the resource
+	ApiVersion *string `json:"apiVersion,omitempty"`
+
+	// Kind Kind of the resource
+	Kind *string `json:"kind,omitempty"`
+
 	// Metadata Standard Kubernetes object metadata (without kind/apiVersion).
 	// Matches the structure of metav1.ObjectMeta for the fields exposed via the API.
 	Metadata ObjectMeta `json:"metadata"`
@@ -403,6 +409,12 @@ type AuthzClusterRole struct {
 // AuthzClusterRoleBinding Cluster-scoped role binding (Kubernetes CRD).
 // Binds a cluster role to a subject identified by an entitlement claim.
 type AuthzClusterRoleBinding struct {
+	// ApiVersion API version of the resource
+	ApiVersion *string `json:"apiVersion,omitempty"`
+
+	// Kind Kind of the resource
+	Kind *string `json:"kind,omitempty"`
+
 	// Metadata Standard Kubernetes object metadata (without kind/apiVersion).
 	// Matches the structure of metav1.ObjectMeta for the fields exposed via the API.
 	Metadata ObjectMeta `json:"metadata"`
@@ -468,6 +480,12 @@ type AuthzEntitlementClaim struct {
 // AuthzRole Namespace-scoped authorization role (Kubernetes CRD).
 // Defines a set of actions that can be assigned to subjects via role bindings within a namespace.
 type AuthzRole struct {
+	// ApiVersion API version of the resource
+	ApiVersion *string `json:"apiVersion,omitempty"`
+
+	// Kind Kind of the resource
+	Kind *string `json:"kind,omitempty"`
+
 	// Metadata Standard Kubernetes object metadata (without kind/apiVersion).
 	// Matches the structure of metav1.ObjectMeta for the fields exposed via the API.
 	Metadata ObjectMeta `json:"metadata"`
@@ -479,6 +497,12 @@ type AuthzRole struct {
 // AuthzRoleBinding Namespace-scoped role binding (Kubernetes CRD).
 // Binds a role to a subject identified by an entitlement claim within a namespace.
 type AuthzRoleBinding struct {
+	// ApiVersion API version of the resource
+	ApiVersion *string `json:"apiVersion,omitempty"`
+
+	// Kind Kind of the resource
+	Kind *string `json:"kind,omitempty"`
+
 	// Metadata Standard Kubernetes object metadata (without kind/apiVersion).
 	// Matches the structure of metav1.ObjectMeta for the fields exposed via the API.
 	Metadata ObjectMeta `json:"metadata"`
@@ -553,9 +577,15 @@ type AuthzTargetPath struct {
 	Project *string `json:"project,omitempty"`
 }
 
-// BuildPlane BuildPlane resource (Kubernetes object without kind/apiVersion).
+// BuildPlane BuildPlane resource.
 // Represents CI/CD build infrastructure within a namespace.
 type BuildPlane struct {
+	// ApiVersion API version of the resource
+	ApiVersion *string `json:"apiVersion,omitempty"`
+
+	// Kind Kind of the resource
+	Kind *string `json:"kind,omitempty"`
+
 	// Metadata Standard Kubernetes object metadata (without kind/apiVersion).
 	// Matches the structure of metav1.ObjectMeta for the fields exposed via the API.
 	Metadata ObjectMeta `json:"metadata"`
@@ -629,9 +659,15 @@ type ClusterAgentConfig struct {
 	ClientCA *ValueFrom `json:"clientCA,omitempty"`
 }
 
-// ClusterBuildPlane ClusterBuildPlane resource (Kubernetes object without kind/apiVersion).
+// ClusterBuildPlane ClusterBuildPlane resource.
 // Represents cluster-scoped CI/CD build infrastructure.
 type ClusterBuildPlane struct {
+	// ApiVersion API version of the resource
+	ApiVersion *string `json:"apiVersion,omitempty"`
+
+	// Kind Kind of the resource
+	Kind *string `json:"kind,omitempty"`
+
 	// Metadata Standard Kubernetes object metadata (without kind/apiVersion).
 	// Matches the structure of metav1.ObjectMeta for the fields exposed via the API.
 	Metadata ObjectMeta `json:"metadata"`
@@ -678,9 +714,15 @@ type ClusterBuildPlaneStatus struct {
 	ObservedGeneration *int64 `json:"observedGeneration,omitempty"`
 }
 
-// ClusterComponentType ClusterComponentType resource (Kubernetes object without kind/apiVersion).
+// ClusterComponentType ClusterComponentType resource.
 // Cluster-scoped version of ComponentType.
 type ClusterComponentType struct {
+	// ApiVersion API version of the resource
+	ApiVersion *string `json:"apiVersion,omitempty"`
+
+	// Kind Kind of the resource
+	Kind *string `json:"kind,omitempty"`
+
 	// Metadata Standard Kubernetes object metadata (without kind/apiVersion).
 	// Matches the structure of metav1.ObjectMeta for the fields exposed via the API.
 	Metadata ObjectMeta `json:"metadata"`
@@ -801,9 +843,15 @@ type ClusterComponentTypeSpecWorkloadType string
 // ClusterComponentTypeStatus Observed state of a ClusterComponentType
 type ClusterComponentTypeStatus = map[string]interface{}
 
-// ClusterDataPlane ClusterDataPlane resource (Kubernetes object without kind/apiVersion).
+// ClusterDataPlane ClusterDataPlane resource.
 // Represents a cluster-scoped data plane for workload deployment.
 type ClusterDataPlane struct {
+	// ApiVersion API version of the resource
+	ApiVersion *string `json:"apiVersion,omitempty"`
+
+	// Kind Kind of the resource
+	Kind *string `json:"kind,omitempty"`
+
 	// Metadata Standard Kubernetes object metadata (without kind/apiVersion).
 	// Matches the structure of metav1.ObjectMeta for the fields exposed via the API.
 	Metadata ObjectMeta `json:"metadata"`
@@ -856,9 +904,15 @@ type ClusterDataPlaneStatus struct {
 	ObservedGeneration *int64 `json:"observedGeneration,omitempty"`
 }
 
-// ClusterObservabilityPlane ClusterObservabilityPlane resource (Kubernetes object without kind/apiVersion).
+// ClusterObservabilityPlane ClusterObservabilityPlane resource.
 // Represents cluster-scoped monitoring and logging infrastructure.
 type ClusterObservabilityPlane struct {
+	// ApiVersion API version of the resource
+	ApiVersion *string `json:"apiVersion,omitempty"`
+
+	// Kind Kind of the resource
+	Kind *string `json:"kind,omitempty"`
+
 	// Metadata Standard Kubernetes object metadata (without kind/apiVersion).
 	// Matches the structure of metav1.ObjectMeta for the fields exposed via the API.
 	Metadata ObjectMeta `json:"metadata"`
@@ -923,9 +977,15 @@ type ClusterRoleRef struct {
 	Name string `json:"name"`
 }
 
-// ClusterTrait ClusterTrait resource (Kubernetes object without kind/apiVersion).
+// ClusterTrait ClusterTrait resource.
 // Cluster-scoped version of Trait.
 type ClusterTrait struct {
+	// ApiVersion API version of the resource
+	ApiVersion *string `json:"apiVersion,omitempty"`
+
+	// Kind Kind of the resource
+	Kind *string `json:"kind,omitempty"`
+
 	// Metadata Standard Kubernetes object metadata (without kind/apiVersion).
 	// Matches the structure of metav1.ObjectMeta for the fields exposed via the API.
 	Metadata ObjectMeta `json:"metadata"`
@@ -1028,9 +1088,15 @@ type ClusterTraitSpecPatchesTargetPlane string
 // ClusterTraitStatus Observed state of a ClusterTrait
 type ClusterTraitStatus = map[string]interface{}
 
-// Component Component resource (Kubernetes object without kind/apiVersion).
+// Component Component resource.
 // Components group source code and deployment configuration within a project.
 type Component struct {
+	// ApiVersion API version of the resource
+	ApiVersion *string `json:"apiVersion,omitempty"`
+
+	// Kind Kind of the resource
+	Kind *string `json:"kind,omitempty"`
+
 	// Metadata Standard Kubernetes object metadata (without kind/apiVersion).
 	// Matches the structure of metav1.ObjectMeta for the fields exposed via the API.
 	Metadata ObjectMeta `json:"metadata"`
@@ -1049,9 +1115,15 @@ type ComponentList struct {
 	Pagination Pagination `json:"pagination"`
 }
 
-// ComponentRelease ComponentRelease resource (Kubernetes object without kind/apiVersion).
+// ComponentRelease ComponentRelease resource.
 // Immutable snapshot of component state at release time.
 type ComponentRelease struct {
+	// ApiVersion API version of the resource
+	ApiVersion *string `json:"apiVersion,omitempty"`
+
+	// Kind Kind of the resource
+	Kind *string `json:"kind,omitempty"`
+
 	// Metadata Standard Kubernetes object metadata (without kind/apiVersion).
 	// Matches the structure of metav1.ObjectMeta for the fields exposed via the API.
 	Metadata ObjectMeta `json:"metadata"`
@@ -1192,9 +1264,15 @@ type ComponentTraitInput struct {
 // ComponentTraitInputKind Kind of trait resource (Trait for namespace-scoped, ClusterTrait for cluster-scoped)
 type ComponentTraitInputKind string
 
-// ComponentType ComponentType resource (Kubernetes object without kind/apiVersion).
+// ComponentType ComponentType resource.
 // Defines workload templates used by platform engineers to govern component behavior.
 type ComponentType struct {
+	// ApiVersion API version of the resource
+	ApiVersion *string `json:"apiVersion,omitempty"`
+
+	// Kind Kind of the resource
+	Kind *string `json:"kind,omitempty"`
+
 	// Metadata Standard Kubernetes object metadata (without kind/apiVersion).
 	// Matches the structure of metav1.ObjectMeta for the fields exposed via the API.
 	Metadata ObjectMeta `json:"metadata"`
@@ -1543,9 +1621,15 @@ type CreateWorkflowRunRequest struct {
 	WorkflowName string `json:"workflowName"`
 }
 
-// DataPlane DataPlane resource (Kubernetes object without kind/apiVersion).
+// DataPlane DataPlane resource.
 // Represents a Kubernetes cluster for workload deployment.
 type DataPlane struct {
+	// ApiVersion API version of the resource
+	ApiVersion *string `json:"apiVersion,omitempty"`
+
+	// Kind Kind of the resource
+	Kind *string `json:"kind,omitempty"`
+
 	// Metadata Standard Kubernetes object metadata (without kind/apiVersion).
 	// Matches the structure of metav1.ObjectMeta for the fields exposed via the API.
 	Metadata ObjectMeta `json:"metadata"`
@@ -1616,9 +1700,15 @@ type DeployReleaseRequest struct {
 	ReleaseName string `json:"releaseName"`
 }
 
-// DeploymentPipeline DeploymentPipeline resource (Kubernetes object without kind/apiVersion).
+// DeploymentPipeline DeploymentPipeline resource.
 // Defines promotion paths between environments for component deployments.
 type DeploymentPipeline struct {
+	// ApiVersion API version of the resource
+	ApiVersion *string `json:"apiVersion,omitempty"`
+
+	// Kind Kind of the resource
+	Kind *string `json:"kind,omitempty"`
+
 	// Metadata Standard Kubernetes object metadata (without kind/apiVersion).
 	// Matches the structure of metav1.ObjectMeta for the fields exposed via the API.
 	Metadata ObjectMeta `json:"metadata"`
@@ -1742,9 +1832,15 @@ type EnvVarValueFrom struct {
 	} `json:"secretRef,omitempty"`
 }
 
-// Environment Environment resource (Kubernetes object without kind/apiVersion).
+// Environment Environment resource.
 // Environments represent deployment targets within a namespace.
 type Environment struct {
+	// ApiVersion API version of the resource
+	ApiVersion *string `json:"apiVersion,omitempty"`
+
+	// Kind Kind of the resource
+	Kind *string `json:"kind,omitempty"`
+
 	// Metadata Standard Kubernetes object metadata (without kind/apiVersion).
 	// Matches the structure of metav1.ObjectMeta for the fields exposed via the API.
 	Metadata ObjectMeta `json:"metadata"`
@@ -1963,7 +2059,7 @@ type MessageResponse struct {
 	Message string `json:"message"`
 }
 
-// Namespace Namespace resource (Kubernetes object without kind/apiVersion).
+// Namespace Namespace resource.
 // Control plane namespaces hold resources like Projects, Components, and Environments.
 // These namespaces are identified by the label `openchoreo.dev/controlplane-namespace=true`.
 type Namespace struct {
@@ -2131,9 +2227,15 @@ type ObjectMeta struct {
 	Uid *string `json:"uid,omitempty"`
 }
 
-// ObservabilityAlertsNotificationChannel ObservabilityAlertsNotificationChannel resource (Kubernetes object without kind/apiVersion).
+// ObservabilityAlertsNotificationChannel ObservabilityAlertsNotificationChannel resource.
 // Defines a channel for sending alert notifications. Currently email and webhook notifications are supported.
 type ObservabilityAlertsNotificationChannel struct {
+	// ApiVersion API version of the resource
+	ApiVersion *string `json:"apiVersion,omitempty"`
+
+	// Kind Kind of the resource
+	Kind *string `json:"kind,omitempty"`
+
 	// Metadata Standard Kubernetes object metadata (without kind/apiVersion).
 	// Matches the structure of metav1.ObjectMeta for the fields exposed via the API.
 	Metadata ObjectMeta `json:"metadata"`
@@ -2187,9 +2289,15 @@ type ObservabilityAlertsNotificationChannelSpec1 struct {
 // ObservabilityAlertsNotificationChannelStatus Observed state of an ObservabilityAlertsNotificationChannel
 type ObservabilityAlertsNotificationChannelStatus = map[string]interface{}
 
-// ObservabilityPlane ObservabilityPlane resource (Kubernetes object without kind/apiVersion).
+// ObservabilityPlane ObservabilityPlane resource.
 // Represents monitoring and logging infrastructure within a namespace.
 type ObservabilityPlane struct {
+	// ApiVersion API version of the resource
+	ApiVersion *string `json:"apiVersion,omitempty"`
+
+	// Kind Kind of the resource
+	Kind *string `json:"kind,omitempty"`
+
 	// Metadata Standard Kubernetes object metadata (without kind/apiVersion).
 	// Matches the structure of metav1.ObjectMeta for the fields exposed via the API.
 	Metadata ObjectMeta `json:"metadata"`
@@ -2302,9 +2410,15 @@ type PodLogEntry struct {
 	Timestamp time.Time `json:"timestamp"`
 }
 
-// Project Project resource (Kubernetes object without kind/apiVersion).
+// Project Project resource.
 // Projects group components within a namespace and reference a deployment pipeline.
 type Project struct {
+	// ApiVersion API version of the resource
+	ApiVersion *string `json:"apiVersion,omitempty"`
+
+	// Kind Kind of the resource
+	Kind *string `json:"kind,omitempty"`
+
 	// Metadata Standard Kubernetes object metadata (without kind/apiVersion).
 	// Matches the structure of metav1.ObjectMeta for the fields exposed via the API.
 	Metadata ObjectMeta `json:"metadata"`
@@ -2366,9 +2480,15 @@ type RCAAgentURLResponse struct {
 	RcaAgentUrl *string `json:"rcaAgentUrl,omitempty"`
 }
 
-// Release Release resource (Kubernetes object without kind/apiVersion).
+// Release Release resource.
 // Contains the final Kubernetes manifests deployed to data plane clusters.
 type Release struct {
+	// ApiVersion API version of the resource
+	ApiVersion *string `json:"apiVersion,omitempty"`
+
+	// Kind Kind of the resource
+	Kind *string `json:"kind,omitempty"`
+
 	// Metadata Standard Kubernetes object metadata (without kind/apiVersion).
 	// Matches the structure of metav1.ObjectMeta for the fields exposed via the API.
 	Metadata ObjectMeta `json:"metadata"`
@@ -2378,9 +2498,15 @@ type Release struct {
 	Status *ReleaseStatus `json:"status,omitempty"`
 }
 
-// ReleaseBinding ReleaseBinding resource (Kubernetes object without kind/apiVersion).
+// ReleaseBinding ReleaseBinding resource.
 // Binds a ComponentRelease to a specific environment.
 type ReleaseBinding struct {
+	// ApiVersion API version of the resource
+	ApiVersion *string `json:"apiVersion,omitempty"`
+
+	// Kind Kind of the resource
+	Kind *string `json:"kind,omitempty"`
+
 	// Metadata Standard Kubernetes object metadata (without kind/apiVersion).
 	// Matches the structure of metav1.ObjectMeta for the fields exposed via the API.
 	Metadata ObjectMeta `json:"metadata"`
@@ -2758,9 +2884,15 @@ type SecretKeyReference struct {
 	Namespace *string `json:"namespace,omitempty"`
 }
 
-// SecretReference SecretReference resource (Kubernetes object without kind/apiVersion).
+// SecretReference SecretReference resource.
 // Defines references to external secrets that are synced into the cluster.
 type SecretReference struct {
+	// ApiVersion API version of the resource
+	ApiVersion *string `json:"apiVersion,omitempty"`
+
+	// Kind Kind of the resource
+	Kind *string `json:"kind,omitempty"`
+
 	// Metadata Standard Kubernetes object metadata (without kind/apiVersion).
 	// Matches the structure of metav1.ObjectMeta for the fields exposed via the API.
 	Metadata ObjectMeta `json:"metadata"`
@@ -2875,9 +3007,15 @@ type TargetPath struct {
 	Project *string `json:"project,omitempty"`
 }
 
-// Trait Trait resource (Kubernetes object without kind/apiVersion).
+// Trait Trait resource.
 // Defines composable cross-cutting concerns that can be applied to components.
 type Trait struct {
+	// ApiVersion API version of the resource
+	ApiVersion *string `json:"apiVersion,omitempty"`
+
+	// Kind Kind of the resource
+	Kind *string `json:"kind,omitempty"`
+
 	// Metadata Standard Kubernetes object metadata (without kind/apiVersion).
 	// Matches the structure of metav1.ObjectMeta for the fields exposed via the API.
 	Metadata ObjectMeta `json:"metadata"`
@@ -3144,6 +3282,12 @@ type WebhookEventResponse struct {
 
 // Workflow defines model for Workflow.
 type Workflow struct {
+	// ApiVersion API version of the resource
+	ApiVersion *string `json:"apiVersion,omitempty"`
+
+	// Kind Kind of the resource
+	Kind *string `json:"kind,omitempty"`
+
 	// Metadata Standard Kubernetes object metadata (without kind/apiVersion).
 	// Matches the structure of metav1.ObjectMeta for the fields exposed via the API.
 	Metadata ObjectMeta `json:"metadata"`
@@ -3176,6 +3320,12 @@ type WorkflowResource struct {
 
 // WorkflowRun defines model for WorkflowRun.
 type WorkflowRun struct {
+	// ApiVersion API version of the resource
+	ApiVersion *string `json:"apiVersion,omitempty"`
+
+	// Kind Kind of the resource
+	Kind *string `json:"kind,omitempty"`
+
 	// Metadata Standard Kubernetes object metadata (without kind/apiVersion).
 	// Matches the structure of metav1.ObjectMeta for the fields exposed via the API.
 	Metadata ObjectMeta `json:"metadata"`
@@ -3330,9 +3480,15 @@ type WorkflowTask struct {
 	StartedAt *time.Time `json:"startedAt,omitempty"`
 }
 
-// Workload Workload resource (Kubernetes object without kind/apiVersion).
+// Workload Workload resource.
 // Defines the source code, container, endpoints and connections for a component.
 type Workload struct {
+	// ApiVersion API version of the resource
+	ApiVersion *string `json:"apiVersion,omitempty"`
+
+	// Kind Kind of the resource
+	Kind *string `json:"kind,omitempty"`
+
 	// Metadata Standard Kubernetes object metadata (without kind/apiVersion).
 	// Matches the structure of metav1.ObjectMeta for the fields exposed via the API.
 	Metadata ObjectMeta `json:"metadata"`

@@ -61,8 +61,6 @@ func (h *Handler) CreateEnvironment(
 		h.logger.Error("Failed to convert create request", "error", err)
 		return gen.CreateEnvironment400JSONResponse{BadRequestJSONResponse: badRequest("Invalid request body")}, nil
 	}
-	envCR.Status = openchoreov1alpha1.EnvironmentStatus{}
-
 	created, err := h.services.EnvironmentService.CreateEnvironment(ctx, request.NamespaceName, &envCR)
 	if err != nil {
 		if errors.Is(err, services.ErrForbidden) {
@@ -132,8 +130,6 @@ func (h *Handler) UpdateEnvironment(
 		h.logger.Error("Failed to convert update request", "error", err)
 		return gen.UpdateEnvironment400JSONResponse{BadRequestJSONResponse: badRequest("Invalid request body")}, nil
 	}
-	envCR.Status = openchoreov1alpha1.EnvironmentStatus{}
-
 	// Ensure the name from the URL path is used
 	envCR.Name = request.EnvName
 
