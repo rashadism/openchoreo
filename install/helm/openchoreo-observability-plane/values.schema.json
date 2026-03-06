@@ -3619,7 +3619,7 @@
             },
             "modelName": {
               "default": "",
-              "description": "LLM model name (e.g., claude-sonnet-4-5, gpt-5, gemini-2.0-flash-exp)",
+              "description": "LLM model name (e.g., gpt-5.2)",
               "title": "modelName",
               "type": "string"
             }
@@ -3667,21 +3667,6 @@
           "title": "observerMcpUrl",
           "type": "string"
         },
-        "opensearch": {
-          "additionalProperties": false,
-          "description": "OpenSearch connection configuration for RCA agent",
-          "properties": {
-            "address": {
-              "default": "https://opensearch:9200",
-              "description": "OpenSearch cluster address",
-              "title": "address",
-              "type": "string"
-            }
-          },
-          "required": [],
-          "title": "opensearch",
-          "type": "object"
-        },
         "remedAgent": {
           "default": true,
           "description": "Enable remediation agent",
@@ -3694,6 +3679,16 @@
           "minimum": 0,
           "title": "replicas",
           "type": "integer"
+        },
+        "reportBackend": {
+          "default": "sqlite",
+          "description": "Report storage backend type",
+          "enum": [
+            "sqlite",
+            "postgresql"
+          ],
+          "required": [],
+          "title": "reportBackend"
         },
         "resources": {
           "additionalProperties": false,
@@ -3773,6 +3768,33 @@
           "required": [],
           "title": "service",
           "type": "object"
+        },
+        "sqlBackendSecret": {
+          "additionalProperties": false,
+          "description": "Reference to an existing Secret containing the SQL connection URI (required for postgresql)",
+          "properties": {
+            "key": {
+              "default": "uri",
+              "description": "Key within the Secret that holds the URI",
+              "title": "key",
+              "type": "string"
+            },
+            "name": {
+              "default": "",
+              "description": "Name of the Secret containing the SQL backend URI",
+              "title": "name",
+              "type": "string"
+            }
+          },
+          "required": [],
+          "title": "sqlBackendSecret",
+          "type": "object"
+        },
+        "sqliteStorageSize": {
+          "default": "128Mi",
+          "description": "PVC storage size for SQLite (only used when reportBackend is sqlite)",
+          "title": "sqliteStorageSize",
+          "type": "string"
         }
       },
       "required": [],

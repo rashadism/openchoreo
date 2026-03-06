@@ -1,0 +1,15 @@
+{{- if and .Values.rca.enabled (eq .Values.rca.reportBackend "sqlite") }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Values.rca.name }}-data
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "openchoreo-observability-plane.componentLabels" (dict "context" . "component" .Values.rca.name) | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.rca.sqliteStorageSize }}
+{{- end }}

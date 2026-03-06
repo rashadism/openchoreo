@@ -22,12 +22,12 @@ class AlertScope:
     component_uid: str | None = None
 
 
-def validate_time_range(start_time: str, end_time: str) -> tuple[datetime, datetime]:
+def validate_time_range(start_time: str, end_time: str) -> tuple[str, str]:
     start_dt = datetime.fromisoformat(start_time.replace("Z", "+00:00"))
     end_dt = datetime.fromisoformat(end_time.replace("Z", "+00:00"))
     if start_dt > end_dt:
         raise ValueError("startTime must be before endTime")
-    return start_dt, end_dt
+    return start_dt.isoformat(), end_dt.isoformat()
 
 
 async def resolve_component_scope(

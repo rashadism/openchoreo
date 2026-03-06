@@ -44,7 +44,6 @@ def setup_logging():
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
     logging.getLogger("mcp.client.streamable_http").setLevel(logging.WARNING)
-    logging.getLogger("opensearch").setLevel(logging.WARNING)
 
     # Control OpenAI client log level
     if settings.openai_debug_logs:
