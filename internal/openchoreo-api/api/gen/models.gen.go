@@ -236,19 +236,19 @@ const (
 	ReleaseResourceTreeTargetPlaneObservabilityplane ReleaseResourceTreeTargetPlane = "observabilityplane"
 )
 
-// Defines values for ReleaseSpecTargetPlane.
+// Defines values for RenderedReleaseSpecTargetPlane.
 const (
-	ReleaseSpecTargetPlaneDataplane          ReleaseSpecTargetPlane = "dataplane"
-	ReleaseSpecTargetPlaneObservabilityplane ReleaseSpecTargetPlane = "observabilityplane"
+	RenderedReleaseSpecTargetPlaneDataplane          RenderedReleaseSpecTargetPlane = "dataplane"
+	RenderedReleaseSpecTargetPlaneObservabilityplane RenderedReleaseSpecTargetPlane = "observabilityplane"
 )
 
-// Defines values for ReleaseStatusResourcesHealthStatus.
+// Defines values for RenderedReleaseStatusResourcesHealthStatus.
 const (
-	ReleaseStatusResourcesHealthStatusDegraded    ReleaseStatusResourcesHealthStatus = "Degraded"
-	ReleaseStatusResourcesHealthStatusHealthy     ReleaseStatusResourcesHealthStatus = "Healthy"
-	ReleaseStatusResourcesHealthStatusProgressing ReleaseStatusResourcesHealthStatus = "Progressing"
-	ReleaseStatusResourcesHealthStatusSuspended   ReleaseStatusResourcesHealthStatus = "Suspended"
-	ReleaseStatusResourcesHealthStatusUnknown     ReleaseStatusResourcesHealthStatus = "Unknown"
+	RenderedReleaseStatusResourcesHealthStatusDegraded    RenderedReleaseStatusResourcesHealthStatus = "Degraded"
+	RenderedReleaseStatusResourcesHealthStatusHealthy     RenderedReleaseStatusResourcesHealthStatus = "Healthy"
+	RenderedReleaseStatusResourcesHealthStatusProgressing RenderedReleaseStatusResourcesHealthStatus = "Progressing"
+	RenderedReleaseStatusResourcesHealthStatusSuspended   RenderedReleaseStatusResourcesHealthStatus = "Suspended"
+	RenderedReleaseStatusResourcesHealthStatusUnknown     RenderedReleaseStatusResourcesHealthStatus = "Unknown"
 )
 
 // Defines values for RoleEntitlementMappingEffect.
@@ -2518,24 +2518,6 @@ type PromotionPath struct {
 	TargetEnvironmentRefs []TargetEnvironmentRef `json:"targetEnvironmentRefs"`
 }
 
-// Release Release resource.
-// Contains the final Kubernetes manifests deployed to data plane clusters.
-type Release struct {
-	// ApiVersion API version of the resource
-	ApiVersion *string `json:"apiVersion,omitempty"`
-
-	// Kind Kind of the resource
-	Kind *string `json:"kind,omitempty"`
-
-	// Metadata Standard Kubernetes object metadata (without kind/apiVersion).
-	// Matches the structure of metav1.ObjectMeta for the fields exposed via the API.
-	Metadata ObjectMeta `json:"metadata"`
-
-	// Spec Desired state of a Release
-	Spec   *ReleaseSpec   `json:"spec,omitempty"`
-	Status *ReleaseStatus `json:"status,omitempty"`
-}
-
 // ReleaseBinding ReleaseBinding resource.
 // Binds a ComponentRelease to a specific environment.
 type ReleaseBinding struct {
@@ -2611,15 +2593,6 @@ type ReleaseBindingStatus struct {
 	ObservedGeneration *int64 `json:"observedGeneration,omitempty"`
 }
 
-// ReleaseList Paginated list of releases
-type ReleaseList struct {
-	Items []Release `json:"items"`
-
-	// Pagination Cursor-based pagination metadata. Uses Kubernetes-native continuation tokens
-	// for efficient pagination through large result sets.
-	Pagination Pagination `json:"pagination"`
-}
-
 // ReleaseResourceTree Resource tree for a single release
 type ReleaseResourceTree struct {
 	// Name Name of the release
@@ -2628,8 +2601,8 @@ type ReleaseResourceTree struct {
 	// Nodes All resource nodes in the tree
 	Nodes []ResourceNode `json:"nodes"`
 
-	// Release Full Release CR (metadata + spec + status). Same structure as returned by GET /releases/{releaseName}.
-	Release *Release `json:"release,omitempty"`
+	// RenderedRelease Full RenderedRelease CR (metadata + spec + status).
+	RenderedRelease *RenderedRelease `json:"renderedRelease,omitempty"`
 
 	// TargetPlane Target plane of the release
 	TargetPlane ReleaseResourceTreeTargetPlane `json:"targetPlane"`
@@ -2638,15 +2611,45 @@ type ReleaseResourceTree struct {
 // ReleaseResourceTreeTargetPlane Target plane of the release
 type ReleaseResourceTreeTargetPlane string
 
-// ReleaseSpec Desired state of a Release
-type ReleaseSpec struct {
-	// EnvironmentName Target environment for this release
+// RemoteReference Points to a secret in an external secret store
+type RemoteReference struct {
+	// Key Path in the external secret store
+	Key string `json:"key"`
+
+	// Property Specific field within the secret
+	Property *string `json:"property,omitempty"`
+
+	// Version Version of the secret to fetch
+	Version *string `json:"version,omitempty"`
+}
+
+// RenderedRelease RenderedRelease resource.
+// Contains the final rendered Kubernetes manifests deployed to data plane clusters.
+type RenderedRelease struct {
+	// ApiVersion API version of the resource
+	ApiVersion *string `json:"apiVersion,omitempty"`
+
+	// Kind Kind of the resource
+	Kind *string `json:"kind,omitempty"`
+
+	// Metadata Standard Kubernetes object metadata (without kind/apiVersion).
+	// Matches the structure of metav1.ObjectMeta for the fields exposed via the API.
+	Metadata ObjectMeta `json:"metadata"`
+
+	// Spec Desired state of a RenderedRelease
+	Spec   *RenderedReleaseSpec   `json:"spec,omitempty"`
+	Status *RenderedReleaseStatus `json:"status,omitempty"`
+}
+
+// RenderedReleaseSpec Desired state of a RenderedRelease
+type RenderedReleaseSpec struct {
+	// EnvironmentName Target environment for this rendered release
 	EnvironmentName string `json:"environmentName"`
 
-	// Interval Watch interval for stable release resources (e.g. 5m, 30s)
+	// Interval Watch interval for stable rendered release resources (e.g. 5m, 30s)
 	Interval *string `json:"interval,omitempty"`
 
-	// Owner Owner identifies the component and project this Release belongs to
+	// Owner Owner identifies the component and project this RenderedRelease belongs to
 	Owner struct {
 		// ComponentName Name of the component
 		ComponentName string `json:"componentName"`
@@ -2655,7 +2658,7 @@ type ReleaseSpec struct {
 		ProjectName string `json:"projectName"`
 	} `json:"owner"`
 
-	// ProgressingInterval Watch interval for transitioning release resources (e.g. 10s)
+	// ProgressingInterval Watch interval for transitioning rendered release resources (e.g. 10s)
 	ProgressingInterval *string `json:"progressingInterval,omitempty"`
 
 	// Resources Kubernetes resource templates to apply to the data plane
@@ -2668,15 +2671,15 @@ type ReleaseSpec struct {
 	} `json:"resources,omitempty"`
 
 	// TargetPlane Target plane for deployment
-	TargetPlane *ReleaseSpecTargetPlane `json:"targetPlane,omitempty"`
+	TargetPlane *RenderedReleaseSpecTargetPlane `json:"targetPlane,omitempty"`
 }
 
-// ReleaseSpecTargetPlane Target plane for deployment
-type ReleaseSpecTargetPlane string
+// RenderedReleaseSpecTargetPlane Target plane for deployment
+type RenderedReleaseSpecTargetPlane string
 
-// ReleaseStatus Observed state of a Release
-type ReleaseStatus struct {
-	// Conditions Latest available observations of the Release's current state
+// RenderedReleaseStatus Observed state of a RenderedRelease
+type RenderedReleaseStatus struct {
+	// Conditions Latest available observations of the RenderedRelease's current state
 	Conditions *[]Condition `json:"conditions,omitempty"`
 
 	// Resources Resources applied to the data plane with their observed status
@@ -2685,7 +2688,7 @@ type ReleaseStatus struct {
 		Group *string `json:"group,omitempty"`
 
 		// HealthStatus Health status of the resource
-		HealthStatus *ReleaseStatusResourcesHealthStatus `json:"healthStatus,omitempty"`
+		HealthStatus *RenderedReleaseStatusResourcesHealthStatus `json:"healthStatus,omitempty"`
 
 		// Id Resource identifier matching spec.resources
 		Id *string `json:"id,omitempty"`
@@ -2707,20 +2710,8 @@ type ReleaseStatus struct {
 	} `json:"resources,omitempty"`
 }
 
-// ReleaseStatusResourcesHealthStatus Health status of the resource
-type ReleaseStatusResourcesHealthStatus string
-
-// RemoteReference Points to a secret in an external secret store
-type RemoteReference struct {
-	// Key Path in the external secret store
-	Key string `json:"key"`
-
-	// Property Specific field within the secret
-	Property *string `json:"property,omitempty"`
-
-	// Version Version of the secret to fetch
-	Version *string `json:"version,omitempty"`
-}
+// RenderedReleaseStatusResourcesHealthStatus Health status of the resource
+type RenderedReleaseStatusResourcesHealthStatus string
 
 // Resource Resource for authorization evaluation
 type Resource struct {
@@ -3728,9 +3719,6 @@ type ProjectQueryParam = string
 // ReleaseBindingNameParam defines model for ReleaseBindingNameParam.
 type ReleaseBindingNameParam = string
 
-// ReleaseNameParam defines model for ReleaseNameParam.
-type ReleaseNameParam = string
-
 // RoleNameParam defines model for RoleNameParam.
 type RoleNameParam = string
 
@@ -4046,22 +4034,6 @@ type GetReleaseBindingK8sResourceLogsParams struct {
 
 	// SinceSeconds Number of seconds since which to show logs
 	SinceSeconds *int64 `form:"sinceSeconds,omitempty" json:"sinceSeconds,omitempty"`
-}
-
-// ListReleasesParams defines parameters for ListReleases.
-type ListReleasesParams struct {
-	// Component Filter resources by component name
-	Component *ComponentQueryParam `form:"component,omitempty" json:"component,omitempty"`
-
-	// Environment Filter resources by environment name
-	Environment *EnvironmentQueryParam `form:"environment,omitempty" json:"environment,omitempty"`
-
-	// Limit Maximum number of items to return per page
-	Limit *LimitParam `form:"limit,omitempty" json:"limit,omitempty"`
-
-	// Cursor Opaque pagination cursor from a previous response.
-	// Pass the `nextCursor` value from pagination metadata to fetch the next page.
-	Cursor *CursorParam `form:"cursor,omitempty" json:"cursor,omitempty"`
 }
 
 // ListNamespaceRoleBindingsParams defines parameters for ListNamespaceRoleBindings.
