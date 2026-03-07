@@ -429,6 +429,9 @@ type ServerInterface interface {
 	// Get workflow run
 	// (GET /api/v1/namespaces/{namespaceName}/workflowruns/{runName})
 	GetWorkflowRun(w http.ResponseWriter, r *http.Request, namespaceName NamespaceNameParam, runName WorkflowRunNameParam)
+	// Update workflow run
+	// (PUT /api/v1/namespaces/{namespaceName}/workflowruns/{runName})
+	UpdateWorkflowRun(w http.ResponseWriter, r *http.Request, namespaceName NamespaceNameParam, runName WorkflowRunNameParam)
 	// Get workflow run events
 	// (GET /api/v1/namespaces/{namespaceName}/workflowruns/{runName}/events)
 	GetWorkflowRunEvents(w http.ResponseWriter, r *http.Request, namespaceName NamespaceNameParam, runName WorkflowRunNameParam, params GetWorkflowRunEventsParams)
@@ -5783,6 +5786,46 @@ func (siw *ServerInterfaceWrapper) GetWorkflowRun(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// UpdateWorkflowRun operation middleware
+func (siw *ServerInterfaceWrapper) UpdateWorkflowRun(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "namespaceName" -------------
+	var namespaceName NamespaceNameParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "namespaceName", r.PathValue("namespaceName"), &namespaceName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "namespaceName", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "runName" -------------
+	var runName WorkflowRunNameParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "runName", r.PathValue("runName"), &runName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "runName", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateWorkflowRun(w, r, namespaceName, runName)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetWorkflowRunEvents operation middleware
 func (siw *ServerInterfaceWrapper) GetWorkflowRunEvents(w http.ResponseWriter, r *http.Request) {
 
@@ -6894,6 +6937,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc("GET "+options.BaseURL+"/api/v1/namespaces/{namespaceName}/workflowruns", wrapper.ListWorkflowRuns)
 	m.HandleFunc("POST "+options.BaseURL+"/api/v1/namespaces/{namespaceName}/workflowruns", wrapper.CreateWorkflowRun)
 	m.HandleFunc("GET "+options.BaseURL+"/api/v1/namespaces/{namespaceName}/workflowruns/{runName}", wrapper.GetWorkflowRun)
+	m.HandleFunc("PUT "+options.BaseURL+"/api/v1/namespaces/{namespaceName}/workflowruns/{runName}", wrapper.UpdateWorkflowRun)
 	m.HandleFunc("GET "+options.BaseURL+"/api/v1/namespaces/{namespaceName}/workflowruns/{runName}/events", wrapper.GetWorkflowRunEvents)
 	m.HandleFunc("GET "+options.BaseURL+"/api/v1/namespaces/{namespaceName}/workflowruns/{runName}/logs", wrapper.GetWorkflowRunLogs)
 	m.HandleFunc("GET "+options.BaseURL+"/api/v1/namespaces/{namespaceName}/workflowruns/{runName}/status", wrapper.GetWorkflowRunStatus)
@@ -14647,6 +14691,70 @@ func (response GetWorkflowRun500JSONResponse) VisitGetWorkflowRunResponse(w http
 	return json.NewEncoder(w).Encode(response)
 }
 
+type UpdateWorkflowRunRequestObject struct {
+	NamespaceName NamespaceNameParam   `json:"namespaceName"`
+	RunName       WorkflowRunNameParam `json:"runName"`
+	Body          *UpdateWorkflowRunJSONRequestBody
+}
+
+type UpdateWorkflowRunResponseObject interface {
+	VisitUpdateWorkflowRunResponse(w http.ResponseWriter) error
+}
+
+type UpdateWorkflowRun200JSONResponse WorkflowRun
+
+func (response UpdateWorkflowRun200JSONResponse) VisitUpdateWorkflowRunResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateWorkflowRun400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response UpdateWorkflowRun400JSONResponse) VisitUpdateWorkflowRunResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateWorkflowRun401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response UpdateWorkflowRun401JSONResponse) VisitUpdateWorkflowRunResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateWorkflowRun403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response UpdateWorkflowRun403JSONResponse) VisitUpdateWorkflowRunResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateWorkflowRun404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response UpdateWorkflowRun404JSONResponse) VisitUpdateWorkflowRunResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateWorkflowRun500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response UpdateWorkflowRun500JSONResponse) VisitUpdateWorkflowRunResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type GetWorkflowRunEventsRequestObject struct {
 	NamespaceName NamespaceNameParam   `json:"namespaceName"`
 	RunName       WorkflowRunNameParam `json:"runName"`
@@ -16144,6 +16252,9 @@ type StrictServerInterface interface {
 	// Get workflow run
 	// (GET /api/v1/namespaces/{namespaceName}/workflowruns/{runName})
 	GetWorkflowRun(ctx context.Context, request GetWorkflowRunRequestObject) (GetWorkflowRunResponseObject, error)
+	// Update workflow run
+	// (PUT /api/v1/namespaces/{namespaceName}/workflowruns/{runName})
+	UpdateWorkflowRun(ctx context.Context, request UpdateWorkflowRunRequestObject) (UpdateWorkflowRunResponseObject, error)
 	// Get workflow run events
 	// (GET /api/v1/namespaces/{namespaceName}/workflowruns/{runName}/events)
 	GetWorkflowRunEvents(ctx context.Context, request GetWorkflowRunEventsRequestObject) (GetWorkflowRunEventsResponseObject, error)
@@ -20159,6 +20270,40 @@ func (sh *strictHandler) GetWorkflowRun(w http.ResponseWriter, r *http.Request, 
 	}
 }
 
+// UpdateWorkflowRun operation middleware
+func (sh *strictHandler) UpdateWorkflowRun(w http.ResponseWriter, r *http.Request, namespaceName NamespaceNameParam, runName WorkflowRunNameParam) {
+	var request UpdateWorkflowRunRequestObject
+
+	request.NamespaceName = namespaceName
+	request.RunName = runName
+
+	var body UpdateWorkflowRunJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateWorkflowRun(ctx, request.(UpdateWorkflowRunRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateWorkflowRun")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateWorkflowRunResponseObject); ok {
+		if err := validResponse.VisitUpdateWorkflowRunResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetWorkflowRunEvents operation middleware
 func (sh *strictHandler) GetWorkflowRunEvents(w http.ResponseWriter, r *http.Request, namespaceName NamespaceNameParam, runName WorkflowRunNameParam, params GetWorkflowRunEventsParams) {
 	var request GetWorkflowRunEventsRequestObject
@@ -21217,39 +21362,39 @@ var swaggerSpec = []string{
 	"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",
-	"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",
-	"6WqtmyayAwA=",
+	"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",
+	"6NKrUG92y9e1tMzvn7//fwEAAP//BbUeMVi1AwA=",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file
