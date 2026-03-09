@@ -96,15 +96,17 @@ func validateComponentType(ct *openchoreodevv1alpha1.ComponentType) field.ErrorL
 	allErrs := field.ErrorList{}
 
 	// Extract and validate schemas, getting structural schemas for CEL validation
-	basePath := field.NewPath("spec", "schema")
-	parametersSchema, envOverridesSchema, schemaErrs := schemautil.ExtractStructuralSchemas(&ct.Spec.Schema, basePath)
+	basePath := field.NewPath("spec")
+	parametersSchema, envConfigsSchema, schemaErrs := schemautil.ExtractStructuralSchemas(
+		ct.Spec.Parameters, ct.Spec.EnvironmentConfigs, basePath,
+	)
 	allErrs = append(allErrs, schemaErrs...)
 
 	// Validate CEL expressions with schema-aware type checking
 	celErrs := component.ValidateComponentTypeResourcesWithSchema(
 		ct,
 		parametersSchema,
-		envOverridesSchema,
+		envConfigsSchema,
 	)
 	allErrs = append(allErrs, celErrs...)
 

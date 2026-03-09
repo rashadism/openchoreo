@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"gopkg.in/yaml.v3"
 	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	extv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
@@ -15,23 +16,65 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 
+	"github.com/openchoreo/openchoreo/api/v1alpha1"
 	"github.com/openchoreo/openchoreo/internal/clone"
 	"github.com/openchoreo/openchoreo/internal/schema/extractor"
 )
 
 // Definition represents a schematized object assembled from one or more field maps.
 type Definition struct {
-	Types   map[string]any
 	Schemas []map[string]any
 	Options extractor.Options
 }
 
-// Source provides access to schema raw extensions for extraction.
-// Both ComponentTypeSchema and TraitSchema implement this interface.
-type Source interface {
-	GetTypes() *runtime.RawExtension
-	GetParameters() *runtime.RawExtension
-	GetEnvOverrides() *runtime.RawExtension
+// ResolveSectionToStructural converts a SchemaSection into a Kubernetes structural schema.
+// It handles both ocSchema and openAPIV3Schema formats transparently.
+// Returns nil if the section is nil or empty.
+func ResolveSectionToStructural(section *v1alpha1.SchemaSection) (*apiextschema.Structural, error) {
+	raw := sectionRaw(section)
+	if raw == nil || len(raw.Raw) == 0 {
+		return nil, nil
+	}
+
+	fields, err := unmarshalSection(raw)
+	if err != nil {
+		return nil, err
+	}
+
+	return ToStructural(Definition{Schemas: []map[string]any{fields}})
+}
+
+// ResolveSectionToBundle converts a SchemaSection into both structural and JSON schema formats.
+// Returns nil for both if the section is nil or empty.
+func ResolveSectionToBundle(section *v1alpha1.SchemaSection) (*apiextschema.Structural, *extv1.JSONSchemaProps, error) {
+	raw := sectionRaw(section)
+	if raw == nil || len(raw.Raw) == 0 {
+		return nil, nil, nil
+	}
+
+	fields, err := unmarshalSection(raw)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return ToStructuralAndJSONSchema(Definition{Schemas: []map[string]any{fields}})
+}
+
+// sectionRaw returns the raw extension from a SchemaSection, or nil if empty.
+func sectionRaw(section *v1alpha1.SchemaSection) *runtime.RawExtension {
+	if section == nil {
+		return nil
+	}
+	return section.GetRaw()
+}
+
+// unmarshalSection unmarshals a raw extension into a field map.
+func unmarshalSection(raw *runtime.RawExtension) (map[string]any, error) {
+	var fields map[string]any
+	if err := yaml.Unmarshal(raw.Raw, &fields); err != nil {
+		return nil, fmt.Errorf("failed to parse schema: %w", err)
+	}
+	return fields, nil
 }
 
 // ToJSONSchema converts a schema definition into an OpenAPI v3 JSON schema.
@@ -40,7 +83,7 @@ type Source interface {
 // from the shorthand format into standard JSON Schema that can be used for validation.
 //
 // Process:
-//  1. Merge all schema maps (parameters, envOverrides, trait config) into one
+//  1. Merge all schema maps (parameters, environmentConfigs, trait config) into one
 //  2. Convert from shorthand syntax to full JSON Schema via extractor (internal type)
 //  3. Convert from internal to v1 type (for API compatibility and JSON serialization)
 //  4. Sort required fields for deterministic output
@@ -61,7 +104,7 @@ func ToJSONSchema(def Definition) (*extv1.JSONSchemaProps, error) {
 		}, nil
 	}
 
-	internalSchema, err := extractor.ExtractSchema(merged, def.Types, def.Options)
+	internalSchema, err := extractor.ExtractSchema(merged, nil, def.Options)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert schema to OpenAPI: %w", err)
 	}
@@ -107,7 +150,7 @@ func ToStructural(def Definition) (*apiextschema.Structural, error) {
 		return structural, nil
 	}
 
-	internalSchema, err := extractor.ExtractSchema(merged, def.Types, def.Options)
+	internalSchema, err := extractor.ExtractSchema(merged, nil, def.Options)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert schema to OpenAPI: %w", err)
 	}
@@ -132,7 +175,7 @@ func ToStructuralAndJSONSchema(def Definition) (*apiextschema.Structural, *extv1
 		}
 	} else {
 		var err error
-		internalSchema, err = extractor.ExtractSchema(merged, def.Types, def.Options)
+		internalSchema, err = extractor.ExtractSchema(merged, nil, def.Options)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to convert schema to OpenAPI: %w", err)
 		}
@@ -184,7 +227,7 @@ func ApplyDefaults(target map[string]any, structural *apiextschema.Structural) m
 //
 // ComponentType separate schemas into logical groups:
 //   - schema.parameters: Component-level configuration
-//   - schema.envOverrides: Environment-specific overrides
+//   - schema.environmentConfigs: Environment-specific overrides
 //   - schema.traitConfig: Trait instance configuration (for Traits)
 //
 // This function merges them using deep merge semantics so that:

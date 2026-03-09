@@ -49,8 +49,10 @@ func (v *Validator) ValidateCreate(_ context.Context, obj runtime.Object) (admis
 	allErrs := field.ErrorList{}
 
 	// Extract and validate schemas, getting structural schemas for CEL validation
-	basePath := field.NewPath("spec", "schema")
-	parametersSchema, envOverridesSchema, schemaErrs := schemautil.ExtractStructuralSchemas(&ct.Spec.Schema, basePath)
+	basePath := field.NewPath("spec")
+	parametersSchema, envConfigsSchema, schemaErrs := schemautil.ExtractStructuralSchemas(
+		ct.Spec.Parameters, ct.Spec.EnvironmentConfigs, basePath,
+	)
 	allErrs = append(allErrs, schemaErrs...)
 
 	templateErrs := validateClusterTraitCreatesTemplateStructure(ct)
@@ -60,7 +62,7 @@ func (v *Validator) ValidateCreate(_ context.Context, obj runtime.Object) (admis
 	celErrs := component.ValidateClusterTraitCreatesAndPatchesWithSchema(
 		ct,
 		parametersSchema,
-		envOverridesSchema,
+		envConfigsSchema,
 	)
 	allErrs = append(allErrs, celErrs...)
 
@@ -82,8 +84,10 @@ func (v *Validator) ValidateUpdate(_ context.Context, oldObj, newObj runtime.Obj
 	allErrs := field.ErrorList{}
 
 	// Extract and validate schemas, getting structural schemas for CEL validation
-	basePath := field.NewPath("spec", "schema")
-	parametersSchema, envOverridesSchema, schemaErrs := schemautil.ExtractStructuralSchemas(&newClusterTrait.Spec.Schema, basePath)
+	basePath := field.NewPath("spec")
+	parametersSchema, envConfigsSchema, schemaErrs := schemautil.ExtractStructuralSchemas(
+		newClusterTrait.Spec.Parameters, newClusterTrait.Spec.EnvironmentConfigs, basePath,
+	)
 	allErrs = append(allErrs, schemaErrs...)
 
 	templateErrs := validateClusterTraitCreatesTemplateStructure(newClusterTrait)
@@ -93,7 +97,7 @@ func (v *Validator) ValidateUpdate(_ context.Context, oldObj, newObj runtime.Obj
 	celErrs := component.ValidateClusterTraitCreatesAndPatchesWithSchema(
 		newClusterTrait,
 		parametersSchema,
-		envOverridesSchema,
+		envConfigsSchema,
 	)
 	allErrs = append(allErrs, celErrs...)
 

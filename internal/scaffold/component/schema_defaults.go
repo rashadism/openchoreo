@@ -22,12 +22,11 @@ type schemaProcessingResult struct {
 	defaultedObj map[string]any
 }
 
-// extractAndConvertSchema converts OpenChoreo schema (Parameters + Types) to JSONSchemaProps.
+// extractAndConvertSchema converts OpenChoreo schema parameters to JSONSchemaProps.
 // This is a convenience function for extracting and converting schemas without applying defaults.
-func extractAndConvertSchema(parameters, types *runtime.RawExtension) (*extv1.JSONSchemaProps, error) {
+func extractAndConvertSchema(parameters *runtime.RawExtension) (*extv1.JSONSchemaProps, error) {
 	def := schema.Definition{
 		Schemas: []map[string]any{},
-		Types:   nil,
 	}
 
 	if parameters != nil {
@@ -36,14 +35,6 @@ func extractAndConvertSchema(parameters, types *runtime.RawExtension) (*extv1.JS
 			return nil, fmt.Errorf("converting parameters: %w", err)
 		}
 		def.Schemas = append(def.Schemas, paramsMap)
-	}
-
-	if types != nil {
-		typesMap, err := rawExtensionToMap(types)
-		if err != nil {
-			return nil, fmt.Errorf("converting types: %w", err)
-		}
-		def.Types = typesMap
 	}
 
 	jsonSchema, err := schema.ToJSONSchema(def)
