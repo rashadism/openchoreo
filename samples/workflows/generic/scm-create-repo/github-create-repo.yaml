@@ -1,6 +1,6 @@
 # ============================================================
 # ClusterWorkflowTemplate — Argo Workflows execution template
-# Deploy this to the Build Plane cluster
+# Deploy this to the Workflow Plane cluster
 # ============================================================
 apiVersion: argoproj.io/v1alpha1
 kind: ClusterWorkflowTemplate
@@ -187,7 +187,7 @@ spec:
     kind: Workflow
     metadata:
       name: ${metadata.workflowRunName}
-      namespace: openchoreo-ci-${metadata.namespaceName}
+      namespace: ${metadata.namespace}
     spec:
       arguments:
         parameters:

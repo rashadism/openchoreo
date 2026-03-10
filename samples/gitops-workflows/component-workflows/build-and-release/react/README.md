@@ -41,7 +41,7 @@ flowchart TB
 
 ## Prerequisites
 
-- OpenChoreo installed with build plane
+- OpenChoreo installed with workflow plane
 - ClusterSecretStore configured (comes with OpenChoreo installation)
 - GitOps repository with openchoreo manifests
 > [!NOTE]  
@@ -153,11 +153,11 @@ spec:
 # Watch the ComponentWorkflowRun status
 kubectl get componentworkflowrun react-starter-gitops-build-release-001 -w
 
-# View Argo Workflow status in the build plane
-kubectl get workflow -n openchoreo-ci-default
+# View Argo Workflow status in the workflow plane
+kubectl get workflow -n workflows-default
 
 # View logs for a specific step
-kubectl logs -n openchoreo-ci-default -l workflows.argoproj.io/workflow=<workflow-name> --all-containers=true
+kubectl logs -n workflows-default -l workflows.argoproj.io/workflow=<workflow-name> --all-containers=true
 ```
 
 ## Parameters Reference

@@ -27,26 +27,26 @@ const (
 	gitSecretTypeValue          = "git-credentials"
 	gitSecretAuthTypeAnnotation = "kubernetes.io/secret-type"
 	ownerNamespaceLabel         = "openchoreo.dev/owner-namespace"
-	gitSecretNamespacePrefix    = "openchoreo-ci-"
+	gitSecretNamespacePrefix    = "workflows-"
 )
 
-// getCINamespace returns the CI namespace for a given control plane namespace.
-func getCINamespace(namespaceName string) string {
+// getWorkflowNamespace returns the workflow execution namespace for a given control plane namespace.
+func getWorkflowNamespace(namespaceName string) string {
 	return gitSecretNamespacePrefix + namespaceName
 }
 
 type gitSecretService struct {
 	k8sClient   client.Client
-	bpClientMgr *kubernetesClient.KubeMultiClientManager
+	wpClientMgr *kubernetesClient.KubeMultiClientManager
 	logger      *slog.Logger
 	gatewayURL  string
 }
 
 // NewService creates a new git secret service without authorization.
-func NewService(k8sClient client.Client, bpClientMgr *kubernetesClient.KubeMultiClientManager, logger *slog.Logger, gatewayURL string) Service {
+func NewService(k8sClient client.Client, wpClientMgr *kubernetesClient.KubeMultiClientManager, logger *slog.Logger, gatewayURL string) Service {
 	return &gitSecretService{
 		k8sClient:   k8sClient,
-		bpClientMgr: bpClientMgr,
+		wpClientMgr: wpClientMgr,
 		logger:      logger,
 		gatewayURL:  gatewayURL,
 	}
@@ -75,7 +75,7 @@ func (s *gitSecretService) ListGitSecrets(ctx context.Context, namespaceName str
 	return secrets, nil
 }
 
-// CreateGitSecret creates a git secret across control and build planes.
+// CreateGitSecret creates a git secret across control and workflow planes.
 func (s *gitSecretService) CreateGitSecret(ctx context.Context, namespaceName string, req *CreateGitSecretParams) (*GitSecretInfo, error) {
 	s.logger.Debug("Creating git secret", "namespace", namespaceName, "secret", req.SecretName, "type", req.SecretType)
 
@@ -94,43 +94,43 @@ func (s *gitSecretService) CreateGitSecret(ctx context.Context, namespaceName st
 		return nil, fmt.Errorf("failed to check existing secret reference: %w", err)
 	}
 
-	buildPlane, err := s.getBuildPlane(ctx, namespaceName)
+	workflowPlane, err := s.getWorkflowPlane(ctx, namespaceName)
 	if err != nil {
 		return nil, err
 	}
 
-	if buildPlane.Spec.SecretStoreRef == nil || buildPlane.Spec.SecretStoreRef.Name == "" {
-		s.logger.Warn("Build plane has no secret store configured", "namespace", namespaceName, "buildPlane", buildPlane.Name)
+	if workflowPlane.Spec.SecretStoreRef == nil || workflowPlane.Spec.SecretStoreRef.Name == "" {
+		s.logger.Warn("Workflow plane has no secret store configured", "namespace", namespaceName, "workflowPlane", workflowPlane.Name)
 		return nil, ErrSecretStoreNotConfigured
 	}
-	secretStoreName := buildPlane.Spec.SecretStoreRef.Name
+	secretStoreName := workflowPlane.Spec.SecretStoreRef.Name
 
-	buildPlaneClient, err := kubernetesClient.GetK8sClientFromBuildPlane(s.bpClientMgr, buildPlane, s.gatewayURL)
+	workflowPlaneClient, err := kubernetesClient.GetK8sClientFromWorkflowPlane(s.wpClientMgr, workflowPlane, s.gatewayURL)
 	if err != nil {
-		s.logger.Error("Failed to get build plane client", "error", err, "namespace", namespaceName, "buildPlane", buildPlane.Name)
-		return nil, fmt.Errorf("failed to get build plane client: %w", err)
+		s.logger.Error("Failed to get workflow plane client", "error", err, "namespace", namespaceName, "workflowPlane", workflowPlane.Name)
+		return nil, fmt.Errorf("failed to get workflow plane client: %w", err)
 	}
 
-	ciNamespace := getCINamespace(namespaceName)
-	if err := s.ensureNamespaceExists(ctx, buildPlaneClient, ciNamespace); err != nil {
+	workflowNamespace := getWorkflowNamespace(namespaceName)
+	if err := s.ensureNamespaceExists(ctx, workflowPlaneClient, workflowNamespace); err != nil {
 		return nil, err
 	}
 
-	// Create or update K8s Secret in build plane using Server-Side Apply
-	secret := s.buildGitSecret(req.SecretName, namespaceName, ciNamespace, req.SecretType, req.Username, req.Token, req.SSHKey, req.SSHKeyID)
-	if err := buildPlaneClient.Patch(ctx, secret, client.Apply, client.ForceOwnership, client.FieldOwner("openchoreo-api")); err != nil {
-		s.logger.Error("Failed to apply build plane secret", "error", err, "namespace", namespaceName, "secret", req.SecretName)
-		return nil, fmt.Errorf("failed to apply build plane secret: %w", err)
+	// Create or update K8s Secret in workflow plane using Server-Side Apply
+	secret := s.buildGitSecret(req.SecretName, namespaceName, workflowNamespace, req.SecretType, req.Username, req.Token, req.SSHKey, req.SSHKeyID)
+	if err := workflowPlaneClient.Patch(ctx, secret, client.Apply, client.ForceOwnership, client.FieldOwner("openchoreo-api")); err != nil {
+		s.logger.Error("Failed to apply workflow plane secret", "error", err, "namespace", namespaceName, "secret", req.SecretName)
+		return nil, fmt.Errorf("failed to apply workflow plane secret: %w", err)
 	}
-	s.logger.Debug("Successfully applied K8s secret in build plane", "namespace", ciNamespace, "secret", req.SecretName)
+	s.logger.Debug("Successfully applied K8s secret in workflow plane", "namespace", workflowNamespace, "secret", req.SecretName)
 
-	// Create or update PushSecret in build plane using Server-Side Apply
-	pushSecret := s.createPushSecret(req.SecretName, secretStoreName, namespaceName, ciNamespace, req.SecretType, req.Username, req.SSHKeyID)
-	if err := buildPlaneClient.Patch(ctx, pushSecret, client.Apply, client.ForceOwnership, client.FieldOwner("openchoreo-api")); err != nil {
+	// Create or update PushSecret in workflow plane using Server-Side Apply
+	pushSecret := s.createPushSecret(req.SecretName, secretStoreName, namespaceName, workflowNamespace, req.SecretType, req.Username, req.SSHKeyID)
+	if err := workflowPlaneClient.Patch(ctx, pushSecret, client.Apply, client.ForceOwnership, client.FieldOwner("openchoreo-api")); err != nil {
 		s.logger.Error("Failed to apply push secret", "error", err, "namespace", namespaceName, "secret", req.SecretName)
 		return nil, fmt.Errorf("failed to apply push secret: %w", err)
 	}
-	s.logger.Debug("Successfully applied PushSecret in build plane", "namespace", ciNamespace, "secret", req.SecretName)
+	s.logger.Debug("Successfully applied PushSecret in workflow plane", "namespace", workflowNamespace, "secret", req.SecretName)
 
 	// Create SecretReference in control plane
 	secretReference := s.buildSecretReference(namespaceName, req.SecretName, req.SecretType, req.Username, req.SSHKeyID)
@@ -146,7 +146,7 @@ func (s *gitSecretService) CreateGitSecret(ctx context.Context, namespaceName st
 	}, nil
 }
 
-// DeleteGitSecret deletes a git secret from control and build planes.
+// DeleteGitSecret deletes a git secret from control and workflow planes.
 func (s *gitSecretService) DeleteGitSecret(ctx context.Context, namespaceName, secretName string) error {
 	s.logger.Debug("Deleting git secret", "namespace", namespaceName, "secret", secretName)
 
@@ -164,26 +164,26 @@ func (s *gitSecretService) DeleteGitSecret(ctx context.Context, namespaceName, s
 		return ErrGitSecretNotFound
 	}
 
-	buildPlane, err := s.getBuildPlane(ctx, namespaceName)
+	workflowPlane, err := s.getWorkflowPlane(ctx, namespaceName)
 	if err != nil {
 		return err
 	}
 
-	buildPlaneClient, err := kubernetesClient.GetK8sClientFromBuildPlane(s.bpClientMgr, buildPlane, s.gatewayURL)
+	workflowPlaneClient, err := kubernetesClient.GetK8sClientFromWorkflowPlane(s.wpClientMgr, workflowPlane, s.gatewayURL)
 	if err != nil {
-		s.logger.Error("Failed to get build plane client", "error", err, "namespace", namespaceName, "buildPlane", buildPlane.Name)
-		return fmt.Errorf("failed to get build plane client: %w", err)
+		s.logger.Error("Failed to get workflow plane client", "error", err, "namespace", namespaceName, "workflowPlane", workflowPlane.Name)
+		return fmt.Errorf("failed to get workflow plane client: %w", err)
 	}
 
-	ciNamespace := getCINamespace(namespaceName)
+	workflowNamespace := getWorkflowNamespace(namespaceName)
 
-	// Delete PushSecret from build plane
+	// Delete PushSecret from workflow plane
 	pushSecret := &unstructured.Unstructured{}
 	pushSecret.SetAPIVersion("external-secrets.io/v1alpha1")
 	pushSecret.SetKind("PushSecret")
 	pushSecret.SetName(secretName)
-	pushSecret.SetNamespace(ciNamespace)
-	if err := buildPlaneClient.Delete(ctx, pushSecret); err != nil {
+	pushSecret.SetNamespace(workflowNamespace)
+	if err := workflowPlaneClient.Delete(ctx, pushSecret); err != nil {
 		if client.IgnoreNotFound(err) != nil {
 			s.logger.Error("Failed to delete push secret", "error", err, "namespace", namespaceName, "secret", secretName)
 			return fmt.Errorf("failed to delete push secret: %w", err)
@@ -191,19 +191,19 @@ func (s *gitSecretService) DeleteGitSecret(ctx context.Context, namespaceName, s
 		s.logger.Debug("Push secret not found, skipping", "namespace", namespaceName, "secret", secretName)
 	}
 
-	// Delete Kubernetes Secret from build plane
+	// Delete Kubernetes Secret from workflow plane
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
-			Namespace: ciNamespace,
+			Namespace: workflowNamespace,
 		},
 	}
-	if err := buildPlaneClient.Delete(ctx, secret); err != nil {
+	if err := workflowPlaneClient.Delete(ctx, secret); err != nil {
 		if client.IgnoreNotFound(err) != nil {
-			s.logger.Error("Failed to delete build plane secret", "error", err, "namespace", namespaceName, "secret", secretName)
-			return fmt.Errorf("failed to delete build plane secret: %w", err)
+			s.logger.Error("Failed to delete workflow plane secret", "error", err, "namespace", namespaceName, "secret", secretName)
+			return fmt.Errorf("failed to delete workflow plane secret: %w", err)
 		}
-		s.logger.Debug("Build plane secret not found, skipping", "namespace", namespaceName, "secret", secretName)
+		s.logger.Debug("Workflow plane secret not found, skipping", "namespace", namespaceName, "secret", secretName)
 	}
 
 	// Delete SecretReference CRD from control plane
@@ -218,22 +218,22 @@ func (s *gitSecretService) DeleteGitSecret(ctx context.Context, namespaceName, s
 	return nil
 }
 
-func (s *gitSecretService) getBuildPlane(ctx context.Context, namespaceName string) (*openchoreov1alpha1.BuildPlane, error) {
-	var buildPlanes openchoreov1alpha1.BuildPlaneList
-	if err := s.k8sClient.List(ctx, &buildPlanes, client.InNamespace(namespaceName)); err != nil {
-		s.logger.Error("Failed to list build planes", "error", err, "namespace", namespaceName)
-		return nil, fmt.Errorf("failed to list build planes: %w", err)
+func (s *gitSecretService) getWorkflowPlane(ctx context.Context, namespaceName string) (*openchoreov1alpha1.WorkflowPlane, error) {
+	var workflowPlanes openchoreov1alpha1.WorkflowPlaneList
+	if err := s.k8sClient.List(ctx, &workflowPlanes, client.InNamespace(namespaceName)); err != nil {
+		s.logger.Error("Failed to list workflow planes", "error", err, "namespace", namespaceName)
+		return nil, fmt.Errorf("failed to list workflow planes: %w", err)
 	}
 
-	if len(buildPlanes.Items) == 0 {
-		s.logger.Warn("No build planes found", "namespace", namespaceName)
-		return nil, ErrBuildPlaneNotFound
+	if len(workflowPlanes.Items) == 0 {
+		s.logger.Warn("No workflow planes found", "namespace", namespaceName)
+		return nil, ErrWorkflowPlaneNotFound
 	}
 
-	return &buildPlanes.Items[0], nil
+	return &workflowPlanes.Items[0], nil
 }
 
-func (s *gitSecretService) buildGitSecret(secretName, ownerNamespace, ciNamespace, secretType, username, token, sshKey, sshKeyID string) *corev1.Secret {
+func (s *gitSecretService) buildGitSecret(secretName, ownerNamespace, workflowNamespace, secretType, username, token, sshKey, sshKeyID string) *corev1.Secret {
 	var k8sSecretType corev1.SecretType
 	var secretData map[string]string
 
@@ -262,7 +262,7 @@ func (s *gitSecretService) buildGitSecret(secretName, ownerNamespace, ciNamespac
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
-			Namespace: ciNamespace,
+			Namespace: workflowNamespace,
 			Labels: map[string]string{
 				ownerNamespaceLabel: ownerNamespace,
 			},
@@ -342,8 +342,8 @@ func (s *gitSecretService) buildSecretReference(namespaceName, secretName, secre
 	}
 }
 
-// createPushSecret creates an unstructured PushSecret resource for build planes.
-func (s *gitSecretService) createPushSecret(name, secretStoreName, ownerNamespace, ciNamespace, secretType, username, sshKeyID string) *unstructured.Unstructured {
+// createPushSecret creates an unstructured PushSecret resource for workflow planes.
+func (s *gitSecretService) createPushSecret(name, secretStoreName, ownerNamespace, workflowNamespace, secretType, username, sshKeyID string) *unstructured.Unstructured {
 	remoteKey := fmt.Sprintf("secret/%s/git/%s", ownerNamespace, name)
 
 	var dataMatches []map[string]any
@@ -400,7 +400,7 @@ func (s *gitSecretService) createPushSecret(name, secretStoreName, ownerNamespac
 	pushSecret.SetAPIVersion("external-secrets.io/v1alpha1")
 	pushSecret.SetKind("PushSecret")
 	pushSecret.SetName(name)
-	pushSecret.SetNamespace(ciNamespace)
+	pushSecret.SetNamespace(workflowNamespace)
 	pushSecret.SetLabels(map[string]string{
 		ownerNamespaceLabel: ownerNamespace,
 	})
@@ -429,7 +429,7 @@ func (s *gitSecretService) ensureNamespaceExists(ctx context.Context, k8sClient 
 	key := client.ObjectKey{Name: namespaceName}
 	if err := k8sClient.Get(ctx, key, namespace); err != nil {
 		if client.IgnoreNotFound(err) == nil {
-			s.logger.Info("Creating namespace in build plane", "namespace", namespaceName)
+			s.logger.Info("Creating namespace in workflow plane", "namespace", namespaceName)
 			namespace = &corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: namespaceName,
@@ -443,13 +443,13 @@ func (s *gitSecretService) ensureNamespaceExists(ctx context.Context, k8sClient 
 				s.logger.Error("Failed to create namespace", "error", err, "namespace", namespaceName)
 				return fmt.Errorf("failed to create namespace %s: %w", namespaceName, err)
 			}
-			s.logger.Info("Successfully created namespace in build plane", "namespace", namespaceName)
+			s.logger.Info("Successfully created namespace in workflow plane", "namespace", namespaceName)
 			return nil
 		}
 		s.logger.Error("Failed to check namespace existence", "error", err, "namespace", namespaceName)
 		return fmt.Errorf("failed to check namespace existence: %w", err)
 	}
-	s.logger.Debug("Namespace already exists in build plane", "namespace", namespaceName)
+	s.logger.Debug("Namespace already exists in workflow plane", "namespace", namespaceName)
 	return nil
 }
 

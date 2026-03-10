@@ -972,8 +972,8 @@ metadata:
       appPath: parameters.repository.appPath
       secretRef: parameters.repository.secretRef
 spec:
-  buildPlaneRef:
-    kind: ClusterBuildPlane
+  workflowPlaneRef:
+    kind: ClusterWorkflowPlane
     name: default
 
   ttlAfterCompletion: "1d"
@@ -1186,8 +1186,8 @@ metadata:
       appPath: parameters.repository.appPath
       secretRef: parameters.repository.secretRef
 spec:
-  buildPlaneRef:
-    kind: ClusterBuildPlane
+  workflowPlaneRef:
+    kind: ClusterWorkflowPlane
     name: default
   ttlAfterCompletion: "1d"
   parameters:
@@ -1394,8 +1394,8 @@ metadata:
       appPath: parameters.repository.appPath
       secretRef: parameters.repository.secretRef
 spec:
-  buildPlaneRef:
-    kind: ClusterBuildPlane
+  workflowPlaneRef:
+    kind: ClusterWorkflowPlane
     name: default
   ttlAfterCompletion: "1d"
   parameters:
@@ -1604,8 +1604,8 @@ metadata:
       appPath: parameters.repository.appPath
       secretRef: parameters.repository.secretRef
 spec:
-  buildPlaneRef:
-    kind: ClusterBuildPlane
+  workflowPlaneRef:
+    kind: ClusterWorkflowPlane
     name: default
   ttlAfterCompletion: "1d"
   parameters:

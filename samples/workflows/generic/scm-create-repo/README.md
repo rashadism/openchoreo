@@ -37,12 +37,12 @@ WorkflowRun
 
 The workflow authenticates with GitHub using a Personal Access Token (PAT). The token must have the **`repo`** scope (for private repositories) or **`public_repo`** scope (for public repositories). If creating repositories under an organization, the token also needs the **`admin:org`** scope.
 
-The secret must be created in the build plane namespace where Argo executes the workflow steps — `openchoreo-ci-<namespace>` (e.g. `openchoreo-ci-default` if your `WorkflowRun` is in the `default` namespace):
+The secret must be created in the workflow plane namespace where Argo executes the workflow steps — `workflows-<namespace>` (e.g. `workflows-default` if your `WorkflowRun` is in the `default` namespace):
 
 ```bash
 kubectl create secret generic github-token \
   --from-literal=token=<your-github-pat> \
-  --namespace=openchoreo-ci-default
+  --namespace=workflows-default
 ```
 
 ### Parameters
@@ -136,13 +136,13 @@ For the full list see the [GitHub license API](https://docs.github.com/en/rest/l
 
 The workflow authenticates with AWS using an IAM user's access key. The IAM user must have the **`codecommit:CreateRepository`** permission.
 
-Create the secret in the build plane namespace:
+Create the secret in the workflow plane namespace:
 
 ```bash
 kubectl create secret generic aws-credentials \
   --from-literal=accessKeyId=<your-access-key-id> \
   --from-literal=secretAccessKey=<your-secret-access-key> \
-  --namespace=openchoreo-ci-default
+  --namespace=workflows-default
 ```
 
 ### Parameters
