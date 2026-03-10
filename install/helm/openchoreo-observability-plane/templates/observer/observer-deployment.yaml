@@ -1,8 +1,8 @@
 {{- if and (eq (.Values.observer.alertStoreBackend | default "sqlite") "sqlite") (gt (.Values.observer.replicas | int) 1) }}
 {{- fail "observer.replicas must be 1 when observer.alertStoreBackend=sqlite (ReadWriteOnce PVC). Set observer.replicas=1 or use observer.alertStoreBackend=postgresql." }}
 {{- end }}
-{{- if and (eq (.Values.observer.alertStoreBackend | default "sqlite") "postgresql") (not .Values.observer.alertStoreSecret.name) }}
-{{- fail "observer.alertStoreSecret.name is required when observer.alertStoreBackend=postgresql." }}
+{{- if and (eq (.Values.observer.alertStoreBackend | default "sqlite") "postgresql") (not .Values.observer.alertStoreSecretName) }}
+{{- fail "observer.alertStoreSecretName is required when observer.alertStoreBackend=postgresql. Create a Secret with a 'postgresql-dsn' key containing the PostgreSQL connection string, then set observer.alertStoreSecretName." }}
 {{- end }}
 apiVersion: apps/v1
 kind: Deployment
@@ -77,12 +77,12 @@ spec:
           value: {{ .Values.rca.enabled | default false | quote }}
         - name: ALERT_STORE_BACKEND
           value: {{ .Values.observer.alertStoreBackend | default "sqlite" | quote }}
-        {{- if and (eq (.Values.observer.alertStoreBackend | default "sqlite") "postgresql") .Values.observer.alertStoreSecret.name }}
+        {{- if and (eq (.Values.observer.alertStoreBackend | default "sqlite") "postgresql") .Values.observer.alertStoreSecretName }}
         - name: ALERT_STORE_DSN
           valueFrom:
             secretKeyRef:
-              name: {{ .Values.observer.alertStoreSecret.name }}
-              key: {{ .Values.observer.alertStoreSecret.key | default "dsn" }}
+              name: {{ .Values.observer.alertStoreSecretName }}
+              key: postgresql-dsn
         {{- end }}
         - name: OBSERVER_AUTH_CONFIG_PATH
           value: /etc/openchoreo/auth-config.yaml
@@ -99,9 +99,12 @@ spec:
         {{- end }}
         - name: UID_RESOLVER_OAUTH_CLIENT_ID
           value: {{ .Values.observer.oauthClientId | default "openchoreo-observer" | quote }}
-        {{- if .Values.observer.oauthClientSecret }}
+        {{- if .Values.observer.secretName }}
         - name: UID_RESOLVER_OAUTH_CLIENT_SECRET
-          value: {{ .Values.observer.oauthClientSecret | quote }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.observer.secretName }}
+              key: oauth-client-secret
         {{- end }}
         {{- if .Values.security.oidc.authServerBaseUrl }}
         - name: AUTH_SERVER_BASE_URL

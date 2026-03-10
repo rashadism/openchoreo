@@ -313,18 +313,22 @@ kubectl create configmap cluster-gateway-ca \
   --dry-run=client -o yaml | kubectl apply -f -
 ```
 
-### OpenSearch Credentials
+### Observability Plane Secrets
 
 ```bash
 kubectl create secret generic opensearch-admin-credentials \
   -n openchoreo-observability-plane \
   --from-literal=username="admin" \
-  --from-literal=password="ThisIsTheOpenSearchPassword1" 
+  --from-literal=password="ThisIsTheOpenSearchPassword1"
 
 kubectl create secret generic observer-opensearch-credentials \
   -n openchoreo-observability-plane \
   --from-literal=username="admin" \
   --from-literal=password="ThisIsTheOpenSearchPassword1"
+
+kubectl create secret generic observer-secret \
+  -n openchoreo-observability-plane \
+  --from-literal=oauth-client-secret="openchoreo-observer-secret"
 ```
 
 ### Install Observability Plane

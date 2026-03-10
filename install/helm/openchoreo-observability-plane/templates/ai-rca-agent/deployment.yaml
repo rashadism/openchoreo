@@ -1,9 +1,15 @@
 {{- if .Values.rca.enabled }}
+{{- if not .Values.rca.llm.secretName }}
+{{- fail "rca.llm.secretName is required when rca is enabled. Create a Secret with a 'rca-llm-api-key' key, then set rca.llm.secretName." }}
+{{- end }}
+{{- if not .Values.rca.oauth.secretName }}
+{{- fail "rca.oauth.secretName is required when rca is enabled. Create a Secret with an 'oauth-client-secret' key, then set rca.oauth.secretName." }}
+{{- end }}
 {{- if and (eq .Values.rca.reportBackend "sqlite") (gt (.Values.rca.replicas | int) 1) }}
 {{- fail "rca.replicas must be 1 when using sqlite backend (ReadWriteOnce PVC). Set rca.replicas=1 or use reportBackend=postgresql." }}
 {{- end }}
-{{- if and (eq .Values.rca.reportBackend "postgresql") (not .Values.rca.sqlBackendSecret.name) }}
-{{- fail "rca.sqlBackendSecret.name is required when reportBackend=postgresql. Create a Secret with the connection URI and set rca.sqlBackendSecret.name." }}
+{{- if and (eq .Values.rca.reportBackend "postgresql") (not .Values.rca.sqlBackendSecretName) }}
+{{- fail "rca.sqlBackendSecretName is required when reportBackend=postgresql. Create a Secret with a 'postgresql-uri' key containing the connection URI, then set rca.sqlBackendSecretName." }}
 {{- end }}
 apiVersion: apps/v1
 kind: Deployment
@@ -22,7 +28,8 @@ spec:
       annotations:
         # Checksum annotations to trigger pod restart when config changes
         checksum/llm-config: {{ .Values.rca.llm.modelName | sha256sum }}
-        checksum/llm-secret: {{ .Values.rca.llm.apiKey | sha256sum }}
+        checksum/llm-secret: {{ .Values.rca.llm.secretName | sha256sum }}
+        checksum/oauth-secret: {{ .Values.rca.oauth.secretName | sha256sum }}
       labels:
         {{- include "openchoreo-observability-plane.componentSelectorLabels" (dict "context" . "component" .Values.rca.name) | nindent 8 }}
     spec:
@@ -59,19 +66,19 @@ spec:
         - name: RCA_LLM_API_KEY
           valueFrom:
             secretKeyRef:
-              name: {{ include "openchoreo-observability-plane.fullname" . }}-rca-llm-secret
-              key: RCA_LLM_API_KEY
+              name: {{ .Values.rca.llm.secretName }}
+              key: rca-llm-api-key
 
         # Report Backend Configuration
         - name: REPORT_BACKEND
           value: {{ .Values.rca.reportBackend | quote }}
 
-        {{- if .Values.rca.sqlBackendSecret.name }}
+        {{- if .Values.rca.sqlBackendSecretName }}
         - name: SQL_BACKEND_URI
           valueFrom:
             secretKeyRef:
-              name: {{ .Values.rca.sqlBackendSecret.name }}
-              key: {{ .Values.rca.sqlBackendSecret.key }}
+              name: {{ .Values.rca.sqlBackendSecretName }}
+              key: postgresql-uri
         {{- end }}
 
         # OAuth2 Client Credentials Configuration
@@ -84,8 +91,8 @@ spec:
         - name: OAUTH_CLIENT_SECRET
           valueFrom:
             secretKeyRef:
-              name: {{ include "openchoreo-observability-plane.fullname" . }}-rca-oauth-secret
-              key: client-secret
+              name: {{ .Values.rca.oauth.secretName }}
+              key: oauth-client-secret
 
         # TLS Configuration
         - name: TLS_INSECURE_SKIP_VERIFY

@@ -898,22 +898,11 @@ observer:
   alertStoreBackend: sqlite
 
   # @schema
-  # type: object
-  # description: Existing Secret reference for PostgreSQL DSN used by alert entry storage
+  # type: string
+  # description: Name of an existing Secret containing the alert store PostgreSQL DSN (required key 'postgresql-dsn'). Required when alertStoreBackend is postgresql.
+  # default: ""
   # @schema
-  alertStoreSecret:
-    # @schema
-    # type: string
-    # description: Secret name that contains the alert store DSN
-    # default: ""
-    # @schema
-    name: ""
-    # @schema
-    # type: string
-    # description: Secret key that contains the alert store DSN value
-    # default: dsn
-    # @schema
-    key: dsn
+  alertStoreSecretName: ""
 
   # @schema
   # type: string
@@ -1010,10 +999,10 @@ observer:
   oauthClientId: "openchoreo-observer"
   # @schema
   # type: string
-  # description: OAuth2 client secret for the Observer when calling the control plane API
-  # default: openchoreo-observer-secret
+  # description: Name of an existing Secret containing Observer credentials (required key 'oauth-client-secret')
+  # default: ""
   # @schema
-  oauthClientSecret: "openchoreo-observer-secret"
+  secretName: ""
   # @schema
   # type: object
   # description: CORS configuration for the Observer service
@@ -3177,17 +3166,17 @@ rca:
   llm:
     # @schema
     # type: string
+    # description: Name of an existing Secret containing the LLM API key (required key 'rca-llm-api-key')
+    # default: ""
+    # @schema
+    secretName: ""
+    # @schema
+    # type: string
     # description: LLM model name (e.g., gpt-5.2)
     # default: ""
     # @schema
     modelName: ""
 
-    # @schema
-    # type: string
-    # description: LLM API key (set via --set rca.llm.apiKey during install)
-    # default: ""
-    # @schema
-    apiKey: ""
 
   # @schema
   # description: Report storage backend type
@@ -3197,22 +3186,11 @@ rca:
   reportBackend: "sqlite"
 
   # @schema
-  # type: object
-  # description: Reference to an existing Secret containing the SQL connection URI (required for postgresql)
+  # type: string
+  # description: Name of an existing Secret containing the SQL backend connection URI (required key 'postgresql-uri'). Required when reportBackend is postgresql.
+  # default: ""
   # @schema
-  sqlBackendSecret:
-    # @schema
-    # type: string
-    # description: Name of the Secret containing the SQL backend URI
-    # default: ""
-    # @schema
-    name: ""
-    # @schema
-    # type: string
-    # description: Key within the Secret that holds the URI
-    # default: uri
-    # @schema
-    key: uri
+  sqlBackendSecretName: ""
 
   # @schema
   # type: string
@@ -3228,16 +3206,16 @@ rca:
   oauth:
     # @schema
     # type: string
+    # description: Name of an existing Secret containing the OAuth2 client secret (required key 'oauth-client-secret')
+    # default: ""
+    # @schema
+    secretName: ""
+    # @schema
+    # type: string
     # description: OAuth2 client ID registered with the IDP
     # default: openchoreo-rca-agent
     # @schema
     clientId: "openchoreo-rca-agent"
-    # @schema
-    # type: string
-    # description: OAuth2 client secret (override via --set rca.oauth.clientSecret)
-    # default: openchoreo-rca-agent-secret
-    # @schema
-    clientSecret: "openchoreo-rca-agent-secret"
 
   # @schema
   # type: object

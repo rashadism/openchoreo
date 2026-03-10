@@ -22,6 +22,7 @@ openSearchCluster:
 # Observer API - REST API for querying logs and metrics
 observer:
   openSearchSecretName: observer-opensearch-credentials
+  secretName: observer-secret
   http:
     hostnames:
     - observer.openchoreo.localhost
