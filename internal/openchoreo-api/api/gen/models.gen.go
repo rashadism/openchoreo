@@ -21,6 +21,11 @@ const (
 	AuthzClusterRoleBindingSpecEffectDeny  AuthzClusterRoleBindingSpecEffect = "deny"
 )
 
+// Defines values for AuthzClusterRoleMappingRoleRefKind.
+const (
+	AuthzClusterRoleMappingRoleRefKindAuthzClusterRole AuthzClusterRoleMappingRoleRefKind = "AuthzClusterRole"
+)
+
 // Defines values for AuthzRoleBindingSpecEffect.
 const (
 	AuthzRoleBindingSpecEffectAllow AuthzRoleBindingSpecEffect = "allow"
@@ -455,8 +460,8 @@ type AuthzClusterRoleBindingSpec struct {
 	// Entitlement Entitlement claim-value pair for subject identification
 	Entitlement AuthzEntitlementClaim `json:"entitlement"`
 
-	// RoleRef Reference to an AuthzRole or AuthzClusterRole
-	RoleRef AuthzRoleRef `json:"roleRef"`
+	// RoleMappings List of cluster role mappings this binding grants
+	RoleMappings []AuthzClusterRoleMapping `json:"roleMappings"`
 }
 
 // AuthzClusterRoleBindingSpecEffect Policy effect (allow or deny)
@@ -470,6 +475,19 @@ type AuthzClusterRoleList struct {
 	// for efficient pagination through large result sets.
 	Pagination Pagination `json:"pagination"`
 }
+
+// AuthzClusterRoleMapping Pairs a role reference for cluster-scoped bindings
+type AuthzClusterRoleMapping struct {
+	RoleRef struct {
+		Kind AuthzClusterRoleMappingRoleRefKind `json:"kind"`
+
+		// Name Name of the role
+		Name string `json:"name"`
+	} `json:"roleRef"`
+}
+
+// AuthzClusterRoleMappingRoleRefKind defines model for AuthzClusterRoleMapping.RoleRef.Kind.
+type AuthzClusterRoleMappingRoleRefKind string
 
 // AuthzClusterRoleSpec Specification for a cluster-scoped authorization role
 type AuthzClusterRoleSpec struct {
@@ -543,11 +561,8 @@ type AuthzRoleBindingSpec struct {
 	// Entitlement Entitlement claim-value pair for subject identification
 	Entitlement AuthzEntitlementClaim `json:"entitlement"`
 
-	// RoleRef Reference to an AuthzRole or AuthzClusterRole
-	RoleRef AuthzRoleRef `json:"roleRef"`
-
-	// TargetPath Target resource path within a namespace (project/component scope)
-	TargetPath *AuthzTargetPath `json:"targetPath,omitempty"`
+	// RoleMappings List of role-scope pair mappings this binding grants
+	RoleMappings []AuthzRoleMapping `json:"roleMappings"`
 }
 
 // AuthzRoleBindingSpecEffect Policy effect (allow or deny)
@@ -560,6 +575,15 @@ type AuthzRoleList struct {
 	// Pagination Cursor-based pagination metadata. Uses Kubernetes-native continuation tokens
 	// for efficient pagination through large result sets.
 	Pagination Pagination `json:"pagination"`
+}
+
+// AuthzRoleMapping Pairs a role reference with an optional target path scope
+type AuthzRoleMapping struct {
+	// RoleRef Reference to an AuthzRole or AuthzClusterRole
+	RoleRef AuthzRoleRef `json:"roleRef"`
+
+	// TargetPath Target resource path within a namespace (project/component scope)
+	TargetPath *AuthzTargetPath `json:"targetPath,omitempty"`
 }
 
 // AuthzRoleRef Reference to an AuthzRole or AuthzClusterRole
@@ -1545,7 +1569,7 @@ type ContainerOverride struct {
 	Files *[]FileVar `json:"files,omitempty"`
 }
 
-// CreateClusterRoleBindingRequest Request to create a cluster-scoped role binding (legacy)
+// CreateClusterRoleBindingRequest Request to create a cluster-scoped role binding (legacy, single mapping only)
 type CreateClusterRoleBindingRequest struct {
 	// Effect Policy effect (allow or deny)
 	Effect *CreateClusterRoleBindingRequestEffect `json:"effect,omitempty"`
@@ -1630,7 +1654,7 @@ type CreateGitSecretRequest struct {
 // CreateGitSecretRequestSecretType Authentication type
 type CreateGitSecretRequestSecretType string
 
-// CreateNamespaceRoleBindingRequest Request to create a namespace-scoped role binding (legacy)
+// CreateNamespaceRoleBindingRequest Request to create a namespace-scoped role binding (legacy, single mapping only)
 type CreateNamespaceRoleBindingRequest struct {
 	// Effect Policy effect (allow or deny)
 	Effect *CreateNamespaceRoleBindingRequestEffect `json:"effect,omitempty"`
@@ -3160,7 +3184,7 @@ type TraitSpecPatchesTargetPlane string
 // TraitStatus Observed state of a Trait
 type TraitStatus = map[string]interface{}
 
-// UpdateClusterRoleBindingRequest Request to update a cluster role binding (legacy)
+// UpdateClusterRoleBindingRequest Request to update a cluster role binding (legacy, single mapping only)
 type UpdateClusterRoleBindingRequest struct {
 	// Effect Policy effect (allow or deny)
 	Effect UpdateClusterRoleBindingRequestEffect `json:"effect"`
@@ -3184,7 +3208,7 @@ type UpdateClusterRoleRequest struct {
 	Description *string `json:"description,omitempty"`
 }
 
-// UpdateNamespaceRoleBindingRequest Request to update a namespace role binding (legacy)
+// UpdateNamespaceRoleBindingRequest Request to update a namespace role binding (legacy, single mapping only)
 type UpdateNamespaceRoleBindingRequest struct {
 	// Effect Policy effect (allow or deny)
 	Effect UpdateNamespaceRoleBindingRequestEffect `json:"effect"`
