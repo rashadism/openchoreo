@@ -9,9 +9,13 @@ spec:
 
   allowedWorkflows:
     - kind: ClusterWorkflow
-      name: google-cloud-buildpacks
+      name: paketo-buildpacks-builder
     - kind: ClusterWorkflow
-      name: docker
+      name: gcp-buildpacks-builder
+    - kind: ClusterWorkflow
+      name: dockerfile-builder
+    - kind: ClusterWorkflow
+      name: ballerina-buildpack-builder
 
   allowedTraits: []
 

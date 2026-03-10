@@ -1,9 +1,9 @@
 apiVersion: openchoreo.dev/v1alpha1
 kind: ClusterWorkflow
 metadata:
-  name: ballerina-buildpack
+  name: ballerina-buildpack-builder
   annotations:
-    openchoreo.dev/description: "Ballerina build workflow for containerized builds using Ballerina Buildpack"
+    openchoreo.dev/description: "Workflow for building applications written in Ballerina"
     openchoreo.dev/workflow-scope: "component"
     openchoreo.dev/component-workflow-parameters: |
       repoUrl: parameters.repository.url
@@ -51,6 +51,20 @@ spec:
               type: string
               default: "."
               description: "Path to the Ballerina application directory within the repository"
+        buildEnv:
+          type: array
+          default: []
+          description: "Environment variables to be passed into the buildpack"
+          items:
+            type: object
+            required: [name, value]
+            properties:
+              name:
+                type: string
+                description: "Environment variable name"
+              value:
+                type: string
+                description: "Environment variable value"
   runTemplate:
     apiVersion: argoproj.io/v1alpha1
     kind: Workflow
@@ -76,6 +90,8 @@ spec:
             value: ${parameters.repository.revision.commit}
           - name: app-path
             value: ${parameters.repository.appPath}
+          - name: build-env
+            value: ${parameters.buildEnv}
           - name: image-name
             value: ${metadata.namespaceName}-${metadata.labels['openchoreo.dev/project']}-${metadata.labels['openchoreo.dev/component']}
           - name: image-tag
@@ -96,13 +112,15 @@ spec:
                   template: checkout
             - - name: build-image
                 templateRef:
-                  name: ballerina-buildpack
+                  name: ballerina-buildpack-build
                   clusterScope: true
                   template: build-image
                 arguments:
                   parameters:
                     - name: git-revision
                       value: '{{steps.checkout-source.outputs.parameters.git-revision}}'
+                    - name: build-env
+                      value: '{{workflow.parameters.build-env}}'
             - - name: publish-image
                 templateRef:
                   name: publish-image

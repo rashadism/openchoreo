@@ -1,9 +1,9 @@
 apiVersion: openchoreo.dev/v1alpha1
 kind: ClusterWorkflow
 metadata:
-  name: react
+  name: gcp-buildpacks-builder
   annotations:
-    openchoreo.dev/description: "Build workflow for React web applications"
+    openchoreo.dev/description: "Supports building Go, Java, Node.js, Python, and .NET applications. See https://cloud.google.com/docs/buildpacks/overview"
     openchoreo.dev/workflow-scope: "component"
     openchoreo.dev/component-workflow-parameters: |
       repoUrl: parameters.repository.url
@@ -50,16 +50,21 @@ spec:
             appPath:
               type: string
               default: "."
-              description: "Path to the React application directory within the repository"
-        nodeVersion:
-          type: string
-          default: "18"
-          enum:
-            - "16"
-            - "18"
-            - "20"
-            - "22"
-          description: "Node.js version to use for building the React application"
+              description: "Path to the application directory within the repository"
+        buildEnv:
+          type: array
+          default: []
+          description: "Build-time environment variables passed to the buildpack (e.g. GOOGLE_RUNTIME_VERSION=21). Reference: https://docs.cloud.google.com/docs/buildpacks/set-environment-variables"
+          items:
+            type: object
+            required: [name, value]
+            properties:
+              name:
+                type: string
+                description: "Environment variable name"
+              value:
+                type: string
+                description: "Environment variable value"
   runTemplate:
     apiVersion: argoproj.io/v1alpha1
     kind: Workflow
@@ -85,8 +90,8 @@ spec:
             value: ${parameters.repository.revision.commit}
           - name: app-path
             value: ${parameters.repository.appPath}
-          - name: node-version
-            value: ${parameters.nodeVersion}
+          - name: build-env
+            value: ${parameters.buildEnv}
           - name: image-name
             value: ${metadata.namespaceName}-${metadata.labels['openchoreo.dev/project']}-${metadata.labels['openchoreo.dev/component']}
           - name: image-tag
@@ -107,13 +112,13 @@ spec:
                   template: checkout
             - - name: build-image
                 templateRef:
-                  name: react
+                  name: gcp-buildpacks-build
                   clusterScope: true
                   template: build-image
                 arguments:
                   parameters:
                     - name: git-revision
-                      value: '{{steps.checkout-source.outputs.parameters.git-revision}}'
+                      value: "{{steps.checkout-source.outputs.parameters.git-revision}}"
             - - name: publish-image
                 templateRef:
                   name: publish-image
@@ -122,7 +127,7 @@ spec:
                 arguments:
                   parameters:
                     - name: git-revision
-                      value: '{{steps.checkout-source.outputs.parameters.git-revision}}'
+                      value: "{{steps.checkout-source.outputs.parameters.git-revision}}"
             - - name: generate-workload-cr
                 templateRef:
                   name: generate-workload
@@ -131,9 +136,9 @@ spec:
                 arguments:
                   parameters:
                     - name: image
-                      value: '{{steps.publish-image.outputs.parameters.image}}'
+                      value: "{{steps.publish-image.outputs.parameters.image}}"
                     - name: run-name
-                      value: '{{workflow.parameters.workflowrun-name}}'
+                      value: "{{workflow.parameters.workflowrun-name}}"
       volumeClaimTemplates:
         - metadata:
             name: workspace

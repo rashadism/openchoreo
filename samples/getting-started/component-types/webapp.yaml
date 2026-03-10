@@ -9,9 +9,11 @@ spec:
 
   allowedWorkflows:
     - kind: ClusterWorkflow
-      name: react
+      name: paketo-buildpacks-builder
     - kind: ClusterWorkflow
-      name: docker
+      name: gcp-buildpacks-builder
+    - kind: ClusterWorkflow
+      name: dockerfile-builder
 
   allowedTraits:
     - kind: ClusterTrait
