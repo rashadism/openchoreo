@@ -897,12 +897,6 @@ observer:
   # @schema
   alertStoreBackend: sqlite
 
-  # @schema
-  # type: string
-  # description: Name of an existing Secret containing the alert store PostgreSQL DSN (required key 'postgresql-dsn'). Required when alertStoreBackend is postgresql.
-  # default: ""
-  # @schema
-  alertStoreSecretName: ""
 
   # @schema
   # type: string
@@ -999,7 +993,7 @@ observer:
   oauthClientId: "openchoreo-observer"
   # @schema
   # type: string
-  # description: Name of an existing Secret containing Observer credentials (required key 'oauth-client-secret')
+  # description: Name of an existing Secret injected via envFrom into the Observer container. Required keys - OPENSEARCH_USERNAME, OPENSEARCH_PASSWORD, UID_RESOLVER_OAUTH_CLIENT_SECRET. Optional keys - ALERT_STORE_DSN (when alertStoreBackend is postgresql).
   # default: ""
   # @schema
   secretName: ""
@@ -3160,16 +3154,17 @@ rca:
   controlPlaneUrl: "http://api.openchoreo.localhost:8080"
 
   # @schema
+  # type: string
+  # description: Name of an existing Secret injected via envFrom into the RCA agent container. Required keys - RCA_LLM_API_KEY, OAUTH_CLIENT_SECRET. Optional keys - SQL_BACKEND_URI (when reportBackend is postgresql).
+  # default: rca-agent-secret
+  # @schema
+  secretName: "rca-agent-secret"
+
+  # @schema
   # type: object
   # description: LLM configuration for AI-powered analysis
   # @schema
   llm:
-    # @schema
-    # type: string
-    # description: Name of an existing Secret containing the LLM API key (required key 'rca-llm-api-key')
-    # default: ""
-    # @schema
-    secretName: ""
     # @schema
     # type: string
     # description: LLM model name (e.g., gpt-5.2)
@@ -3187,13 +3182,6 @@ rca:
 
   # @schema
   # type: string
-  # description: Name of an existing Secret containing the SQL backend connection URI (required key 'postgresql-uri'). Required when reportBackend is postgresql.
-  # default: ""
-  # @schema
-  sqlBackendSecretName: ""
-
-  # @schema
-  # type: string
   # description: PVC storage size for SQLite (only used when reportBackend is sqlite)
   # default: 128Mi
   # @schema
@@ -3204,12 +3192,6 @@ rca:
   # description: OAuth2 client credentials configuration for RCA agent authentication
   # @schema
   oauth:
-    # @schema
-    # type: string
-    # description: Name of an existing Secret containing the OAuth2 client secret (required key 'oauth-client-secret')
-    # default: ""
-    # @schema
-    secretName: ""
     # @schema
     # type: string
     # description: OAuth2 client ID registered with the IDP
@@ -3247,3 +3229,18 @@ rca:
     #   type: string
     # @schema
     hostnames: []
+
+  # @schema
+  # type: array
+  # description: Extra environment variables for the RCA agent container
+  # items:
+  #   type: object
+  #   properties:
+  #     name:
+  #       type: string
+  #       description: Environment variable name
+  #     value:
+  #       type: string
+  #       description: Environment variable value
+  # @schema
+  extraEnvs: []

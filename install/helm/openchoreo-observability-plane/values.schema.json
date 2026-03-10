@@ -1565,12 +1565,6 @@
           "required": [],
           "title": "alertStoreBackend"
         },
-        "alertStoreSecretName": {
-          "default": "",
-          "description": "Name of an existing Secret containing the alert store PostgreSQL DSN (required key 'postgresql-dsn'). Required when alertStoreBackend is postgresql.",
-          "title": "alertStoreSecretName",
-          "type": "string"
-        },
         "alertStoreSqliteSize": {
           "default": "128Mi",
           "description": "PVC size for SQLite alert entry storage",
@@ -1829,7 +1823,7 @@
         },
         "secretName": {
           "default": "",
-          "description": "Name of an existing Secret containing Observer credentials (required key 'oauth-client-secret')",
+          "description": "Name of an existing Secret injected via envFrom into the Observer container. Required keys - OPENSEARCH_USERNAME, OPENSEARCH_PASSWORD, UID_RESOLVER_OAUTH_CLIENT_SECRET. Optional keys - ALERT_STORE_DSN (when alertStoreBackend is postgresql).",
           "title": "secretName",
           "type": "string"
         },
@@ -3664,6 +3658,25 @@
           "title": "enabled",
           "type": "boolean"
         },
+        "extraEnvs": {
+          "description": "Extra environment variables for the RCA agent container",
+          "items": {
+            "properties": {
+              "name": {
+                "description": "Environment variable name",
+                "type": "string"
+              },
+              "value": {
+                "description": "Environment variable value",
+                "type": "string"
+              }
+            },
+            "required": [],
+            "type": "object"
+          },
+          "title": "extraEnvs",
+          "type": "array"
+        },
         "http": {
           "additionalProperties": false,
           "description": "HTTPRoute configuration for the RCA agent",
@@ -3728,12 +3741,6 @@
               "description": "LLM model name (e.g., gpt-5.2)",
               "title": "modelName",
               "type": "string"
-            },
-            "secretName": {
-              "default": "",
-              "description": "Name of an existing Secret containing the LLM API key (required key 'rca-llm-api-key')",
-              "title": "secretName",
-              "type": "string"
             }
           },
           "required": [],
@@ -3760,12 +3767,6 @@
               "default": "openchoreo-rca-agent",
               "description": "OAuth2 client ID registered with the IDP",
               "title": "clientId",
-              "type": "string"
-            },
-            "secretName": {
-              "default": "",
-              "description": "Name of an existing Secret containing the OAuth2 client secret (required key 'oauth-client-secret')",
-              "title": "secretName",
               "type": "string"
             }
           },
@@ -3853,6 +3854,12 @@
           "title": "resources",
           "type": "object"
         },
+        "secretName": {
+          "default": "rca-agent-secret",
+          "description": "Name of an existing Secret injected via envFrom into the RCA agent container. Required keys - RCA_LLM_API_KEY, OAUTH_CLIENT_SECRET. Optional keys - SQL_BACKEND_URI (when reportBackend is postgresql).",
+          "title": "secretName",
+          "type": "string"
+        },
         "service": {
           "additionalProperties": false,
           "description": "Kubernetes service configuration",
@@ -3880,12 +3887,6 @@
           "required": [],
           "title": "service",
           "type": "object"
-        },
-        "sqlBackendSecretName": {
-          "default": "",
-          "description": "Name of an existing Secret containing the SQL backend connection URI (required key 'postgresql-uri'). Required when reportBackend is postgresql.",
-          "title": "sqlBackendSecretName",
-          "type": "string"
         },
         "sqliteStorageSize": {
           "default": "128Mi",
