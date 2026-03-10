@@ -31,12 +31,16 @@ func (h *Handler) ListComponents(
 		projectName = *request.Params.Project
 	}
 
-	opts := NormalizeListOptions(request.Params.Limit, request.Params.Cursor)
+	opts := NormalizeListOptions(request.Params.Limit, request.Params.Cursor, request.Params.LabelSelector)
 
 	result, err := h.services.ComponentService.ListComponents(ctx, request.NamespaceName, projectName, opts)
 	if err != nil {
 		if errors.Is(err, projectsvc.ErrProjectNotFound) {
 			return gen.ListComponents404JSONResponse{NotFoundJSONResponse: notFound("Project")}, nil
+		}
+		var validationErr *svcerrors.ValidationError
+		if errors.As(err, &validationErr) {
+			return gen.ListComponents400JSONResponse{BadRequestJSONResponse: badRequest(validationErr.Msg)}, nil
 		}
 		h.logger.Error("Failed to list components", "error", err)
 		return gen.ListComponents500JSONResponse{InternalErrorJSONResponse: internalError()}, nil

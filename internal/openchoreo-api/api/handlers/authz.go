@@ -251,11 +251,15 @@ func (h *Handler) ListClusterRoles(
 ) (gen.ListClusterRolesResponseObject, error) {
 	h.logger.Debug("ListClusterRoles called")
 
-	opts := NormalizeListOptions(request.Params.Limit, request.Params.Cursor)
+	opts := NormalizeListOptions(request.Params.Limit, request.Params.Cursor, request.Params.LabelSelector)
 	result, err := h.services.AuthzService.ListClusterRoles(ctx, opts)
 	if err != nil {
 		if errors.Is(err, svcpkg.ErrForbidden) {
 			return gen.ListClusterRoles403JSONResponse{ForbiddenJSONResponse: forbidden()}, nil
+		}
+		var validationErr *svcpkg.ValidationError
+		if errors.As(err, &validationErr) {
+			return gen.ListClusterRoles400JSONResponse{BadRequestJSONResponse: badRequest(validationErr.Msg)}, nil
 		}
 		h.logger.Error("Failed to list cluster roles", "error", err)
 		return gen.ListClusterRoles500JSONResponse{InternalErrorJSONResponse: internalError()}, nil
@@ -413,11 +417,15 @@ func (h *Handler) ListClusterRoleBindings(
 ) (gen.ListClusterRoleBindingsResponseObject, error) {
 	h.logger.Debug("ListClusterRoleBindings called")
 
-	opts := NormalizeListOptions(request.Params.Limit, request.Params.Cursor)
+	opts := NormalizeListOptions(request.Params.Limit, request.Params.Cursor, request.Params.LabelSelector)
 	result, err := h.services.AuthzService.ListClusterRoleBindings(ctx, opts)
 	if err != nil {
 		if errors.Is(err, svcpkg.ErrForbidden) {
 			return gen.ListClusterRoleBindings403JSONResponse{ForbiddenJSONResponse: forbidden()}, nil
+		}
+		var validationErr *svcpkg.ValidationError
+		if errors.As(err, &validationErr) {
+			return gen.ListClusterRoleBindings400JSONResponse{BadRequestJSONResponse: badRequest(validationErr.Msg)}, nil
 		}
 		h.logger.Error("Failed to list cluster role bindings", "error", err)
 		return gen.ListClusterRoleBindings500JSONResponse{InternalErrorJSONResponse: internalError()}, nil
@@ -575,11 +583,15 @@ func (h *Handler) ListNamespaceRoles(
 ) (gen.ListNamespaceRolesResponseObject, error) {
 	h.logger.Debug("ListNamespaceRoles called", "namespace", request.NamespaceName)
 
-	opts := NormalizeListOptions(request.Params.Limit, request.Params.Cursor)
+	opts := NormalizeListOptions(request.Params.Limit, request.Params.Cursor, request.Params.LabelSelector)
 	result, err := h.services.AuthzService.ListNamespaceRoles(ctx, request.NamespaceName, opts)
 	if err != nil {
 		if errors.Is(err, svcpkg.ErrForbidden) {
 			return gen.ListNamespaceRoles403JSONResponse{ForbiddenJSONResponse: forbidden()}, nil
+		}
+		var validationErr *svcpkg.ValidationError
+		if errors.As(err, &validationErr) {
+			return gen.ListNamespaceRoles400JSONResponse{BadRequestJSONResponse: badRequest(validationErr.Msg)}, nil
 		}
 		h.logger.Error("Failed to list namespace roles", "error", err)
 		return gen.ListNamespaceRoles500JSONResponse{InternalErrorJSONResponse: internalError()}, nil
@@ -737,11 +749,15 @@ func (h *Handler) ListNamespaceRoleBindings(
 ) (gen.ListNamespaceRoleBindingsResponseObject, error) {
 	h.logger.Debug("ListNamespaceRoleBindings called", "namespace", request.NamespaceName)
 
-	opts := NormalizeListOptions(request.Params.Limit, request.Params.Cursor)
+	opts := NormalizeListOptions(request.Params.Limit, request.Params.Cursor, request.Params.LabelSelector)
 	result, err := h.services.AuthzService.ListNamespaceRoleBindings(ctx, request.NamespaceName, opts)
 	if err != nil {
 		if errors.Is(err, svcpkg.ErrForbidden) {
 			return gen.ListNamespaceRoleBindings403JSONResponse{ForbiddenJSONResponse: forbidden()}, nil
+		}
+		var validationErr *svcpkg.ValidationError
+		if errors.As(err, &validationErr) {
+			return gen.ListNamespaceRoleBindings400JSONResponse{BadRequestJSONResponse: badRequest(validationErr.Msg)}, nil
 		}
 		h.logger.Error("Failed to list namespace role bindings", "error", err)
 		return gen.ListNamespaceRoleBindings500JSONResponse{InternalErrorJSONResponse: internalError()}, nil

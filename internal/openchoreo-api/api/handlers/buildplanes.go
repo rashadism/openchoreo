@@ -20,10 +20,14 @@ func (h *Handler) ListBuildPlanes(
 ) (gen.ListBuildPlanesResponseObject, error) {
 	h.logger.Debug("ListBuildPlanes called", "namespaceName", request.NamespaceName)
 
-	opts := NormalizeListOptions(request.Params.Limit, request.Params.Cursor)
+	opts := NormalizeListOptions(request.Params.Limit, request.Params.Cursor, request.Params.LabelSelector)
 
 	result, err := h.services.BuildPlaneService.ListBuildPlanes(ctx, request.NamespaceName, opts)
 	if err != nil {
+		var validationErr *services.ValidationError
+		if errors.As(err, &validationErr) {
+			return gen.ListBuildPlanes400JSONResponse{BadRequestJSONResponse: badRequest(validationErr.Msg)}, nil
+		}
 		h.logger.Error("Failed to list build planes", "error", err)
 		return gen.ListBuildPlanes500JSONResponse{InternalErrorJSONResponse: internalError()}, nil
 	}

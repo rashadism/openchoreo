@@ -179,10 +179,11 @@ paths:
       description: |
         Returns a paginated list of OpenChoreo control plane namespaces the user has access to.
         Only namespaces with the label `openchoreo.dev/controlplane-namespace=true` are returned.
-        This filters out system namespaces (e.g., openchoreo-control-plane, kube-system) and 
+        This filters out system namespaces (e.g., openchoreo-control-plane, kube-system) and
         data plane runtime namespaces.
       tags: [Namespaces]
       parameters:
+        - $ref: '#/components/parameters/LabelSelectorParam'
         - $ref: '#/components/parameters/LimitParam'
         - $ref: '#/components/parameters/CursorParam'
       responses:
@@ -192,6 +193,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/NamespaceList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -316,6 +319,7 @@ paths:
       tags: [Projects]
       parameters:
         - $ref: '#/components/parameters/NamespaceNameParam'
+        - $ref: '#/components/parameters/LabelSelectorParam'
         - $ref: '#/components/parameters/LimitParam'
         - $ref: '#/components/parameters/CursorParam'
       responses:
@@ -325,6 +329,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProjectList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -457,6 +463,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/NamespaceNameParam'
         - $ref: '#/components/parameters/ProjectQueryParam'
+        - $ref: '#/components/parameters/LabelSelectorParam'
         - $ref: '#/components/parameters/LimitParam'
         - $ref: '#/components/parameters/CursorParam'
       responses:
@@ -466,6 +473,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ComponentList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -518,6 +527,7 @@ paths:
       tags: [Environments]
       parameters:
         - $ref: '#/components/parameters/NamespaceNameParam'
+        - $ref: '#/components/parameters/LabelSelectorParam'
         - $ref: '#/components/parameters/LimitParam'
         - $ref: '#/components/parameters/CursorParam'
       responses:
@@ -527,6 +537,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/EnvironmentList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -656,6 +668,7 @@ paths:
       tags: [DataPlanes]
       parameters:
         - $ref: '#/components/parameters/NamespaceNameParam'
+        - $ref: '#/components/parameters/LabelSelectorParam'
         - $ref: '#/components/parameters/LimitParam'
         - $ref: '#/components/parameters/CursorParam'
       responses:
@@ -665,6 +678,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DataPlaneList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -794,6 +809,7 @@ paths:
       tags: [BuildPlanes]
       parameters:
         - $ref: '#/components/parameters/NamespaceNameParam'
+        - $ref: '#/components/parameters/LabelSelectorParam'
         - $ref: '#/components/parameters/LimitParam'
         - $ref: '#/components/parameters/CursorParam'
       responses:
@@ -803,6 +819,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BuildPlaneList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -932,6 +950,7 @@ paths:
       tags: [ObservabilityPlanes]
       parameters:
         - $ref: '#/components/parameters/NamespaceNameParam'
+        - $ref: '#/components/parameters/LabelSelectorParam'
         - $ref: '#/components/parameters/LimitParam'
         - $ref: '#/components/parameters/CursorParam'
       responses:
@@ -941,6 +960,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ObservabilityPlaneList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -1069,6 +1090,7 @@ paths:
       description: Returns a paginated list of cluster-scoped data planes.
       tags: [ClusterDataPlanes]
       parameters:
+        - $ref: '#/components/parameters/LabelSelectorParam'
         - $ref: '#/components/parameters/LimitParam'
         - $ref: '#/components/parameters/CursorParam'
       responses:
@@ -1203,6 +1225,7 @@ paths:
       description: Returns a list of cluster-scoped build planes.
       tags: [ClusterBuildPlanes]
       parameters:
+        - $ref: '#/components/parameters/LabelSelectorParam'
         - $ref: '#/components/parameters/LimitParam'
         - $ref: '#/components/parameters/CursorParam'
       responses:
@@ -1212,6 +1235,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ClusterBuildPlaneList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -1350,6 +1375,7 @@ paths:
       description: Returns a paginated list of cluster-scoped observability planes.
       tags: [ClusterObservabilityPlanes]
       parameters:
+        - $ref: '#/components/parameters/LabelSelectorParam'
         - $ref: '#/components/parameters/LimitParam'
         - $ref: '#/components/parameters/CursorParam'
       responses:
@@ -1359,6 +1385,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ClusterObservabilityPlaneList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -1482,6 +1510,7 @@ paths:
       description: Returns a list of cluster-scoped component types.
       tags: [ClusterComponentTypes]
       parameters:
+        - $ref: '#/components/parameters/LabelSelectorParam'
         - $ref: '#/components/parameters/LimitParam'
         - $ref: '#/components/parameters/CursorParam'
       responses:
@@ -1491,6 +1520,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ClusterComponentTypeList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -1638,6 +1669,7 @@ paths:
       description: Returns a list of cluster-scoped traits.
       tags: [ClusterTraits]
       parameters:
+        - $ref: '#/components/parameters/LabelSelectorParam'
         - $ref: '#/components/parameters/LimitParam'
         - $ref: '#/components/parameters/CursorParam'
       responses:
@@ -1647,6 +1679,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ClusterTraitList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -1795,6 +1829,7 @@ paths:
       tags: [ComponentTypes]
       parameters:
         - $ref: '#/components/parameters/NamespaceNameParam'
+        - $ref: '#/components/parameters/LabelSelectorParam'
         - $ref: '#/components/parameters/LimitParam'
         - $ref: '#/components/parameters/CursorParam'
       responses:
@@ -1804,6 +1839,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ComponentTypeList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -1958,6 +1995,7 @@ paths:
       tags: [Traits]
       parameters:
         - $ref: '#/components/parameters/NamespaceNameParam'
+        - $ref: '#/components/parameters/LabelSelectorParam'
         - $ref: '#/components/parameters/LimitParam'
         - $ref: '#/components/parameters/CursorParam'
       responses:
@@ -1967,6 +2005,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TraitList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -2120,6 +2160,7 @@ paths:
       description: Returns a list of cluster-scoped workflows.
       tags: [ClusterWorkflows]
       parameters:
+        - $ref: '#/components/parameters/LabelSelectorParam'
         - $ref: '#/components/parameters/LimitParam'
         - $ref: '#/components/parameters/CursorParam'
       responses:
@@ -2129,6 +2170,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ClusterWorkflowList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -2277,6 +2320,7 @@ paths:
       tags: [Workflows]
       parameters:
         - $ref: '#/components/parameters/NamespaceNameParam'
+        - $ref: '#/components/parameters/LabelSelectorParam'
         - $ref: '#/components/parameters/LimitParam'
         - $ref: '#/components/parameters/CursorParam'
       responses:
@@ -2286,6 +2330,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/WorkflowList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -2441,6 +2487,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/NamespaceNameParam'
         - $ref: '#/components/parameters/WorkflowQueryParam'
+        - $ref: '#/components/parameters/LabelSelectorParam'
         - $ref: '#/components/parameters/LimitParam'
         - $ref: '#/components/parameters/CursorParam'
       responses:
@@ -2450,6 +2497,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/WorkflowRunList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -2948,6 +2997,7 @@ paths:
       description: Returns all cluster-scoped authorization roles.
       tags: [Authorization]
       parameters:
+        - $ref: '#/components/parameters/LabelSelectorParam'
         - $ref: '#/components/parameters/LimitParam'
         - $ref: '#/components/parameters/CursorParam'
       responses:
@@ -2957,6 +3007,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AuthzClusterRoleList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -3094,6 +3146,7 @@ paths:
       description: Returns all cluster-scoped role bindings.
       tags: [Authorization]
       parameters:
+        - $ref: '#/components/parameters/LabelSelectorParam'
         - $ref: '#/components/parameters/LimitParam'
         - $ref: '#/components/parameters/CursorParam'
       responses:
@@ -3103,6 +3156,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AuthzClusterRoleBindingList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -3241,6 +3296,7 @@ paths:
       tags: [Authorization]
       parameters:
         - $ref: '#/components/parameters/NamespaceNameParam'
+        - $ref: '#/components/parameters/LabelSelectorParam'
         - $ref: '#/components/parameters/LimitParam'
         - $ref: '#/components/parameters/CursorParam'
       responses:
@@ -3399,6 +3455,7 @@ paths:
       tags: [Authorization]
       parameters:
         - $ref: '#/components/parameters/NamespaceNameParam'
+        - $ref: '#/components/parameters/LabelSelectorParam'
         - $ref: '#/components/parameters/LimitParam'
         - $ref: '#/components/parameters/CursorParam'
       responses:
@@ -3642,6 +3699,7 @@ paths:
       tags: [SecretReferences]
       parameters:
         - $ref: '#/components/parameters/NamespaceNameParam'
+        - $ref: '#/components/parameters/LabelSelectorParam'
         - $ref: '#/components/parameters/LimitParam'
         - $ref: '#/components/parameters/CursorParam'
       responses:
@@ -3651,6 +3709,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SecretReferenceList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -3779,6 +3839,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/NamespaceNameParam'
         - $ref: '#/components/parameters/ComponentQueryParam'
+        - $ref: '#/components/parameters/LabelSelectorParam'
         - $ref: '#/components/parameters/LimitParam'
         - $ref: '#/components/parameters/CursorParam'
       responses:
@@ -3788,6 +3849,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/WorkloadList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -3918,6 +3981,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/NamespaceNameParam'
         - $ref: '#/components/parameters/ComponentQueryParam'
+        - $ref: '#/components/parameters/LabelSelectorParam'
         - $ref: '#/components/parameters/LimitParam'
         - $ref: '#/components/parameters/CursorParam'
       responses:
@@ -3927,6 +3991,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ComponentReleaseList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -3974,6 +4040,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/NamespaceNameParam'
         - $ref: '#/components/parameters/ComponentQueryParam'
+        - $ref: '#/components/parameters/LabelSelectorParam'
         - $ref: '#/components/parameters/LimitParam'
         - $ref: '#/components/parameters/CursorParam'
       responses:
@@ -3983,6 +4050,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ReleaseBindingList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -4231,6 +4300,7 @@ paths:
       tags: [DeploymentPipelines]
       parameters:
         - $ref: '#/components/parameters/NamespaceNameParam'
+        - $ref: '#/components/parameters/LabelSelectorParam'
         - $ref: '#/components/parameters/LimitParam'
         - $ref: '#/components/parameters/CursorParam'
       responses:
@@ -4240,6 +4310,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DeploymentPipelineList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -4367,6 +4439,7 @@ paths:
       tags: [ObservabilityAlertsNotificationChannels]
       parameters:
         - $ref: '#/components/parameters/NamespaceNameParam'
+        - $ref: '#/components/parameters/LabelSelectorParam'
         - $ref: '#/components/parameters/LimitParam'
         - $ref: '#/components/parameters/CursorParam'
       responses:
@@ -4376,6 +4449,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ObservabilityAlertsNotificationChannelList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -4850,6 +4925,20 @@ components:
       schema:
         type: string
         example: my-git-secret
+
+    LabelSelectorParam:
+      name: labelSelector
+      in: query
+      required: false
+      description: |
+        A label selector to filter resources using Kubernetes label selector syntax.
+        Supports equality-based requirements: "key=value" (equality), "key!=value" (inequality).
+        Supports set-based requirements: "key in (val1,val2)" (value in set), "key notin (val1,val2)" (value not in set).
+        Supports existence checks: "key" (label exists), "!key" (label does not exist).
+        Multiple requirements are comma-separated and ANDed together.
+      schema:
+        type: string
+        example: "app=frontend,environment notin (staging,qa),tier!=backend,!deprecated"
 
     LimitParam:
       name: limit
