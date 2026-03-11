@@ -8,182 +8,197 @@ import (
 	"strings"
 )
 
+// ActionScope represents the resource hierarchy level at which an action is evaluated.
+type ActionScope string
+
+const (
+	// ScopeCluster indicates the action is evaluated at the cluster level (no hierarchy).
+	ScopeCluster ActionScope = "cluster"
+	// ScopeNamespace indicates the action is evaluated at the namespace level.
+	ScopeNamespace ActionScope = "namespace"
+	// ScopeProject indicates the action is evaluated at the project level.
+	ScopeProject ActionScope = "project"
+	// ScopeComponent indicates the action is evaluated at the component level.
+	ScopeComponent ActionScope = "component"
+)
+
 // Action represents a system action with metadata
 type Action struct {
-	Name       string
+	Name string
+	// LowestScope indicates the lowest resource hierarchy level at which this action is evaluated
+	LowestScope ActionScope
+	// IsInternal indicates if the action is internal (not publicly visible)
 	IsInternal bool
 }
 
 // systemActions defines all available actions in the system
-// IsInternal indicates if the action is internal (not publicly visible)
 var systemActions = []Action{
 	// Namespace
-	{Name: "namespace:view", IsInternal: false},
-	{Name: "namespace:create", IsInternal: false},
-	{Name: "namespace:update", IsInternal: false},
-	{Name: "namespace:delete", IsInternal: false},
+	{Name: "namespace:create", LowestScope: ScopeCluster, IsInternal: false},
+	{Name: "namespace:view", LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: "namespace:update", LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: "namespace:delete", LowestScope: ScopeNamespace, IsInternal: false},
 
 	// Project
-	{Name: "project:view", IsInternal: false},
-	{Name: "project:create", IsInternal: false},
-	{Name: "project:update", IsInternal: false},
-	{Name: "project:delete", IsInternal: false},
+	{Name: "project:create", LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: "project:view", LowestScope: ScopeProject, IsInternal: false},
+	{Name: "project:update", LowestScope: ScopeProject, IsInternal: false},
+	{Name: "project:delete", LowestScope: ScopeProject, IsInternal: false},
 
 	// Component
-	{Name: "component:view", IsInternal: false},
-	{Name: "component:create", IsInternal: false},
-	{Name: "component:update", IsInternal: false},
-	{Name: "component:delete", IsInternal: false},
+	{Name: "component:create", LowestScope: ScopeProject, IsInternal: false},
+	{Name: "component:view", LowestScope: ScopeComponent, IsInternal: false},
+	{Name: "component:update", LowestScope: ScopeComponent, IsInternal: false},
+	{Name: "component:delete", LowestScope: ScopeComponent, IsInternal: false},
 
 	// ComponentRelease
-	{Name: "componentrelease:view", IsInternal: false},
-	{Name: "componentrelease:create", IsInternal: false},
+	{Name: "componentrelease:view", LowestScope: ScopeComponent, IsInternal: false},
+	{Name: "componentrelease:create", LowestScope: ScopeComponent, IsInternal: false},
 
 	// ReleaseBinding
-	{Name: "releasebinding:view", IsInternal: false},
-	{Name: "releasebinding:create", IsInternal: false},
-	{Name: "releasebinding:update", IsInternal: false},
-	{Name: "releasebinding:delete", IsInternal: false},
+	{Name: "releasebinding:view", LowestScope: ScopeComponent, IsInternal: false},
+	{Name: "releasebinding:create", LowestScope: ScopeComponent, IsInternal: false},
+	{Name: "releasebinding:update", LowestScope: ScopeComponent, IsInternal: false},
+	{Name: "releasebinding:delete", LowestScope: ScopeComponent, IsInternal: false},
 
 	// ComponentType
-	{Name: "componenttype:view", IsInternal: false},
-	{Name: "componenttype:create", IsInternal: false},
-	{Name: "componenttype:update", IsInternal: false},
-	{Name: "componenttype:delete", IsInternal: false},
+	{Name: "componenttype:view", LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: "componenttype:create", LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: "componenttype:update", LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: "componenttype:delete", LowestScope: ScopeNamespace, IsInternal: false},
 
 	// Workflow
-	{Name: "workflow:view", IsInternal: false},
-	{Name: "workflow:create", IsInternal: false},
-	{Name: "workflow:update", IsInternal: false},
-	{Name: "workflow:delete", IsInternal: false},
+	{Name: "workflow:view", LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: "workflow:create", LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: "workflow:update", LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: "workflow:delete", LowestScope: ScopeNamespace, IsInternal: false},
 
-	// WorkflowRun
-	{Name: "workflowrun:view", IsInternal: false},
-	{Name: "workflowrun:create", IsInternal: false},
-	{Name: "workflowrun:update", IsInternal: false},
+	// WorkflowRun (dynamic scope: namespace,or component depending on query context)
+	{Name: "workflowrun:create", LowestScope: ScopeComponent, IsInternal: false},
+	{Name: "workflowrun:view", LowestScope: ScopeComponent, IsInternal: false},
+	{Name: "workflowrun:update", LowestScope: ScopeComponent, IsInternal: false},
 
 	// Trait
-	{Name: "trait:view", IsInternal: false},
-	{Name: "trait:create", IsInternal: false},
-	{Name: "trait:update", IsInternal: false},
-	{Name: "trait:delete", IsInternal: false},
+	{Name: "trait:view", LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: "trait:create", LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: "trait:update", LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: "trait:delete", LowestScope: ScopeNamespace, IsInternal: false},
 
 	// Environment
-	{Name: "environment:view", IsInternal: false},
-	{Name: "environment:create", IsInternal: false},
-	{Name: "environment:update", IsInternal: false},
-	{Name: "environment:delete", IsInternal: false},
+	{Name: "environment:view", LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: "environment:create", LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: "environment:update", LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: "environment:delete", LowestScope: ScopeNamespace, IsInternal: false},
 
 	// DataPlane
-	{Name: "dataplane:view", IsInternal: false},
-	{Name: "dataplane:create", IsInternal: false},
-	{Name: "dataplane:update", IsInternal: false},
-	{Name: "dataplane:delete", IsInternal: false},
+	{Name: "dataplane:view", LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: "dataplane:create", LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: "dataplane:update", LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: "dataplane:delete", LowestScope: ScopeNamespace, IsInternal: false},
 
 	// WorkflowPlane
-	{Name: "workflowplane:view", IsInternal: false},
-	{Name: "workflowplane:create", IsInternal: false},
-	{Name: "workflowplane:update", IsInternal: false},
-	{Name: "workflowplane:delete", IsInternal: false},
+	{Name: "workflowplane:view", LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: "workflowplane:create", LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: "workflowplane:update", LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: "workflowplane:delete", LowestScope: ScopeNamespace, IsInternal: false},
 
 	// ObservabilityPlane
-	{Name: "observabilityplane:view", IsInternal: false},
-	{Name: "observabilityplane:create", IsInternal: false},
-	{Name: "observabilityplane:update", IsInternal: false},
-	{Name: "observabilityplane:delete", IsInternal: false},
+	{Name: "observabilityplane:view", LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: "observabilityplane:create", LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: "observabilityplane:update", LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: "observabilityplane:delete", LowestScope: ScopeNamespace, IsInternal: false},
 
 	// ClusterComponentType
-	{Name: "clustercomponenttype:view", IsInternal: false},
-	{Name: "clustercomponenttype:create", IsInternal: false},
-	{Name: "clustercomponenttype:update", IsInternal: false},
-	{Name: "clustercomponenttype:delete", IsInternal: false},
+	{Name: "clustercomponenttype:view", LowestScope: ScopeCluster, IsInternal: false},
+	{Name: "clustercomponenttype:create", LowestScope: ScopeCluster, IsInternal: false},
+	{Name: "clustercomponenttype:update", LowestScope: ScopeCluster, IsInternal: false},
+	{Name: "clustercomponenttype:delete", LowestScope: ScopeCluster, IsInternal: false},
 
 	// ClusterTrait
-	{Name: "clustertrait:view", IsInternal: false},
-	{Name: "clustertrait:create", IsInternal: false},
-	{Name: "clustertrait:update", IsInternal: false},
-	{Name: "clustertrait:delete", IsInternal: false},
+	{Name: "clustertrait:view", LowestScope: ScopeCluster, IsInternal: false},
+	{Name: "clustertrait:create", LowestScope: ScopeCluster, IsInternal: false},
+	{Name: "clustertrait:update", LowestScope: ScopeCluster, IsInternal: false},
+	{Name: "clustertrait:delete", LowestScope: ScopeCluster, IsInternal: false},
 
 	// ClusterWorkflow
-	{Name: "clusterworkflow:view", IsInternal: false},
-	{Name: "clusterworkflow:create", IsInternal: false},
-	{Name: "clusterworkflow:update", IsInternal: false},
-	{Name: "clusterworkflow:delete", IsInternal: false},
+	{Name: "clusterworkflow:view", LowestScope: ScopeCluster, IsInternal: false},
+	{Name: "clusterworkflow:create", LowestScope: ScopeCluster, IsInternal: false},
+	{Name: "clusterworkflow:update", LowestScope: ScopeCluster, IsInternal: false},
+	{Name: "clusterworkflow:delete", LowestScope: ScopeCluster, IsInternal: false},
 
 	// ClusterDataPlane
-	{Name: "clusterdataplane:view", IsInternal: false},
-	{Name: "clusterdataplane:create", IsInternal: false},
-	{Name: "clusterdataplane:update", IsInternal: false},
-	{Name: "clusterdataplane:delete", IsInternal: false},
+	{Name: "clusterdataplane:view", LowestScope: ScopeCluster, IsInternal: false},
+	{Name: "clusterdataplane:create", LowestScope: ScopeCluster, IsInternal: false},
+	{Name: "clusterdataplane:update", LowestScope: ScopeCluster, IsInternal: false},
+	{Name: "clusterdataplane:delete", LowestScope: ScopeCluster, IsInternal: false},
 
 	// ClusterWorkflowPlane
-	{Name: "clusterworkflowplane:view", IsInternal: false},
-	{Name: "clusterworkflowplane:create", IsInternal: false},
-	{Name: "clusterworkflowplane:update", IsInternal: false},
-	{Name: "clusterworkflowplane:delete", IsInternal: false},
+	{Name: "clusterworkflowplane:view", LowestScope: ScopeCluster, IsInternal: false},
+	{Name: "clusterworkflowplane:create", LowestScope: ScopeCluster, IsInternal: false},
+	{Name: "clusterworkflowplane:update", LowestScope: ScopeCluster, IsInternal: false},
+	{Name: "clusterworkflowplane:delete", LowestScope: ScopeCluster, IsInternal: false},
 
 	// ClusterObservabilityPlane
-	{Name: "clusterobservabilityplane:view", IsInternal: false},
-	{Name: "clusterobservabilityplane:create", IsInternal: false},
-	{Name: "clusterobservabilityplane:update", IsInternal: false},
-	{Name: "clusterobservabilityplane:delete", IsInternal: false},
+	{Name: "clusterobservabilityplane:view", LowestScope: ScopeCluster, IsInternal: false},
+	{Name: "clusterobservabilityplane:create", LowestScope: ScopeCluster, IsInternal: false},
+	{Name: "clusterobservabilityplane:update", LowestScope: ScopeCluster, IsInternal: false},
+	{Name: "clusterobservabilityplane:delete", LowestScope: ScopeCluster, IsInternal: false},
 
 	// DeploymentPipeline
-	{Name: "deploymentpipeline:view", IsInternal: false},
-	{Name: "deploymentpipeline:create", IsInternal: false},
-	{Name: "deploymentpipeline:update", IsInternal: false},
-	{Name: "deploymentpipeline:delete", IsInternal: false},
+	{Name: "deploymentpipeline:view", LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: "deploymentpipeline:create", LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: "deploymentpipeline:update", LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: "deploymentpipeline:delete", LowestScope: ScopeNamespace, IsInternal: false},
 
 	// ObservabilityAlertsNotificationChannel
-	{Name: "observabilityalertsnotificationchannel:view", IsInternal: false},
-	{Name: "observabilityalertsnotificationchannel:create", IsInternal: false},
-	{Name: "observabilityalertsnotificationchannel:update", IsInternal: false},
-	{Name: "observabilityalertsnotificationchannel:delete", IsInternal: false},
+	{Name: "observabilityalertsnotificationchannel:view", LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: "observabilityalertsnotificationchannel:create", LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: "observabilityalertsnotificationchannel:update", LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: "observabilityalertsnotificationchannel:delete", LowestScope: ScopeNamespace, IsInternal: false},
 
 	// SecretReference
-	{Name: "secretreference:view", IsInternal: false},
-	{Name: "secretreference:create", IsInternal: false},
-	{Name: "secretreference:update", IsInternal: false},
-	{Name: "secretreference:delete", IsInternal: false},
+	{Name: "secretreference:view", LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: "secretreference:create", LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: "secretreference:update", LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: "secretreference:delete", LowestScope: ScopeNamespace, IsInternal: false},
 
 	// Workload
-	{Name: "workload:view", IsInternal: false},
-	{Name: "workload:create", IsInternal: false},
-	{Name: "workload:update", IsInternal: false},
-	{Name: "workload:delete", IsInternal: false},
+	{Name: "workload:view", LowestScope: ScopeComponent, IsInternal: false},
+	{Name: "workload:create", LowestScope: ScopeComponent, IsInternal: false},
+	{Name: "workload:update", LowestScope: ScopeComponent, IsInternal: false},
+	{Name: "workload:delete", LowestScope: ScopeComponent, IsInternal: false},
 
 	// roles
-	{Name: "role:view", IsInternal: false},
-	{Name: "role:create", IsInternal: false},
-	{Name: "role:delete", IsInternal: false},
-	{Name: "role:update", IsInternal: false},
+	{Name: "role:view", LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: "role:create", LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: "role:delete", LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: "role:update", LowestScope: ScopeNamespace, IsInternal: false},
 
 	// role mapping
-	{Name: "rolemapping:view", IsInternal: false},
-	{Name: "rolemapping:create", IsInternal: false},
-	{Name: "rolemapping:delete", IsInternal: false},
-	{Name: "rolemapping:update", IsInternal: false},
+	{Name: "rolemapping:view", LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: "rolemapping:create", LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: "rolemapping:delete", LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: "rolemapping:update", LowestScope: ScopeNamespace, IsInternal: false},
 
-	// logs
-	{Name: "logs:view", IsInternal: false},
+	// logs (dynamic scope: namespace or component depending on query)
+	{Name: "logs:view", LowestScope: ScopeComponent, IsInternal: false},
 
-	// metrics
-	{Name: "metrics:view", IsInternal: false},
+	// metrics (dynamic scope: namespace or component depending on query)
+	{Name: "metrics:view", LowestScope: ScopeComponent, IsInternal: false},
 
-	// traces
-	{Name: "traces:view", IsInternal: false},
+	// traces (dynamic scope: namespace or project depending on query)
+	{Name: "traces:view", LowestScope: ScopeProject, IsInternal: false},
 
-	// alerts
-	{Name: "alerts:view", IsInternal: false},
+	// alerts (dynamic scope: namespace, project, or component depending on query)
+	{Name: "alerts:view", LowestScope: ScopeComponent, IsInternal: false},
 
-	// incidents
-	{Name: "incidents:view", IsInternal: false},
-	{Name: "incidents:update", IsInternal: false},
+	// incidents (dynamic scope: namespace, project, or component depending on query)
+	{Name: "incidents:view", LowestScope: ScopeComponent, IsInternal: false},
+	{Name: "incidents:update", LowestScope: ScopeComponent, IsInternal: false},
 
 	// RCA Report
-	{Name: "rcareport:view", IsInternal: false},
-	{Name: "rcareport:update", IsInternal: false},
-	{Name: "rcareport:delete", IsInternal: false},
+	{Name: "rcareport:view", LowestScope: ScopeProject, IsInternal: false},
+	{Name: "rcareport:update", LowestScope: ScopeProject, IsInternal: false},
 }
 
 // AllActions returns all system-defined actions

@@ -19,7 +19,7 @@ func TestAllActions(t *testing.T) {
 	})
 
 	t.Run("returns expected action count", func(t *testing.T) {
-		expectedCount := 106 // Update this when intentionally adding/removing actions
+		expectedCount := 105 // Update this when intentionally adding/removing actions
 		if len(actions) != expectedCount {
 			t.Errorf("Expected %d actions, got %d. Update expected count if intentional.", expectedCount, len(actions))
 		}
@@ -55,6 +55,18 @@ func TestAllActions(t *testing.T) {
 		for _, action := range actions {
 			if !strings.Contains(action.Name, "*") && action.Name != strings.ToLower(action.Name) {
 				t.Errorf("Action name %q should be lowercase", action.Name)
+			}
+		}
+	})
+
+	t.Run("all actions have a valid LowestScope", func(t *testing.T) {
+		valid := map[ActionScope]bool{
+			ScopeCluster: true, ScopeNamespace: true,
+			ScopeProject: true, ScopeComponent: true,
+		}
+		for _, action := range actions {
+			if !valid[action.LowestScope] {
+				t.Errorf("Action %q has invalid LowestScope %q", action.Name, action.LowestScope)
 			}
 		}
 	})
