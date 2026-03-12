@@ -120,10 +120,8 @@ func (t *Toolsets) RegisterCreateComponent(s *mcp.Server) {
 			"name":           stringProperty("DNS-compatible identifier (lowercase, alphanumeric, hyphens only, max 63 chars)"),
 			"display_name":   stringProperty("Human-readable display name"),
 			"description":    stringProperty("Human-readable description"),
-			"componentType": stringProperty("Component type identifier in {workloadType}/{componentTypeName} format. " +
-				"Use list_component_types or list_cluster_component_types to discover valid types"),
-			"componentTypeKind": stringProperty("Optional: Kind of component type reference. " +
-				"Use 'ComponentType' for namespace-scoped (default) or 'ClusterComponentType' for cluster-scoped"),
+			"componentType": stringProperty("Component type in {workloadType}/{componentTypeName} format. " +
+				"Use list_component_types or list_cluster_component_types to discover valid values."),
 			"autoDeploy": map[string]any{
 				"type": "boolean",
 				"description": "Optional: Automatically triggers the component deployment if the component or" +
@@ -140,26 +138,19 @@ func (t *Toolsets) RegisterCreateComponent(s *mcp.Server) {
 			},
 		}, []string{"namespace_name", "project_name", "name", "componentType"}),
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
-		NamespaceName     string                 `json:"namespace_name"`
-		ProjectName       string                 `json:"project_name"`
-		Name              string                 `json:"name"`
-		DisplayName       string                 `json:"display_name"`
-		Description       string                 `json:"description"`
-		ComponentType     string                 `json:"componentType"`
-		ComponentTypeKind string                 `json:"componentTypeKind"`
-		AutoDeploy        *bool                  `json:"autoDeploy,omitempty"`
-		Parameters        map[string]interface{} `json:"parameters"`
-		Workflow          map[string]interface{} `json:"workflow"`
+		NamespaceName string                 `json:"namespace_name"`
+		ProjectName   string                 `json:"project_name"`
+		Name          string                 `json:"name"`
+		DisplayName   string                 `json:"display_name"`
+		Description   string                 `json:"description"`
+		ComponentType string                 `json:"componentType"`
+		AutoDeploy    *bool                  `json:"autoDeploy,omitempty"`
+		Parameters    map[string]interface{} `json:"parameters"`
+		Workflow      map[string]interface{} `json:"workflow"`
 	}) (*mcp.CallToolResult, any, error) {
 		var componentType *string
 		if args.ComponentType != "" {
-			// ComponentType in gen is a string in format: {workloadType}/{componentTypeName}
-			// If ComponentTypeKind is provided, we construct it, otherwise use ComponentType as-is
 			ct := args.ComponentType
-			if args.ComponentTypeKind != "" {
-				// If kind is provided, assume ComponentType is just the name
-				ct = args.ComponentType
-			}
 			componentType = &ct
 		}
 
@@ -206,69 +197,6 @@ func (t *Toolsets) RegisterCreateComponent(s *mcp.Server) {
 		}
 
 		result, err := t.ComponentToolset.CreateComponent(ctx, args.NamespaceName, args.ProjectName, componentReq)
-		return handleToolResult(result, err)
-	})
-}
-
-func (t *Toolsets) RegisterListComponentReleases(s *mcp.Server) {
-	mcp.AddTool(s, &mcp.Tool{
-		Name: "list_component_releases",
-		Description: "List all releases for a component. Releases are immutable snapshots of a component at a " +
-			"specific build, ready for deployment to environments. Supports pagination via limit and cursor.",
-		InputSchema: createSchema(addPaginationProperties(map[string]any{
-			"namespace_name": defaultStringProperty(),
-			"component_name": defaultStringProperty(),
-		}), []string{"namespace_name", "component_name"}),
-	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
-		NamespaceName string `json:"namespace_name"`
-		ComponentName string `json:"component_name"`
-		Limit         int    `json:"limit,omitempty"`
-		Cursor        string `json:"cursor,omitempty"`
-	}) (*mcp.CallToolResult, any, error) {
-		result, err := t.DeploymentToolset.ListComponentReleases(
-			ctx, args.NamespaceName, args.ComponentName,
-			ListOpts{Limit: args.Limit, Cursor: args.Cursor})
-		return handleToolResult(result, err)
-	})
-}
-
-func (t *Toolsets) RegisterCreateComponentRelease(s *mcp.Server) {
-	mcp.AddTool(s, &mcp.Tool{
-		Name: "create_component_release",
-		Description: "Create a new release from the latest build of a component. Releases are immutable " +
-			"snapshots that can be deployed to environments. The component must have at least one successful build. " +
-			"If the source repository does not contain a workload descriptor (workload.yaml), use update_workload " +
-			"to configure the workload before creating a release.",
-		InputSchema: createSchema(map[string]any{
-			"namespace_name": defaultStringProperty(),
-			"component_name": defaultStringProperty(),
-			"release_name":   stringProperty("Optional release name. If omitted, a name will be auto-generated"),
-		}, []string{"namespace_name", "component_name"}),
-	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
-		NamespaceName string `json:"namespace_name"`
-		ComponentName string `json:"component_name"`
-		ReleaseName   string `json:"release_name"`
-	}) (*mcp.CallToolResult, any, error) {
-		result, err := t.DeploymentToolset.CreateComponentRelease(
-			ctx, args.NamespaceName, args.ComponentName, args.ReleaseName)
-		return handleToolResult(result, err)
-	})
-}
-
-func (t *Toolsets) RegisterGetComponentRelease(s *mcp.Server) {
-	mcp.AddTool(s, &mcp.Tool{
-		Name: "get_component_release",
-		Description: "Get detailed information about a specific component release including build information, " +
-			"image tags, and deployment status.",
-		InputSchema: createSchema(map[string]any{
-			"namespace_name": defaultStringProperty(),
-			"release_name":   stringProperty("Use list_component_releases to discover valid names"),
-		}, []string{"namespace_name", "release_name"}),
-	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
-		NamespaceName string `json:"namespace_name"`
-		ReleaseName   string `json:"release_name"`
-	}) (*mcp.CallToolResult, any, error) {
-		result, err := t.DeploymentToolset.GetComponentRelease(ctx, args.NamespaceName, args.ReleaseName)
 		return handleToolResult(result, err)
 	})
 }
@@ -514,7 +442,7 @@ func (t *Toolsets) RegisterUpdateWorkload(s *mcp.Server) {
 			"get_workload to retrieve the current workload name and spec before updating.",
 		InputSchema: createSchema(map[string]any{
 			"namespace_name": defaultStringProperty(),
-			"workload_name":  stringProperty("Use get_component_workloads to discover valid names"),
+			"workload_name":  stringProperty("Use list_workloads to discover valid names"),
 			"workload_spec": map[string]any{
 				"type":        "object",
 				"description": "Updated workload specification (containers, resources, env vars, port mappings, file mounts, etc.)",
@@ -552,7 +480,7 @@ func (t *Toolsets) RegisterGetComponentSchema(s *mcp.Server) {
 			"configuration options, required fields, and their types.",
 		InputSchema: createSchema(map[string]any{
 			"namespace_name": defaultStringProperty(),
-			"component_name": stringProperty("Component name. Use list_components to discover valid names"),
+			"component_name": stringProperty("Use list_components to discover valid names"),
 		}, []string{"namespace_name", "component_name"}),
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
 		NamespaceName string `json:"namespace_name"`
@@ -589,27 +517,6 @@ func (t *Toolsets) RegisterUpdateReleaseBindingState(s *mcp.Server) {
 		state := gen.ReleaseBindingSpecState(args.ReleaseState)
 		result, err := t.DeploymentToolset.UpdateReleaseBindingState(
 			ctx, args.NamespaceName, args.BindingName, &state)
-		return handleToolResult(result, err)
-	})
-}
-
-func (t *Toolsets) RegisterGetComponentReleaseSchema(s *mcp.Server) {
-	mcp.AddTool(s, &mcp.Tool{
-		Name: "get_component_release_schema",
-		Description: "Get the release schema for a component. Returns the JSON schema showing the configuration " +
-			"options available when creating or deploying releases for this component.",
-		InputSchema: createSchema(map[string]any{
-			"namespace_name": defaultStringProperty(),
-			"component_name": stringProperty("Use list_components to discover valid names"),
-			"release_name":   stringProperty("Optional: specific release name for release-specific schema"),
-		}, []string{"namespace_name", "component_name"}),
-	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
-		NamespaceName string `json:"namespace_name"`
-		ComponentName string `json:"component_name"`
-		ReleaseName   string `json:"release_name"`
-	}) (*mcp.CallToolResult, any, error) {
-		result, err := t.DeploymentToolset.GetComponentReleaseSchema(
-			ctx, args.NamespaceName, args.ComponentName, args.ReleaseName)
 		return handleToolResult(result, err)
 	})
 }

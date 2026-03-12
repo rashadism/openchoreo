@@ -209,6 +209,13 @@ func (m *MockCoreToolsetHandler) ListComponentTypes(
 	return `[{"name":"WebApplication"}]`, nil
 }
 
+func (m *MockCoreToolsetHandler) GetComponentType(
+	ctx context.Context, namespaceName, ctName string,
+) (any, error) {
+	m.recordCall("GetComponentType", namespaceName, ctName)
+	return `{"name":"WebApplication","spec":{"workloadType":"deployment"}}`, nil
+}
+
 func (m *MockCoreToolsetHandler) GetComponentTypeSchema(
 	ctx context.Context, namespaceName, ctName string,
 ) (any, error) {
@@ -219,6 +226,11 @@ func (m *MockCoreToolsetHandler) GetComponentTypeSchema(
 func (m *MockCoreToolsetHandler) ListTraits(ctx context.Context, namespaceName string, opts ListOpts) (any, error) {
 	m.recordCall("ListTraits", namespaceName, opts)
 	return `[{"name":"autoscaling"}]`, nil
+}
+
+func (m *MockCoreToolsetHandler) GetTrait(ctx context.Context, namespaceName, traitName string) (any, error) {
+	m.recordCall("GetTrait", namespaceName, traitName)
+	return `{"name":"autoscaling","spec":{}}`, nil
 }
 
 func (m *MockCoreToolsetHandler) GetTraitSchema(ctx context.Context, namespaceName, traitName string) (any, error) {
@@ -277,6 +289,11 @@ func (m *MockCoreToolsetHandler) ListWorkflows(ctx context.Context, namespaceNam
 	return `[{"name":"build-workflow"}]`, nil
 }
 
+func (m *MockCoreToolsetHandler) GetWorkflow(ctx context.Context, namespaceName, workflowName string) (any, error) {
+	m.recordCall("GetWorkflow", namespaceName, workflowName)
+	return `{"name":"build-workflow","spec":{}}`, nil
+}
+
 func (m *MockCoreToolsetHandler) GetWorkflowSchema(
 	ctx context.Context, namespaceName, workflowName string,
 ) (any, error) {
@@ -324,6 +341,20 @@ func (m *MockCoreToolsetHandler) CreateDeploymentPipeline(
 ) (any, error) {
 	m.recordCall("CreateDeploymentPipeline", namespaceName, req)
 	return `{"name":"new-pipeline"}`, nil
+}
+
+func (m *MockCoreToolsetHandler) UpdateDeploymentPipeline(
+	ctx context.Context, namespaceName string, req *gen.UpdateDeploymentPipelineJSONRequestBody,
+) (any, error) {
+	m.recordCall("UpdateDeploymentPipeline", namespaceName, req)
+	return `{"name":"updated-pipeline"}`, nil
+}
+
+func (m *MockCoreToolsetHandler) DeleteDeploymentPipeline(
+	ctx context.Context, namespaceName, dpName string,
+) (any, error) {
+	m.recordCall("DeleteDeploymentPipeline", namespaceName, dpName)
+	return `{"name":"deleted-pipeline","action":"deleted"}`, nil
 }
 
 func (m *MockCoreToolsetHandler) ListDataPlanes(ctx context.Context, namespaceName string, opts ListOpts) (any, error) {
@@ -395,9 +426,19 @@ func (m *MockCoreToolsetHandler) ListClusterWorkflowPlanes(ctx context.Context, 
 	return `[{"name":"cwp1"}]`, nil
 }
 
+func (m *MockCoreToolsetHandler) GetClusterWorkflowPlane(ctx context.Context, cbpName string) (any, error) {
+	m.recordCall("GetClusterWorkflowPlane", cbpName)
+	return `{"name":"cwp1"}`, nil
+}
+
 func (m *MockCoreToolsetHandler) ListClusterObservabilityPlanes(ctx context.Context, opts ListOpts) (any, error) {
 	m.recordCall("ListClusterObservabilityPlanes", opts)
 	return `[{"name":"cop1"}]`, nil
+}
+
+func (m *MockCoreToolsetHandler) GetClusterObservabilityPlane(ctx context.Context, copName string) (any, error) {
+	m.recordCall("GetClusterObservabilityPlane", copName)
+	return `{"name":"cop1"}`, nil
 }
 
 func (m *MockCoreToolsetHandler) ListClusterWorkflows(ctx context.Context, opts ListOpts) (any, error) {
@@ -413,6 +454,136 @@ func (m *MockCoreToolsetHandler) GetClusterWorkflow(ctx context.Context, cwfName
 func (m *MockCoreToolsetHandler) GetClusterWorkflowSchema(ctx context.Context, cwfName string) (any, error) {
 	m.recordCall("GetClusterWorkflowSchema", cwfName)
 	return emptyObjectSchema, nil
+}
+
+// Platform standards write methods (namespace-scoped)
+
+func (m *MockCoreToolsetHandler) CreateComponentType(
+	ctx context.Context, namespaceName string, req *gen.CreateComponentTypeJSONRequestBody,
+) (any, error) {
+	m.recordCall("CreateComponentType", namespaceName, req)
+	return `{"name":"new-component-type","action":"created"}`, nil
+}
+
+func (m *MockCoreToolsetHandler) UpdateComponentType(
+	ctx context.Context, namespaceName string, req *gen.UpdateComponentTypeJSONRequestBody,
+) (any, error) {
+	m.recordCall("UpdateComponentType", namespaceName, req)
+	return `{"name":"updated-component-type","action":"updated"}`, nil
+}
+
+func (m *MockCoreToolsetHandler) DeleteComponentType(
+	ctx context.Context, namespaceName, ctName string,
+) (any, error) {
+	m.recordCall("DeleteComponentType", namespaceName, ctName)
+	return `{"name":"deleted-component-type","action":"deleted"}`, nil
+}
+
+func (m *MockCoreToolsetHandler) CreateTrait(
+	ctx context.Context, namespaceName string, req *gen.CreateTraitJSONRequestBody,
+) (any, error) {
+	m.recordCall("CreateTrait", namespaceName, req)
+	return `{"name":"new-trait","action":"created"}`, nil
+}
+
+func (m *MockCoreToolsetHandler) UpdateTrait(
+	ctx context.Context, namespaceName string, req *gen.UpdateTraitJSONRequestBody,
+) (any, error) {
+	m.recordCall("UpdateTrait", namespaceName, req)
+	return `{"name":"updated-trait","action":"updated"}`, nil
+}
+
+func (m *MockCoreToolsetHandler) DeleteTrait(
+	ctx context.Context, namespaceName, traitName string,
+) (any, error) {
+	m.recordCall("DeleteTrait", namespaceName, traitName)
+	return `{"name":"deleted-trait","action":"deleted"}`, nil
+}
+
+func (m *MockCoreToolsetHandler) CreateWorkflow(
+	ctx context.Context, namespaceName string, req *gen.CreateWorkflowJSONRequestBody,
+) (any, error) {
+	m.recordCall("CreateWorkflow", namespaceName, req)
+	return `{"name":"new-workflow","action":"created"}`, nil
+}
+
+func (m *MockCoreToolsetHandler) UpdateWorkflow(
+	ctx context.Context, namespaceName string, req *gen.UpdateWorkflowJSONRequestBody,
+) (any, error) {
+	m.recordCall("UpdateWorkflow", namespaceName, req)
+	return `{"name":"updated-workflow","action":"updated"}`, nil
+}
+
+func (m *MockCoreToolsetHandler) DeleteWorkflow(
+	ctx context.Context, namespaceName, workflowName string,
+) (any, error) {
+	m.recordCall("DeleteWorkflow", namespaceName, workflowName)
+	return `{"name":"deleted-workflow","action":"deleted"}`, nil
+}
+
+// Platform standards write methods (cluster-scoped)
+
+func (m *MockCoreToolsetHandler) CreateClusterComponentType(
+	ctx context.Context, req *gen.CreateClusterComponentTypeJSONRequestBody,
+) (any, error) {
+	m.recordCall("CreateClusterComponentType", req)
+	return `{"name":"new-cluster-component-type","action":"created"}`, nil
+}
+
+func (m *MockCoreToolsetHandler) UpdateClusterComponentType(
+	ctx context.Context, req *gen.UpdateClusterComponentTypeJSONRequestBody,
+) (any, error) {
+	m.recordCall("UpdateClusterComponentType", req)
+	return `{"name":"updated-cluster-component-type","action":"updated"}`, nil
+}
+
+func (m *MockCoreToolsetHandler) DeleteClusterComponentType(
+	ctx context.Context, cctName string,
+) (any, error) {
+	m.recordCall("DeleteClusterComponentType", cctName)
+	return `{"name":"deleted-cluster-component-type","action":"deleted"}`, nil
+}
+
+func (m *MockCoreToolsetHandler) CreateClusterTrait(
+	ctx context.Context, req *gen.CreateClusterTraitJSONRequestBody,
+) (any, error) {
+	m.recordCall("CreateClusterTrait", req)
+	return `{"name":"new-cluster-trait","action":"created"}`, nil
+}
+
+func (m *MockCoreToolsetHandler) UpdateClusterTrait(
+	ctx context.Context, req *gen.UpdateClusterTraitJSONRequestBody,
+) (any, error) {
+	m.recordCall("UpdateClusterTrait", req)
+	return `{"name":"updated-cluster-trait","action":"updated"}`, nil
+}
+
+func (m *MockCoreToolsetHandler) DeleteClusterTrait(
+	ctx context.Context, clusterTraitName string,
+) (any, error) {
+	m.recordCall("DeleteClusterTrait", clusterTraitName)
+	return `{"name":"deleted-cluster-trait","action":"deleted"}`, nil
+}
+
+func (m *MockCoreToolsetHandler) CreateClusterWorkflow(
+	ctx context.Context, req *gen.CreateClusterWorkflowJSONRequestBody,
+) (any, error) {
+	m.recordCall("CreateClusterWorkflow", req)
+	return `{"name":"new-cluster-workflow","action":"created"}`, nil
+}
+
+func (m *MockCoreToolsetHandler) UpdateClusterWorkflow(
+	ctx context.Context, req *gen.UpdateClusterWorkflowJSONRequestBody,
+) (any, error) {
+	m.recordCall("UpdateClusterWorkflow", req)
+	return `{"name":"updated-cluster-workflow","action":"updated"}`, nil
+}
+
+func (m *MockCoreToolsetHandler) DeleteClusterWorkflow(
+	ctx context.Context, clusterWorkflowName string,
+) (any, error) {
+	m.recordCall("DeleteClusterWorkflow", clusterWorkflowName)
+	return `{"name":"deleted-cluster-workflow","action":"deleted"}`, nil
 }
 
 // Diagnostics methods

@@ -14,6 +14,7 @@ import (
 func peToolSpecs() []toolTestSpec {
 	specs := peEnvironmentSpecs()
 	specs = append(specs, pePipelineSpecs()...)
+	specs = append(specs, peComponentReleaseSpecs()...)
 	specs = append(specs, peDataPlaneSpecs()...)
 	specs = append(specs, peWorkflowPlaneSpecs()...)
 	specs = append(specs, peObservabilityPlaneSpecs()...)
@@ -22,6 +23,88 @@ func peToolSpecs() []toolTestSpec {
 	specs = append(specs, pePlatformStandardsSpecs()...)
 	specs = append(specs, peDiagnosticsSpecs()...)
 	return specs
+}
+
+func peComponentReleaseSpecs() []toolTestSpec {
+	return []toolTestSpec{
+		{
+			name:                "list_component_releases",
+			toolset:             "pe",
+			descriptionKeywords: []string{"list", "release"},
+			descriptionMinLen:   10,
+			requiredParams:      []string{"namespace_name", "component_name"},
+			optionalParams:      []string{"limit", "cursor"},
+			testArgs: map[string]any{
+				"namespace_name": testNamespaceName,
+				"component_name": testComponentName,
+			},
+			expectedMethod: "ListComponentReleases",
+			validateCall: func(t *testing.T, args []interface{}) {
+				if args[0] != testNamespaceName || args[1] != testComponentName {
+					t.Errorf("Expected (%s, %s), got (%v, %v)",
+						testNamespaceName, testComponentName, args[0], args[1])
+				}
+			},
+		},
+		{
+			name:                "create_component_release",
+			toolset:             "pe",
+			descriptionKeywords: []string{"create", "release"},
+			descriptionMinLen:   10,
+			requiredParams:      []string{"namespace_name", "component_name"},
+			optionalParams:      []string{"release_name"},
+			testArgs: map[string]any{
+				"namespace_name": testNamespaceName,
+				"component_name": testComponentName,
+				"release_name":   testReleaseName,
+			},
+			expectedMethod: "CreateComponentRelease",
+			validateCall: func(t *testing.T, args []interface{}) {
+				if args[0] != testNamespaceName || args[1] != testComponentName || args[2] != testReleaseName {
+					t.Errorf("Expected (%s, %s, %s), got (%v, %v, %v)",
+						testNamespaceName, testComponentName, testReleaseName,
+						args[0], args[1], args[2])
+				}
+			},
+		},
+		{
+			name:                "get_component_release",
+			toolset:             "pe",
+			descriptionKeywords: []string{"release"},
+			descriptionMinLen:   10,
+			requiredParams:      []string{"namespace_name", "release_name"},
+			testArgs: map[string]any{
+				"namespace_name": testNamespaceName,
+				"release_name":   testReleaseName,
+			},
+			expectedMethod: "GetComponentRelease",
+			validateCall: func(t *testing.T, args []interface{}) {
+				if args[0] != testNamespaceName || args[1] != testReleaseName {
+					t.Errorf("Expected (%s, %s), got (%v, %v)",
+						testNamespaceName, testReleaseName, args[0], args[1])
+				}
+			},
+		},
+		{
+			name:                "get_component_release_schema",
+			toolset:             "pe",
+			descriptionKeywords: []string{"release", "schema"},
+			descriptionMinLen:   10,
+			requiredParams:      []string{"namespace_name", "component_name", "release_name"},
+			testArgs: map[string]any{
+				"namespace_name": testNamespaceName,
+				"component_name": testComponentName,
+				"release_name":   testReleaseName,
+			},
+			expectedMethod: "GetComponentReleaseSchema",
+			validateCall: func(t *testing.T, args []interface{}) {
+				if args[0] != testNamespaceName || args[1] != testComponentName || args[2] != testReleaseName {
+					t.Errorf("Expected (%s, %s, %s), got (%v, %v, %v)",
+						testNamespaceName, testComponentName, testReleaseName, args[0], args[1], args[2])
+				}
+			},
+		},
+	}
 }
 
 func peEnvironmentSpecs() []toolTestSpec {
@@ -48,15 +131,18 @@ func peEnvironmentSpecs() []toolTestSpec {
 			toolset:             "pe",
 			descriptionKeywords: []string{"create", "environment"},
 			descriptionMinLen:   10,
-			requiredParams:      []string{"namespace_name", "name"},
-			optionalParams:      []string{"display_name", "description", "data_plane_ref", "is_production", "dns_prefix"},
+			requiredParams:      []string{"namespace_name", "name", "data_plane_ref"},
+			optionalParams: []string{
+				"display_name", "description", "data_plane_ref_kind", "is_production",
+			},
 			testArgs: map[string]any{
-				"namespace_name": testNamespaceName,
-				"name":           "new-env",
-				"display_name":   "New Environment",
-				"description":    "Test environment",
-				"data_plane_ref": "dp1",
-				"is_production":  false,
+				"namespace_name":      testNamespaceName,
+				"name":                "new-env",
+				"display_name":        "New Environment",
+				"description":         "Test environment",
+				"data_plane_ref":      "dp1",
+				"data_plane_ref_kind": "DataPlane",
+				"is_production":       false,
 			},
 			expectedMethod: "CreateEnvironment",
 			validateCall: func(t *testing.T, args []interface{}) {
@@ -120,6 +206,41 @@ func pePipelineSpecs() []toolTestSpec {
 			validateCall: func(t *testing.T, args []interface{}) {
 				if args[0] != testNamespaceName {
 					t.Errorf("Expected namespace %q, got %v", testNamespaceName, args[0])
+				}
+			},
+		},
+		{
+			name:                "update_deployment_pipeline",
+			toolset:             "pe",
+			descriptionKeywords: []string{"update", "deployment", "pipeline"},
+			descriptionMinLen:   10,
+			requiredParams:      []string{"namespace_name", "name"},
+			optionalParams:      []string{"display_name", "description", "promotion_paths"},
+			testArgs: map[string]any{
+				"namespace_name": testNamespaceName,
+				"name":           "my-pipeline",
+			},
+			expectedMethod: "UpdateDeploymentPipeline",
+			validateCall: func(t *testing.T, args []interface{}) {
+				if args[0] != testNamespaceName {
+					t.Errorf("Expected namespace %q, got %v", testNamespaceName, args[0])
+				}
+			},
+		},
+		{
+			name:                "delete_deployment_pipeline",
+			toolset:             "pe",
+			descriptionKeywords: []string{"delete", "deployment", "pipeline"},
+			descriptionMinLen:   10,
+			requiredParams:      []string{"namespace_name", "pipeline_name"},
+			testArgs: map[string]any{
+				"namespace_name": testNamespaceName,
+				"pipeline_name":  "my-pipeline",
+			},
+			expectedMethod: "DeleteDeploymentPipeline",
+			validateCall: func(t *testing.T, args []interface{}) {
+				if args[0] != testNamespaceName || args[1] != "my-pipeline" {
+					t.Errorf("Expected (%s, my-pipeline), got (%v, %v)", testNamespaceName, args[0], args[1])
 				}
 			},
 		},
@@ -193,6 +314,22 @@ func peClusterSpecs() []toolTestSpec {
 			},
 		},
 		{
+			name:                "get_cluster_workflowplane",
+			toolset:             "pe",
+			descriptionKeywords: []string{"cluster", "workflow", "plane"},
+			descriptionMinLen:   10,
+			requiredParams:      []string{"cwp_name"},
+			testArgs: map[string]any{
+				"cwp_name": "cwp1",
+			},
+			expectedMethod: "GetClusterWorkflowPlane",
+			validateCall: func(t *testing.T, args []interface{}) {
+				if args[0] != "cwp1" {
+					t.Errorf("Expected cwp_name %q, got %v", "cwp1", args[0])
+				}
+			},
+		},
+		{
 			name:                "list_cluster_observability_planes",
 			toolset:             "pe",
 			descriptionKeywords: []string{"cluster", "observability", "plane"},
@@ -202,6 +339,22 @@ func peClusterSpecs() []toolTestSpec {
 			expectedMethod:      "ListClusterObservabilityPlanes",
 			validateCall: func(t *testing.T, args []interface{}) {
 				// Only ListOpts argument
+			},
+		},
+		{
+			name:                "get_cluster_observability_plane",
+			toolset:             "pe",
+			descriptionKeywords: []string{"cluster", "observability", "plane"},
+			descriptionMinLen:   10,
+			requiredParams:      []string{"cop_name"},
+			testArgs: map[string]any{
+				"cop_name": "cop1",
+			},
+			expectedMethod: "GetClusterObservabilityPlane",
+			validateCall: func(t *testing.T, args []interface{}) {
+				if args[0] != "cop1" {
+					t.Errorf("Expected cop_name %q, got %v", "cop1", args[0])
+				}
 			},
 		},
 	}
@@ -297,6 +450,139 @@ func peClusterPlatformStandardsSpecs() []toolTestSpec {
 				}
 			},
 		},
+		// Write operations (cluster-scoped)
+		{
+			name:                "create_cluster_component_type",
+			toolset:             "pe",
+			descriptionKeywords: []string{"create", "cluster", "component", "type"},
+			descriptionMinLen:   10,
+			requiredParams:      []string{"name", "spec"},
+			optionalParams:      []string{"display_name", "description"},
+			testArgs: map[string]any{
+				"name": testGoServiceName,
+				"spec": map[string]any{"workloadType": "deployment", "resources": []any{}},
+			},
+			expectedMethod: "CreateClusterComponentType",
+			validateCall:   func(t *testing.T, args []interface{}) {},
+		},
+		{
+			name:                "update_cluster_component_type",
+			toolset:             "pe",
+			descriptionKeywords: []string{"update", "cluster", "component", "type"},
+			descriptionMinLen:   10,
+			requiredParams:      []string{"name", "spec"},
+			optionalParams:      []string{"display_name", "description"},
+			testArgs: map[string]any{
+				"name": testGoServiceName,
+				"spec": map[string]any{"workloadType": "deployment", "resources": []any{}},
+			},
+			expectedMethod: "UpdateClusterComponentType",
+			validateCall:   func(t *testing.T, args []interface{}) {},
+		},
+		{
+			name:                "delete_cluster_component_type",
+			toolset:             "pe",
+			descriptionKeywords: []string{"delete", "cluster", "component", "type"},
+			descriptionMinLen:   10,
+			requiredParams:      []string{"cct_name"},
+			testArgs: map[string]any{
+				"cct_name": testGoServiceName,
+			},
+			expectedMethod: "DeleteClusterComponentType",
+			validateCall: func(t *testing.T, args []interface{}) {
+				if args[0] != testGoServiceName {
+					t.Errorf("Expected cct_name %q, got %v", testGoServiceName, args[0])
+				}
+			},
+		},
+		{
+			name:                "create_cluster_trait",
+			toolset:             "pe",
+			descriptionKeywords: []string{"create", "cluster", "trait"},
+			descriptionMinLen:   10,
+			requiredParams:      []string{"name", "spec"},
+			optionalParams:      []string{"display_name", "description"},
+			testArgs: map[string]any{
+				"name": testAutoscalerName,
+				"spec": map[string]any{},
+			},
+			expectedMethod: "CreateClusterTrait",
+			validateCall:   func(t *testing.T, args []interface{}) {},
+		},
+		{
+			name:                "update_cluster_trait",
+			toolset:             "pe",
+			descriptionKeywords: []string{"update", "cluster", "trait"},
+			descriptionMinLen:   10,
+			requiredParams:      []string{"name", "spec"},
+			optionalParams:      []string{"display_name", "description"},
+			testArgs: map[string]any{
+				"name": testAutoscalerName,
+				"spec": map[string]any{},
+			},
+			expectedMethod: "UpdateClusterTrait",
+			validateCall:   func(t *testing.T, args []interface{}) {},
+		},
+		{
+			name:                "delete_cluster_trait",
+			toolset:             "pe",
+			descriptionKeywords: []string{"delete", "cluster", "trait"},
+			descriptionMinLen:   10,
+			requiredParams:      []string{"ct_name"},
+			testArgs: map[string]any{
+				"ct_name": testAutoscalerName,
+			},
+			expectedMethod: "DeleteClusterTrait",
+			validateCall: func(t *testing.T, args []interface{}) {
+				if args[0] != testAutoscalerName {
+					t.Errorf("Expected ct_name %q, got %v", testAutoscalerName, args[0])
+				}
+			},
+		},
+		{
+			name:                "create_cluster_workflow",
+			toolset:             "pe",
+			descriptionKeywords: []string{"create", "cluster", "workflow"},
+			descriptionMinLen:   10,
+			requiredParams:      []string{"name", "spec"},
+			optionalParams:      []string{"display_name", "description"},
+			testArgs: map[string]any{
+				"name": testBuildWorkflow,
+				"spec": map[string]any{"runTemplate": map[string]any{}},
+			},
+			expectedMethod: "CreateClusterWorkflow",
+			validateCall:   func(t *testing.T, args []interface{}) {},
+		},
+		{
+			name:                "update_cluster_workflow",
+			toolset:             "pe",
+			descriptionKeywords: []string{"update", "cluster", "workflow"},
+			descriptionMinLen:   10,
+			requiredParams:      []string{"name", "spec"},
+			optionalParams:      []string{"display_name", "description"},
+			testArgs: map[string]any{
+				"name": testBuildWorkflow,
+				"spec": map[string]any{"runTemplate": map[string]any{}},
+			},
+			expectedMethod: "UpdateClusterWorkflow",
+			validateCall:   func(t *testing.T, args []interface{}) {},
+		},
+		{
+			name:                "delete_cluster_workflow",
+			toolset:             "pe",
+			descriptionKeywords: []string{"delete", "cluster", "workflow"},
+			descriptionMinLen:   10,
+			requiredParams:      []string{"cwf_name"},
+			testArgs: map[string]any{
+				"cwf_name": testBuildWorkflow,
+			},
+			expectedMethod: "DeleteClusterWorkflow",
+			validateCall: func(t *testing.T, args []interface{}) {
+				if args[0] != testBuildWorkflow {
+					t.Errorf("Expected cwf_name %q, got %v", testBuildWorkflow, args[0])
+				}
+			},
+		},
 	}
 }
 
@@ -320,6 +606,23 @@ func pePlatformStandardsSpecs() []toolTestSpec {
 			},
 		},
 		{
+			name:                "get_component_type",
+			toolset:             "pe",
+			descriptionKeywords: []string{"component", "type", "spec"},
+			descriptionMinLen:   10,
+			requiredParams:      []string{"namespace_name", "ct_name"},
+			testArgs: map[string]any{
+				"namespace_name": testNamespaceName,
+				"ct_name":        testWebAppType,
+			},
+			expectedMethod: "GetComponentType",
+			validateCall: func(t *testing.T, args []interface{}) {
+				if args[0] != testNamespaceName || args[1] != testWebAppType {
+					t.Errorf("Expected (%s, %s), got (%v, %v)", testNamespaceName, testWebAppType, args[0], args[1])
+				}
+			},
+		},
+		{
 			name:                "get_component_type_schema",
 			toolset:             "pe",
 			descriptionKeywords: []string{"component", "type", "schema"},
@@ -327,12 +630,12 @@ func pePlatformStandardsSpecs() []toolTestSpec {
 			requiredParams:      []string{"namespace_name", "ct_name"},
 			testArgs: map[string]any{
 				"namespace_name": testNamespaceName,
-				"ct_name":        "WebApplication",
+				"ct_name":        testWebAppType,
 			},
 			expectedMethod: "GetComponentTypeSchema",
 			validateCall: func(t *testing.T, args []interface{}) {
-				if args[0] != testNamespaceName || args[1] != "WebApplication" {
-					t.Errorf("Expected (%s, WebApplication), got (%v, %v)", testNamespaceName, args[0], args[1])
+				if args[0] != testNamespaceName || args[1] != testWebAppType {
+					t.Errorf("Expected (%s, %s), got (%v, %v)", testNamespaceName, testWebAppType, args[0], args[1])
 				}
 			},
 		},
@@ -354,6 +657,23 @@ func pePlatformStandardsSpecs() []toolTestSpec {
 			},
 		},
 		{
+			name:                "get_trait",
+			toolset:             "pe",
+			descriptionKeywords: []string{"trait", "spec"},
+			descriptionMinLen:   10,
+			requiredParams:      []string{"namespace_name", "trait_name"},
+			testArgs: map[string]any{
+				"namespace_name": testNamespaceName,
+				"trait_name":     testAutoscalingTrait,
+			},
+			expectedMethod: "GetTrait",
+			validateCall: func(t *testing.T, args []interface{}) {
+				if args[0] != testNamespaceName || args[1] != testAutoscalingTrait {
+					t.Errorf("Expected (%s, %s), got (%v, %v)", testNamespaceName, testAutoscalingTrait, args[0], args[1])
+				}
+			},
+		},
+		{
 			name:                "get_trait_schema",
 			toolset:             "pe",
 			descriptionKeywords: []string{"trait", "schema"},
@@ -361,12 +681,12 @@ func pePlatformStandardsSpecs() []toolTestSpec {
 			requiredParams:      []string{"namespace_name", "trait_name"},
 			testArgs: map[string]any{
 				"namespace_name": testNamespaceName,
-				"trait_name":     "autoscaling",
+				"trait_name":     testAutoscalingTrait,
 			},
 			expectedMethod: "GetTraitSchema",
 			validateCall: func(t *testing.T, args []interface{}) {
-				if args[0] != testNamespaceName || args[1] != "autoscaling" {
-					t.Errorf("Expected (%s, autoscaling), got (%v, %v)", testNamespaceName, args[0], args[1])
+				if args[0] != testNamespaceName || args[1] != testAutoscalingTrait {
+					t.Errorf("Expected (%s, %s), got (%v, %v)", testNamespaceName, testAutoscalingTrait, args[0], args[1])
 				}
 			},
 		},
@@ -388,6 +708,23 @@ func pePlatformStandardsSpecs() []toolTestSpec {
 			},
 		},
 		{
+			name:                "get_workflow",
+			toolset:             "pe",
+			descriptionKeywords: []string{"workflow", "spec"},
+			descriptionMinLen:   10,
+			requiredParams:      []string{"namespace_name", "workflow_name"},
+			testArgs: map[string]any{
+				"namespace_name": testNamespaceName,
+				"workflow_name":  testBuildWorkflow,
+			},
+			expectedMethod: "GetWorkflow",
+			validateCall: func(t *testing.T, args []interface{}) {
+				if args[0] != testNamespaceName || args[1] != testBuildWorkflow {
+					t.Errorf("Expected (%s, build-workflow), got (%v, %v)", testNamespaceName, args[0], args[1])
+				}
+			},
+		},
+		{
 			name:                "get_workflow_schema",
 			toolset:             "pe",
 			descriptionKeywords: []string{"workflow", "schema"},
@@ -401,6 +738,194 @@ func pePlatformStandardsSpecs() []toolTestSpec {
 			validateCall: func(t *testing.T, args []interface{}) {
 				if args[0] != testNamespaceName || args[1] != testBuildWorkflow {
 					t.Errorf("Expected (%s, build-workflow), got (%v, %v)", testNamespaceName, args[0], args[1])
+				}
+			},
+		},
+		// Creation schema tools (static, no handler call)
+		{
+			name:                "get_component_type_creation_schema",
+			toolset:             "pe",
+			descriptionKeywords: []string{"schema", "creating", "component", "type"},
+			descriptionMinLen:   10,
+			testArgs:            map[string]any{},
+		},
+		{
+			name:                "get_cluster_component_type_creation_schema",
+			toolset:             "pe",
+			descriptionKeywords: []string{"schema", "creating", "cluster", "component", "type"},
+			descriptionMinLen:   10,
+			testArgs:            map[string]any{},
+		},
+		{
+			name:                "get_trait_creation_schema",
+			toolset:             "pe",
+			descriptionKeywords: []string{"schema", "creating", "trait"},
+			descriptionMinLen:   10,
+			testArgs:            map[string]any{},
+		},
+		// Write operations (namespace-scoped)
+		{
+			name:                "create_component_type",
+			toolset:             "pe",
+			descriptionKeywords: []string{"create", "component", "type"},
+			descriptionMinLen:   10,
+			requiredParams:      []string{"namespace_name", "name", "spec"},
+			optionalParams:      []string{"display_name", "description"},
+			testArgs: map[string]any{
+				"namespace_name": testNamespaceName,
+				"name":           "my-component-type",
+				"spec":           map[string]any{"workloadType": "deployment", "resources": []any{}},
+			},
+			expectedMethod: "CreateComponentType",
+			validateCall: func(t *testing.T, args []interface{}) {
+				if args[0] != testNamespaceName {
+					t.Errorf("Expected namespace %q, got %v", testNamespaceName, args[0])
+				}
+			},
+		},
+		{
+			name:                "update_component_type",
+			toolset:             "pe",
+			descriptionKeywords: []string{"update", "component", "type"},
+			descriptionMinLen:   10,
+			requiredParams:      []string{"namespace_name", "name", "spec"},
+			optionalParams:      []string{"display_name", "description"},
+			testArgs: map[string]any{
+				"namespace_name": testNamespaceName,
+				"name":           "my-component-type",
+				"spec":           map[string]any{"workloadType": "deployment", "resources": []any{}},
+			},
+			expectedMethod: "UpdateComponentType",
+			validateCall: func(t *testing.T, args []interface{}) {
+				if args[0] != testNamespaceName {
+					t.Errorf("Expected namespace %q, got %v", testNamespaceName, args[0])
+				}
+			},
+		},
+		{
+			name:                "delete_component_type",
+			toolset:             "pe",
+			descriptionKeywords: []string{"delete", "component", "type"},
+			descriptionMinLen:   10,
+			requiredParams:      []string{"namespace_name", "ct_name"},
+			testArgs: map[string]any{
+				"namespace_name": testNamespaceName,
+				"ct_name":        "my-component-type",
+			},
+			expectedMethod: "DeleteComponentType",
+			validateCall: func(t *testing.T, args []interface{}) {
+				if args[0] != testNamespaceName || args[1] != "my-component-type" {
+					t.Errorf("Expected (%s, my-component-type), got (%v, %v)", testNamespaceName, args[0], args[1])
+				}
+			},
+		},
+		{
+			name:                "create_trait",
+			toolset:             "pe",
+			descriptionKeywords: []string{"create", "trait"},
+			descriptionMinLen:   10,
+			requiredParams:      []string{"namespace_name", "name", "spec"},
+			optionalParams:      []string{"display_name", "description"},
+			testArgs: map[string]any{
+				"namespace_name": testNamespaceName,
+				"name":           "my-trait",
+				"spec":           map[string]any{},
+			},
+			expectedMethod: "CreateTrait",
+			validateCall: func(t *testing.T, args []interface{}) {
+				if args[0] != testNamespaceName {
+					t.Errorf("Expected namespace %q, got %v", testNamespaceName, args[0])
+				}
+			},
+		},
+		{
+			name:                "update_trait",
+			toolset:             "pe",
+			descriptionKeywords: []string{"update", "trait"},
+			descriptionMinLen:   10,
+			requiredParams:      []string{"namespace_name", "name", "spec"},
+			optionalParams:      []string{"display_name", "description"},
+			testArgs: map[string]any{
+				"namespace_name": testNamespaceName,
+				"name":           "my-trait",
+				"spec":           map[string]any{},
+			},
+			expectedMethod: "UpdateTrait",
+			validateCall: func(t *testing.T, args []interface{}) {
+				if args[0] != testNamespaceName {
+					t.Errorf("Expected namespace %q, got %v", testNamespaceName, args[0])
+				}
+			},
+		},
+		{
+			name:                "delete_trait",
+			toolset:             "pe",
+			descriptionKeywords: []string{"delete", "trait"},
+			descriptionMinLen:   10,
+			requiredParams:      []string{"namespace_name", "trait_name"},
+			testArgs: map[string]any{
+				"namespace_name": testNamespaceName,
+				"trait_name":     "my-trait",
+			},
+			expectedMethod: "DeleteTrait",
+			validateCall: func(t *testing.T, args []interface{}) {
+				if args[0] != testNamespaceName || args[1] != "my-trait" {
+					t.Errorf("Expected (%s, my-trait), got (%v, %v)", testNamespaceName, args[0], args[1])
+				}
+			},
+		},
+		{
+			name:                "create_workflow",
+			toolset:             "pe",
+			descriptionKeywords: []string{"create", "workflow"},
+			descriptionMinLen:   10,
+			requiredParams:      []string{"namespace_name", "name", "spec"},
+			optionalParams:      []string{"display_name", "description"},
+			testArgs: map[string]any{
+				"namespace_name": testNamespaceName,
+				"name":           testBuildWorkflow,
+				"spec":           map[string]any{"runTemplate": map[string]any{}},
+			},
+			expectedMethod: "CreateWorkflow",
+			validateCall: func(t *testing.T, args []interface{}) {
+				if args[0] != testNamespaceName {
+					t.Errorf("Expected namespace %q, got %v", testNamespaceName, args[0])
+				}
+			},
+		},
+		{
+			name:                "update_workflow",
+			toolset:             "pe",
+			descriptionKeywords: []string{"update", "workflow"},
+			descriptionMinLen:   10,
+			requiredParams:      []string{"namespace_name", "name", "spec"},
+			optionalParams:      []string{"display_name", "description"},
+			testArgs: map[string]any{
+				"namespace_name": testNamespaceName,
+				"name":           testBuildWorkflow,
+				"spec":           map[string]any{"runTemplate": map[string]any{}},
+			},
+			expectedMethod: "UpdateWorkflow",
+			validateCall: func(t *testing.T, args []interface{}) {
+				if args[0] != testNamespaceName {
+					t.Errorf("Expected namespace %q, got %v", testNamespaceName, args[0])
+				}
+			},
+		},
+		{
+			name:                "delete_workflow",
+			toolset:             "pe",
+			descriptionKeywords: []string{"delete", "workflow"},
+			descriptionMinLen:   10,
+			requiredParams:      []string{"namespace_name", "workflow_name"},
+			testArgs: map[string]any{
+				"namespace_name": testNamespaceName,
+				"workflow_name":  testBuildWorkflow,
+			},
+			expectedMethod: "DeleteWorkflow",
+			validateCall: func(t *testing.T, args []interface{}) {
+				if args[0] != testNamespaceName || args[1] != testBuildWorkflow {
+					t.Errorf("Expected (%s, %s), got (%v, %v)", testNamespaceName, testBuildWorkflow, args[0], args[1])
 				}
 			},
 		},
@@ -477,13 +1002,13 @@ func TestComponentToolsetClosuresInPEFile(t *testing.T) {
 		{"list_component_types", map[string]any{"namespace_name": testNamespaceName}, "ListComponentTypes"},
 		{
 			"get_component_type_schema",
-			map[string]any{"namespace_name": testNamespaceName, "ct_name": "WebApplication"},
+			map[string]any{"namespace_name": testNamespaceName, "ct_name": testWebAppType},
 			"GetComponentTypeSchema",
 		},
 		{"list_traits", map[string]any{"namespace_name": testNamespaceName}, "ListTraits"},
 		{
 			"get_trait_schema",
-			map[string]any{"namespace_name": testNamespaceName, "trait_name": "autoscaling"},
+			map[string]any{"namespace_name": testNamespaceName, "trait_name": testAutoscalingTrait},
 			"GetTraitSchema",
 		},
 		{"list_cluster_component_types", map[string]any{}, "ListClusterComponentTypes"},
@@ -588,7 +1113,7 @@ func TestDeploymentToolsetListEnvironmentsInPEFile(t *testing.T) {
 }
 
 // TestCreateEnvironmentMinimalArgs covers the code path in RegisterCreateEnvironment
-// where optional fields (display_name, description, data_plane_ref) are absent.
+// where optional fields (display_name, description) are absent.
 func TestCreateEnvironmentMinimalArgs(t *testing.T) {
 	mockHandler := NewMockCoreToolsetHandler()
 	toolsets := &Toolsets{PEToolset: mockHandler}
@@ -600,7 +1125,7 @@ func TestCreateEnvironmentMinimalArgs(t *testing.T) {
 
 	result, err := clientSession.CallTool(ctx, &mcp.CallToolParams{
 		Name:      "create_environment",
-		Arguments: map[string]any{"namespace_name": testNamespaceName, "name": "minimal-env"},
+		Arguments: map[string]any{"namespace_name": testNamespaceName, "name": "minimal-env", "data_plane_ref": "default"},
 	})
 	if err != nil {
 		t.Fatalf("Failed to call create_environment: %v", err)
@@ -681,5 +1206,107 @@ func TestUpdateEnvironmentWithOptionalFields(t *testing.T) {
 	}
 	if _, ok := mockHandler.calls["UpdateEnvironment"]; !ok {
 		t.Errorf("Expected UpdateEnvironment to be called, got: %v", mockHandler.calls)
+	}
+}
+
+// TestCreateEnvironmentWithClusterDataPlane covers the ClusterDataPlane kind branch
+// in RegisterCreateEnvironment (data_plane_ref_kind == "ClusterDataPlane").
+func TestCreateEnvironmentWithClusterDataPlane(t *testing.T) {
+	mockHandler := NewMockCoreToolsetHandler()
+	toolsets := &Toolsets{PEToolset: mockHandler}
+	clientSession := setupTestServerWithToolset(t, toolsets)
+	defer clientSession.Close()
+
+	ctx := context.Background()
+	mockHandler.calls = make(map[string][]interface{})
+
+	result, err := clientSession.CallTool(ctx, &mcp.CallToolParams{
+		Name: "create_environment",
+		Arguments: map[string]any{
+			"namespace_name":      testNamespaceName,
+			"name":                "prod-env",
+			"data_plane_ref":      "cdp1",
+			"data_plane_ref_kind": "ClusterDataPlane",
+			"is_production":       true,
+		},
+	})
+	if err != nil {
+		t.Fatalf("Failed to call create_environment: %v", err)
+	}
+	if len(result.Content) == 0 {
+		t.Fatal("Expected non-empty result content")
+	}
+	if _, ok := mockHandler.calls["CreateEnvironment"]; !ok {
+		t.Errorf("Expected CreateEnvironment to be called, got: %v", mockHandler.calls)
+	}
+}
+
+// TestUpdateDeploymentPipelineWithPromotionPaths covers the promotion_paths branch
+// in RegisterUpdateDeploymentPipeline.
+func TestUpdateDeploymentPipelineWithPromotionPaths(t *testing.T) {
+	mockHandler := NewMockCoreToolsetHandler()
+	toolsets := &Toolsets{PEToolset: mockHandler}
+	clientSession := setupTestServerWithToolset(t, toolsets)
+	defer clientSession.Close()
+
+	ctx := context.Background()
+	mockHandler.calls = make(map[string][]interface{})
+
+	result, err := clientSession.CallTool(ctx, &mcp.CallToolParams{
+		Name: "update_deployment_pipeline",
+		Arguments: map[string]any{
+			"namespace_name": testNamespaceName,
+			"name":           "my-pipeline",
+			"display_name":   "Updated Pipeline",
+			"description":    "Updated description",
+			"promotion_paths": []map[string]any{
+				{
+					"source_environment_ref": "dev",
+					"target_environment_refs": []map[string]any{
+						{"name": "prod", "requires_approval": true},
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Failed to call update_deployment_pipeline: %v", err)
+	}
+	if len(result.Content) == 0 {
+		t.Fatal("Expected non-empty result content")
+	}
+	if _, ok := mockHandler.calls["UpdateDeploymentPipeline"]; !ok {
+		t.Errorf("Expected UpdateDeploymentPipeline to be called, got: %v", mockHandler.calls)
+	}
+}
+
+// TestGetResourceLogsWithSinceSeconds covers the since_seconds optional parameter
+// in RegisterGetResourceLogs.
+func TestGetResourceLogsWithSinceSeconds(t *testing.T) {
+	mockHandler := NewMockCoreToolsetHandler()
+	toolsets := &Toolsets{PEToolset: mockHandler}
+	clientSession := setupTestServerWithToolset(t, toolsets)
+	defer clientSession.Close()
+
+	ctx := context.Background()
+	mockHandler.calls = make(map[string][]interface{})
+
+	result, err := clientSession.CallTool(ctx, &mcp.CallToolParams{
+		Name: "get_resource_logs",
+		Arguments: map[string]any{
+			"namespace_name":       testNamespaceName,
+			"release_binding_name": "binding-dev",
+			"pod_name":             "my-app-pod-abc123",
+			"since_seconds":        int64(300),
+		},
+	})
+	if err != nil {
+		t.Fatalf("Failed to call get_resource_logs: %v", err)
+	}
+	if len(result.Content) == 0 {
+		t.Fatal("Expected non-empty result content")
+	}
+	if _, ok := mockHandler.calls["GetResourceLogs"]; !ok {
+		t.Errorf("Expected GetResourceLogs to be called, got: %v", mockHandler.calls)
 	}
 }

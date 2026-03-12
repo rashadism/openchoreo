@@ -429,6 +429,15 @@ func workflowSummary(wf openchoreov1alpha1.Workflow) map[string]any {
 	return m
 }
 
+func workflowDetail(wf *openchoreov1alpha1.Workflow) map[string]any {
+	m := extractCommonMeta(wf)
+	if spec := specToMap(wf.Spec); len(spec) > 0 {
+		m["spec"] = spec
+	}
+	setIfNotEmpty(m, "status", readyStatus(wf.Status.Conditions))
+	return m
+}
+
 // ---------------------------------------------------------------------------
 // ComponentType
 // ---------------------------------------------------------------------------
@@ -446,12 +455,28 @@ func componentTypeSummary(ct openchoreov1alpha1.ComponentType) map[string]any {
 	return m
 }
 
+func componentTypeDetail(ct *openchoreov1alpha1.ComponentType) map[string]any {
+	m := extractCommonMeta(ct)
+	if spec := specToMap(ct.Spec); len(spec) > 0 {
+		m["spec"] = spec
+	}
+	return m
+}
+
 // ---------------------------------------------------------------------------
 // Trait
 // ---------------------------------------------------------------------------
 
 func traitSummary(t openchoreov1alpha1.Trait) map[string]any {
 	return extractCommonMeta(&t)
+}
+
+func traitDetail(t *openchoreov1alpha1.Trait) map[string]any {
+	m := extractCommonMeta(t)
+	if spec := specToMap(t.Spec); len(spec) > 0 {
+		m["spec"] = spec
+	}
+	return m
 }
 
 // ---------------------------------------------------------------------------
@@ -575,6 +600,19 @@ func clusterWorkflowPlaneSummary(cwp openchoreov1alpha1.ClusterWorkflowPlane) ma
 	return m
 }
 
+func clusterWorkflowPlaneDetail(cbp *openchoreov1alpha1.ClusterWorkflowPlane) map[string]any {
+	m := extractCommonMeta(cbp)
+	setIfNotEmpty(m, "planeID", cbp.Spec.PlaneID)
+	if cbp.Status.AgentConnection != nil {
+		m["agentConnection"] = agentConnectionToMap(cbp.Status.AgentConnection)
+	}
+	setIfNotEmpty(m, "status", readyStatus(cbp.Status.Conditions))
+	if conds := conditionsSummary(cbp.Status.Conditions); conds != nil {
+		m["conditions"] = conds
+	}
+	return m
+}
+
 // ---------------------------------------------------------------------------
 // ClusterObservabilityPlane
 // ---------------------------------------------------------------------------
@@ -585,6 +623,20 @@ func clusterObservabilityPlaneSummary(cop openchoreov1alpha1.ClusterObservabilit
 	setIfNotEmpty(m, "observerURL", cop.Spec.ObserverURL)
 	if cop.Status.AgentConnection != nil {
 		m["agentConnected"] = cop.Status.AgentConnection.Connected
+	}
+	return m
+}
+
+func clusterObservabilityPlaneDetail(cop *openchoreov1alpha1.ClusterObservabilityPlane) map[string]any {
+	m := extractCommonMeta(cop)
+	setIfNotEmpty(m, "planeID", cop.Spec.PlaneID)
+	setIfNotEmpty(m, "observerURL", cop.Spec.ObserverURL)
+	if cop.Status.AgentConnection != nil {
+		m["agentConnection"] = agentConnectionToMap(cop.Status.AgentConnection)
+	}
+	setIfNotEmpty(m, "status", readyStatus(cop.Status.Conditions))
+	if conds := conditionsSummary(cop.Status.Conditions); conds != nil {
+		m["conditions"] = conds
 	}
 	return m
 }
@@ -608,13 +660,8 @@ func clusterComponentTypeSummary(cct openchoreov1alpha1.ClusterComponentType) ma
 
 func clusterComponentTypeDetail(cct *openchoreov1alpha1.ClusterComponentType) map[string]any {
 	m := extractCommonMeta(cct)
-	m["workloadType"] = cct.Spec.WorkloadType
-	if len(cct.Spec.AllowedWorkflows) > 0 {
-		wfs := make([]map[string]string, len(cct.Spec.AllowedWorkflows))
-		for i, ref := range cct.Spec.AllowedWorkflows {
-			wfs[i] = map[string]string{"kind": string(ref.Kind), "name": ref.Name}
-		}
-		m["allowedWorkflows"] = wfs
+	if spec := specToMap(cct.Spec); len(spec) > 0 {
+		m["spec"] = spec
 	}
 	return m
 }
@@ -628,7 +675,11 @@ func clusterTraitSummary(ct openchoreov1alpha1.ClusterTrait) map[string]any {
 }
 
 func clusterTraitDetail(ct *openchoreov1alpha1.ClusterTrait) map[string]any {
-	return extractCommonMeta(ct)
+	m := extractCommonMeta(ct)
+	if spec := specToMap(ct.Spec); len(spec) > 0 {
+		m["spec"] = spec
+	}
+	return m
 }
 
 // ---------------------------------------------------------------------------
@@ -640,7 +691,11 @@ func clusterWorkflowSummary(cwf openchoreov1alpha1.ClusterWorkflow) map[string]a
 }
 
 func clusterWorkflowDetail(cwf *openchoreov1alpha1.ClusterWorkflow) map[string]any {
-	return extractCommonMeta(cwf)
+	m := extractCommonMeta(cwf)
+	if spec := specToMap(cwf.Spec); len(spec) > 0 {
+		m["spec"] = spec
+	}
+	return m
 }
 
 // ---------------------------------------------------------------------------
@@ -658,4 +713,18 @@ func rawExtensionToAny(raw *runtime.RawExtension) any {
 		return string(raw.Raw)
 	}
 	return v
+}
+
+// specToMap marshals a spec struct to a map[string]any via JSON round-trip,
+// preserving all fields including RawExtension values.
+func specToMap(spec any) map[string]any {
+	data, err := json.Marshal(spec)
+	if err != nil {
+		return nil
+	}
+	var m map[string]any
+	if err := json.Unmarshal(data, &m); err != nil {
+		return nil
+	}
+	return m
 }

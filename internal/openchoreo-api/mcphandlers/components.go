@@ -6,7 +6,9 @@ package mcphandlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -16,7 +18,9 @@ import (
 	ocLabels "github.com/openchoreo/openchoreo/internal/labels"
 	"github.com/openchoreo/openchoreo/internal/openchoreo-api/api/gen"
 	"github.com/openchoreo/openchoreo/internal/openchoreo-api/services"
+	clustercomponenttypesvc "github.com/openchoreo/openchoreo/internal/openchoreo-api/services/clustercomponenttype"
 	componentsvc "github.com/openchoreo/openchoreo/internal/openchoreo-api/services/component"
+	componenttypesvc "github.com/openchoreo/openchoreo/internal/openchoreo-api/services/componenttype"
 	"github.com/openchoreo/openchoreo/pkg/mcp/tools"
 )
 
@@ -43,10 +47,12 @@ func (h *MCPHandler) CreateComponent(
 		component.Annotations[controller.AnnotationKeyDescription] = *req.Description
 	}
 	if req.ComponentType != nil && *req.ComponentType != "" {
-		// ComponentType in gen is a string in format: {workloadType}/{componentTypeName}
-		// Default to ComponentType kind if not specified
+		kind, err := h.resolveComponentTypeKind(ctx, namespaceName, *req.ComponentType)
+		if err != nil {
+			return nil, err
+		}
 		component.Spec.ComponentType = openchoreov1alpha1.ComponentTypeRef{
-			Kind: openchoreov1alpha1.ComponentTypeRefKindComponentType,
+			Kind: kind,
 			Name: *req.ComponentType,
 		}
 	}
@@ -373,6 +379,14 @@ func (h *MCPHandler) GetComponentTypeSchema(ctx context.Context, namespaceName, 
 	return h.services.ComponentTypeService.GetComponentTypeSchema(ctx, namespaceName, ctName)
 }
 
+func (h *MCPHandler) GetComponentType(ctx context.Context, namespaceName, ctName string) (any, error) {
+	ct, err := h.services.ComponentTypeService.GetComponentType(ctx, namespaceName, ctName)
+	if err != nil {
+		return nil, err
+	}
+	return componentTypeDetail(ct), nil
+}
+
 func (h *MCPHandler) ListTraits(ctx context.Context, namespaceName string, opts tools.ListOpts) (any, error) {
 	result, err := h.services.TraitService.ListTraits(ctx, namespaceName, toServiceListOptions(opts))
 	if err != nil {
@@ -383,6 +397,14 @@ func (h *MCPHandler) ListTraits(ctx context.Context, namespaceName string, opts 
 
 func (h *MCPHandler) GetTraitSchema(ctx context.Context, namespaceName, traitName string) (any, error) {
 	return h.services.TraitService.GetTraitSchema(ctx, namespaceName, traitName)
+}
+
+func (h *MCPHandler) GetTrait(ctx context.Context, namespaceName, traitName string) (any, error) {
+	t, err := h.services.TraitService.GetTrait(ctx, namespaceName, traitName)
+	if err != nil {
+		return nil, err
+	}
+	return traitDetail(t), nil
 }
 
 func (h *MCPHandler) CreateWorkflowRun(ctx context.Context, namespaceName, workflowName string, parameters map[string]any) (any, error) {
@@ -511,6 +533,14 @@ func (h *MCPHandler) GetWorkflowSchema(ctx context.Context, namespaceName, workf
 	return h.services.WorkflowService.GetWorkflowSchema(ctx, namespaceName, workflowName)
 }
 
+func (h *MCPHandler) GetWorkflow(ctx context.Context, namespaceName, workflowName string) (any, error) {
+	wf, err := h.services.WorkflowService.GetWorkflow(ctx, namespaceName, workflowName)
+	if err != nil {
+		return nil, err
+	}
+	return workflowDetail(wf), nil
+}
+
 func (h *MCPHandler) TriggerWorkflowRun(
 	ctx context.Context, namespaceName, projectName, componentName, commit string,
 ) (any, error) {
@@ -567,4 +597,34 @@ func (h *MCPHandler) TriggerWorkflowRun(
 	return mutationResult(created, "triggered", map[string]any{
 		"workflowName": component.Spec.Workflow.Name,
 	}), nil
+}
+
+// resolveComponentTypeKind resolves the kind of a component type reference by looking up
+// both namespace-scoped ComponentType and cluster-scoped ClusterComponentType.
+// The componentType string is in {workloadType}/{componentTypeName} format.
+// Namespace-scoped ComponentType takes precedence; ClusterComponentType is the fallback.
+func (h *MCPHandler) resolveComponentTypeKind(ctx context.Context, namespaceName, componentType string) (openchoreov1alpha1.ComponentTypeRefKind, error) {
+	parts := strings.SplitN(componentType, "/", 2)
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		return "", fmt.Errorf("invalid componentType format %q: expected {workloadType}/{name}", componentType)
+	}
+	typeName := parts[1]
+
+	_, err := h.services.ComponentTypeService.GetComponentType(ctx, namespaceName, typeName)
+	if err == nil {
+		return openchoreov1alpha1.ComponentTypeRefKindComponentType, nil
+	}
+	if !errors.Is(err, componenttypesvc.ErrComponentTypeNotFound) {
+		return "", fmt.Errorf("failed to look up ComponentType %q: %w", typeName, err)
+	}
+
+	_, cctErr := h.services.ClusterComponentTypeService.GetClusterComponentType(ctx, typeName)
+	if cctErr == nil {
+		return openchoreov1alpha1.ComponentTypeRefKindClusterComponentType, nil
+	}
+	if !errors.Is(cctErr, clustercomponenttypesvc.ErrClusterComponentTypeNotFound) {
+		return "", fmt.Errorf("failed to look up ClusterComponentType %q: %w", typeName, cctErr)
+	}
+
+	return "", fmt.Errorf("component type %q not found: no ComponentType in namespace %q or ClusterComponentType with that name", typeName, namespaceName)
 }
