@@ -66,18 +66,6 @@ spec:
       app: test
   policyTypes:
     - Ingress
-    - Egress
-  egress:
-    - to:
-        - namespaceSelector:
-            matchExpressions:
-              - key: openchoreo.dev/namespace
-                operator: DoesNotExist
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              openchoreo.dev/namespace: cp-ns
-              openchoreo.dev/environment: development
 `)
 
 	// Also verify empty map case
@@ -125,24 +113,12 @@ spec:
       openchoreo.dev/project: my-project
   policyTypes:
     - Ingress
-    - Egress
   ingress:
     - from:
         - podSelector: {}
       ports:
         - protocol: TCP
           port: 8080
-  egress:
-    - to:
-        - namespaceSelector:
-            matchExpressions:
-              - key: openchoreo.dev/namespace
-                operator: DoesNotExist
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              openchoreo.dev/namespace: cp-ns
-              openchoreo.dev/environment: development
 `)
 }
 
@@ -177,7 +153,6 @@ spec:
       app: api-svc
   policyTypes:
     - Ingress
-    - Egress
   ingress:
     - from:
         - podSelector: {}
@@ -192,17 +167,6 @@ spec:
       ports:
         - protocol: TCP
           port: 9090
-  egress:
-    - to:
-        - namespaceSelector:
-            matchExpressions:
-              - key: openchoreo.dev/namespace
-                operator: DoesNotExist
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              openchoreo.dev/namespace: cp-ns
-              openchoreo.dev/environment: development
 `)
 }
 
@@ -237,7 +201,6 @@ spec:
       app: public-api
   policyTypes:
     - Ingress
-    - Egress
   ingress:
     - from:
         - podSelector: {}
@@ -252,17 +215,6 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
-  egress:
-    - to:
-        - namespaceSelector:
-            matchExpressions:
-              - key: openchoreo.dev/namespace
-                operator: DoesNotExist
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              openchoreo.dev/namespace: cp-ns
-              openchoreo.dev/environment: development
 `)
 }
 
@@ -297,7 +249,6 @@ spec:
       app: internal-svc
   policyTypes:
     - Ingress
-    - Egress
   ingress:
     - from:
         - podSelector: {}
@@ -312,17 +263,6 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
-  egress:
-    - to:
-        - namespaceSelector:
-            matchExpressions:
-              - key: openchoreo.dev/namespace
-                operator: DoesNotExist
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              openchoreo.dev/namespace: cp-ns
-              openchoreo.dev/environment: development
 `)
 }
 
@@ -368,7 +308,6 @@ spec:
       app: mixed-svc
   policyTypes:
     - Ingress
-    - Egress
   ingress:
     - from:
         - podSelector: {}
@@ -395,17 +334,6 @@ spec:
       ports:
         - protocol: TCP
           port: 8443
-  egress:
-    - to:
-        - namespaceSelector:
-            matchExpressions:
-              - key: openchoreo.dev/namespace
-                operator: DoesNotExist
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              openchoreo.dev/namespace: cp-ns
-              openchoreo.dev/environment: development
 `)
 }
 
@@ -436,24 +364,12 @@ spec:
       app: dns-svc
   policyTypes:
     - Ingress
-    - Egress
   ingress:
     - from:
         - podSelector: {}
       ports:
         - protocol: UDP
           port: 5353
-  egress:
-    - to:
-        - namespaceSelector:
-            matchExpressions:
-              - key: openchoreo.dev/namespace
-                operator: DoesNotExist
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              openchoreo.dev/namespace: cp-ns
-              openchoreo.dev/environment: development
 `)
 }
 

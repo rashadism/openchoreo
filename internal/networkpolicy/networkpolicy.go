@@ -13,7 +13,7 @@ import (
 )
 
 // ComponentPolicyParams holds parameters for generating per-component NetworkPolicies
-// that include both ingress (endpoint-based) and egress (isolation) rules.
+// with ingress rules based on endpoint visibility.
 type ComponentPolicyParams struct {
 	Namespace     string                                         // data plane namespace name
 	CPNamespace   string                                         // control plane namespace name
@@ -23,45 +23,11 @@ type ComponentPolicyParams struct {
 	Endpoints     map[string]openchoreov1alpha1.WorkloadEndpoint // from workload spec
 }
 
-// MakeComponentPolicies returns a unified NetworkPolicy for a component that includes
-// both ingress rules (based on declared endpoints) and egress isolation rules
-// (blocking cross-CP-namespace and cross-environment traffic).
+// MakeComponentPolicies returns a NetworkPolicy for a component with ingress rules
+// based on declared endpoint visibility. Egress is unrestricted.
 func MakeComponentPolicies(params ComponentPolicyParams) []map[string]any {
 	// Build ingress rules from endpoints
 	ingressRules := makeIngressRules(params)
-
-	// Build egress isolation rules
-	egressRules := []any{
-		// Allow egress to namespaces that are NOT OpenChoreo CP namespaces
-		// (e.g., kube-system, kube-dns, external services)
-		map[string]any{
-			"to": []any{
-				map[string]any{
-					"namespaceSelector": map[string]any{
-						"matchExpressions": []any{
-							map[string]any{
-								"key":      labels.LabelKeyNamespaceName,
-								"operator": "DoesNotExist",
-							},
-						},
-					},
-				},
-			},
-		},
-		// Allow egress to dp namespaces in the same CP namespace and same environment
-		map[string]any{
-			"to": []any{
-				map[string]any{
-					"namespaceSelector": map[string]any{
-						"matchLabels": map[string]any{
-							labels.LabelKeyNamespaceName:   params.CPNamespace,
-							labels.LabelKeyEnvironmentName: params.Environment,
-						},
-					},
-				},
-			},
-		},
-	}
 
 	// Generate a policy name, truncated to k8s limits
 	policyName := fmt.Sprintf("openchoreo-%s", params.ComponentName)
@@ -76,8 +42,7 @@ func MakeComponentPolicies(params ComponentPolicyParams) []map[string]any {
 		"podSelector": map[string]any{
 			"matchLabels": toAnyMap(params.PodSelectors),
 		},
-		"policyTypes": []any{"Ingress", "Egress"},
-		"egress":      egressRules,
+		"policyTypes": []any{"Ingress"},
 	}
 	if len(ingressRules) > 0 {
 		spec["ingress"] = ingressRules
