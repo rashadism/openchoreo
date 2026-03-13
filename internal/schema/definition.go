@@ -26,6 +26,7 @@ const (
 	typeString  = "string"
 	typeInteger = "integer"
 	typeObject  = "object"
+	typeArray   = "array"
 )
 
 // Definition represents a schematized object assembled from one or more field maps.
@@ -35,7 +36,6 @@ type Definition struct {
 }
 
 // ResolveSectionToStructural converts a SchemaSection into a Kubernetes structural schema.
-// It handles both ocSchema and openAPIV3Schema formats transparently.
 // Returns nil if the section is nil or empty.
 func ResolveSectionToStructural(section *v1alpha1.SchemaSection) (*apiextschema.Structural, error) {
 	raw := sectionRaw(section)
@@ -48,7 +48,7 @@ func ResolveSectionToStructural(section *v1alpha1.SchemaSection) (*apiextschema.
 		return nil, err
 	}
 
-	if section.IsOpenAPIV3() {
+	if isOpenAPIV3Content(fields) {
 		return OpenAPIV3ToStructural(fields)
 	}
 
@@ -68,7 +68,7 @@ func ResolveSectionToBundle(section *v1alpha1.SchemaSection) (*apiextschema.Stru
 		return nil, nil, err
 	}
 
-	if section.IsOpenAPIV3() {
+	if isOpenAPIV3Content(fields) {
 		return OpenAPIV3ToStructuralAndJSONSchema(fields)
 	}
 
@@ -76,7 +76,6 @@ func ResolveSectionToBundle(section *v1alpha1.SchemaSection) (*apiextschema.Stru
 }
 
 // SectionToJSONSchema converts a SchemaSection to JSON Schema for API responses.
-// Handles both ocSchema (via extractor) and openAPIV3Schema (via ref resolution).
 func SectionToJSONSchema(section *v1alpha1.SchemaSection) (*extv1.JSONSchemaProps, error) {
 	raw := sectionRaw(section)
 	if raw == nil || len(raw.Raw) == 0 {
@@ -91,7 +90,7 @@ func SectionToJSONSchema(section *v1alpha1.SchemaSection) (*extv1.JSONSchemaProp
 		return nil, err
 	}
 
-	if section.IsOpenAPIV3() {
+	if isOpenAPIV3Content(fields) {
 		return OpenAPIV3ToJSONSchema(fields)
 	}
 
@@ -100,8 +99,7 @@ func SectionToJSONSchema(section *v1alpha1.SchemaSection) (*extv1.JSONSchemaProp
 
 // SectionToRawJSONSchema converts a SchemaSection to a raw map for API responses.
 // For openAPIV3Schema, this preserves vendor extensions (x-*) that are lost when
-// converting through extv1.JSONSchemaProps. For ocSchema, it falls back to
-// ToJSONSchema and re-marshals the result.
+// converting through extv1.JSONSchemaProps.
 func SectionToRawJSONSchema(section *v1alpha1.SchemaSection) (map[string]any, error) {
 	raw := sectionRaw(section)
 	if raw == nil || len(raw.Raw) == 0 {
@@ -116,11 +114,11 @@ func SectionToRawJSONSchema(section *v1alpha1.SchemaSection) (map[string]any, er
 		return nil, err
 	}
 
-	if section.IsOpenAPIV3() {
+	if isOpenAPIV3Content(fields) {
 		return OpenAPIV3ToResolvedSchema(fields)
 	}
 
-	// For ocSchema, convert through the extractor and re-marshal to map
+	// For shorthand schema, convert through the extractor and re-marshal to map
 	jsonSchema, err := ToJSONSchema(Definition{Schemas: []map[string]any{fields}})
 	if err != nil {
 		return nil, err
@@ -148,6 +146,54 @@ func sectionRaw(section *v1alpha1.SchemaSection) *runtime.RawExtension {
 		return nil
 	}
 	return section.GetRaw()
+}
+
+// isOpenAPIV3Content determines if unmarshaled fields represent standard OpenAPI V3 JSON Schema
+// or shorthand schema format based on content inspection.
+// Returns true if any top-level key is a structural or compositional JSON Schema keyword that
+// would never appear as a field name in shorthand schemas.
+// This is a temporary bridge for Phase 1 — Phase 2 will remove the shorthand extractor entirely.
+//
+// NOTE: We intentionally exclude generic keywords (type, format, description, default, enum,
+// pattern, title, etc.) because these are valid shorthand field names that would cause
+// misclassification. Only structural/object-level markers that unambiguously indicate
+// OpenAPI V3 content are included.
+func isOpenAPIV3Content(fields map[string]any) bool {
+	if len(fields) == 0 {
+		return true
+	}
+	for key := range fields {
+		if openAPIStructuralKeywords[key] {
+			return true
+		}
+	}
+	// A top-level "type" with value "object" or "array" is unambiguously OpenAPI V3.
+	// In shorthand, these are not valid type descriptors at the root level.
+	if typeVal, ok := fields["type"].(string); ok {
+		if typeVal == "object" || typeVal == "array" {
+			return true
+		}
+	}
+	return false
+}
+
+// openAPIStructuralKeywords contains only structural and compositional JSON Schema keywords
+// that unambiguously indicate OpenAPI V3 content. Generic keywords like "type", "format",
+// "description", "default", "enum", "pattern", etc. are excluded because they can also be
+// valid field names in shorthand schemas (e.g., a field named "format" or "description").
+var openAPIStructuralKeywords = map[string]bool{
+	// Structural keywords — define object/array shape
+	"properties": true, "items": true,
+	"additionalProperties": true, "patternProperties": true,
+	// Composition keywords
+	"allOf": true, "oneOf": true, "anyOf": true, "not": true,
+	// Reference keywords ($ prefix never appears in shorthand field names)
+	"$ref": true, "$defs": true, "$id": true, "$schema": true,
+	// Kubernetes extensions
+	"x-kubernetes-preserve-unknown-fields": true,
+	"x-kubernetes-int-or-string":           true,
+	"x-kubernetes-embedded-resource":       true,
+	"x-kubernetes-validations":             true,
 }
 
 // unmarshalSection unmarshals a raw extension into a field map.
