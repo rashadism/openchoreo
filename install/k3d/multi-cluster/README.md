@@ -429,6 +429,18 @@ kubectl --context k3d-openchoreo-op create configmap cluster-gateway-ca \
   --dry-run=client -o yaml | kubectl --context k3d-openchoreo-op apply -f -
 ```
 
+### OpenBao (Secret Store)
+
+Install [OpenBao](https://openbao.org/) as the secret backend on the observability plane cluster:
+
+```bash
+install/prerequisites/openbao/setup.sh --dev --seed-dev-secrets --kube-context k3d-openchoreo-op
+```
+
+This installs OpenBao in dev mode into the `openbao` namespace, configures Kubernetes auth, seeds placeholder development secrets, and creates a `ClusterSecretStore` named `default`.
+
+To use a different secret backend, skip this and create your own `ClusterSecretStore` named `default` following the [ESO provider docs](https://external-secrets.io/latest/provider/).
+
 ### Observability Plane Secrets
 
 ```bash
@@ -548,7 +560,7 @@ kubectl --context k3d-openchoreo-cp patch clusterdataplane default --type merge 
 
 # If cluster workflow plane is installed:
 kubectl --context k3d-openchoreo-cp patch clusterworkflowplane default -n default --type merge \
-  -p '{"spec":{"observabilityPlaneRef":{"kind":"ObservabilityPlane","name":"default"}}}'
+  -p '{"spec":{"observabilityPlaneRef":{"kind":"ClusterObservabilityPlane","name":"default"}}}'
 ```
 
 ## Port Mappings

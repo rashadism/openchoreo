@@ -19,7 +19,7 @@ OPENBAO_IMAGE_TAG="2.4.4"
 CLUSTER_SECRET_STORE_NAME="default"
 DEV_MODE=false
 SEED_DEV_SECRETS=false
-KUBE_CONTEXT_FLAG=""
+KUBE_CONTEXT=""
 DEV_ROOT_TOKEN="root"
 
 while [[ $# -gt 0 ]]; do
@@ -33,7 +33,7 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         --kube-context)
-            KUBE_CONTEXT_FLAG="--kube-context $2"
+            KUBE_CONTEXT="$2"
             shift 2
             ;;
         *)
@@ -52,7 +52,7 @@ fi
 
 # shellcheck disable=SC2086
 helm upgrade --install openbao oci://ghcr.io/openbao/charts/openbao \
-    ${KUBE_CONTEXT_FLAG} \
+    ${KUBE_CONTEXT:+--kube-context "$KUBE_CONTEXT"} \
     --namespace "${OPENBAO_NAMESPACE}" \
     --create-namespace \
     --version "${OPENBAO_CHART_VERSION}" \
@@ -66,14 +66,14 @@ helm upgrade --install openbao oci://ghcr.io/openbao/charts/openbao \
 
 echo "Waiting for OpenBao to be ready..."
 # shellcheck disable=SC2086
-kubectl ${KUBE_CONTEXT_FLAG} wait --namespace "${OPENBAO_NAMESPACE}" \
+kubectl ${KUBE_CONTEXT:+--context "$KUBE_CONTEXT"} wait --namespace "${OPENBAO_NAMESPACE}" \
     --for=condition=Ready pods \
     -l app.kubernetes.io/name=openbao,component=server \
     --timeout=300s
 
 echo "Configuring OpenBao..."
 # shellcheck disable=SC2086
-kubectl ${KUBE_CONTEXT_FLAG} exec -n "${OPENBAO_NAMESPACE}" openbao-0 -- sh -c "
+kubectl ${KUBE_CONTEXT:+--context "$KUBE_CONTEXT"} exec -n "${OPENBAO_NAMESPACE}" openbao-0 -- sh -c "
     export BAO_ADDR=http://127.0.0.1:8200
     export BAO_TOKEN=${DEV_ROOT_TOKEN}
 
@@ -121,7 +121,7 @@ POLICY
 
 echo "Creating ServiceAccount for ESO..."
 # shellcheck disable=SC2086
-kubectl ${KUBE_CONTEXT_FLAG} apply -f - <<EOF
+kubectl ${KUBE_CONTEXT:+--context "$KUBE_CONTEXT"} apply -f - <<EOF
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -131,7 +131,7 @@ EOF
 
 echo "Creating ClusterSecretStore '${CLUSTER_SECRET_STORE_NAME}'..."
 # shellcheck disable=SC2086
-kubectl ${KUBE_CONTEXT_FLAG} apply -f - <<EOF
+kubectl ${KUBE_CONTEXT:+--context "$KUBE_CONTEXT"} apply -f - <<EOF
 apiVersion: external-secrets.io/v1
 kind: ClusterSecretStore
 metadata:
@@ -154,7 +154,7 @@ EOF
 if [[ "$SEED_DEV_SECRETS" == "true" ]]; then
     echo "Seeding development placeholder secrets..."
     # shellcheck disable=SC2086
-    kubectl ${KUBE_CONTEXT_FLAG} exec -n "${OPENBAO_NAMESPACE}" openbao-0 -- sh -c "
+    kubectl ${KUBE_CONTEXT:+--context "$KUBE_CONTEXT"} exec -n "${OPENBAO_NAMESPACE}" openbao-0 -- sh -c "
         export BAO_ADDR=http://127.0.0.1:8200
         export BAO_TOKEN=${DEV_ROOT_TOKEN}
 
