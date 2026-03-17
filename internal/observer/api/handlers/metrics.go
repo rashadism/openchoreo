@@ -53,8 +53,18 @@ func (h *Handler) QueryMetrics(w http.ResponseWriter, r *http.Request) {
 			h.writeErrorResponse(w, http.StatusUnauthorized, gen.Unauthorized, "", "Unauthorized")
 			return
 		}
+		h.logger.Error("Failed to query metrics", "error", err)
 		errorCode := types.ErrorCodeV1MetricsInternalGeneric
 		switch {
+		case errors.Is(err, service.ErrScopeAuthFailed):
+			h.writeErrorResponse(
+				w,
+				http.StatusInternalServerError,
+				gen.InternalServerError,
+				types.ErrorCodeV1ScopeAuthFailed,
+				"",
+			)
+			return
 		case errors.Is(err, service.ErrMetricsInvalidRequest):
 			h.logger.Debug("Invalid metrics request", "error", err)
 			h.writeErrorResponse(w, http.StatusBadRequest, gen.BadRequest, errorCode, err.Error())
