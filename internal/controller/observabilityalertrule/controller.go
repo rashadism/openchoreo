@@ -174,45 +174,28 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	return ctrl.Result{}, nil
 }
 
-// upsertAlertRule implements GET-first logic:
-//   - If BackendMonitorID is set: GET → 200 → PUT; 404 → POST (stale status).
-//   - If BackendMonitorID is empty: POST → 409 → PUT (fallback).
+// upsertAlertRule performs a GET-first upsert by rule name:
+//   - If GET returns 200, update the existing rule via PUT.
+//   - If GET returns 404, create a new rule via POST.
+//   - Any other status is treated as an error.
 func (r *Reconciler) upsertAlertRule(ctx context.Context, alertRule *openchoreov1alpha1.ObservabilityAlertRule, payload *alertRuleRequest) (*alertRuleSyncResponse, error) {
 	baseURL := getObserverInternalBaseURL()
 	ruleName := alertRule.Name
 	sourceType := string(alertRule.Spec.Source.Type)
 
-	if alertRule.Status.BackendMonitorID != "" {
-		// GET the rule to verify it still exists.
-		getResp, statusCode, err := r.getAlertRule(ctx, baseURL, ruleName, sourceType)
-		if err != nil {
-			return nil, fmt.Errorf("failed to GET alert rule: %w", err)
-		}
-		switch statusCode {
-		case http.StatusOK:
-			_ = getResp // rule exists; proceed with PUT
-			return r.putAlertRule(ctx, baseURL, ruleName, payload)
-		case http.StatusNotFound:
-			// Stale BackendMonitorID — rule was deleted externally; create it again.
-			return r.postAlertRule(ctx, baseURL, payload)
-		default:
-			return nil, fmt.Errorf("unexpected GET status %d for alert rule %q", statusCode, ruleName)
-		}
+	_, statusCode, err := r.getAlertRule(ctx, baseURL, ruleName, sourceType)
+	if err != nil {
+		return nil, fmt.Errorf("failed to GET alert rule: %w", err)
 	}
 
-	// No BackendMonitorID — attempt POST.
-	syncResp, statusCode, err := r.postAlertRuleWithStatus(ctx, baseURL, payload)
-	if err != nil {
-		return nil, err
-	}
-	if statusCode == http.StatusConflict {
-		// Rule exists but status doesn't know about it — fall back to PUT.
+	switch statusCode {
+	case http.StatusOK:
 		return r.putAlertRule(ctx, baseURL, ruleName, payload)
+	case http.StatusNotFound:
+		return r.postAlertRule(ctx, baseURL, payload)
+	default:
+		return nil, fmt.Errorf("unexpected GET status %d for alert rule %q", statusCode, ruleName)
 	}
-	if statusCode != http.StatusCreated {
-		return nil, fmt.Errorf("unexpected POST status %d for alert rule %q", statusCode, ruleName)
-	}
-	return syncResp, nil
 }
 
 // getAlertRule calls GET /api/v1alpha1/alerts/sources/{sourceType}/rules/{ruleName}
@@ -355,8 +338,8 @@ func buildAlertRuleRequest(rule *openchoreov1alpha1.ObservabilityAlertRule) (*al
 		},
 		Condition: alertRuleCondition{
 			Enabled:   enabled,
-			Window:    spec.Condition.Window.Duration.String(),
-			Interval:  spec.Condition.Interval.Duration.String(),
+			Window:    formatMinutesHours(spec.Condition.Window.Duration),
+			Interval:  formatMinutesHours(spec.Condition.Interval.Duration),
 			Operator:  string(spec.Condition.Operator),
 			Threshold: float64(spec.Condition.Threshold),
 		},
@@ -375,6 +358,14 @@ func getObserverInternalBaseURL() string {
 		return v
 	}
 	return defaultObserverInternalBaseURL
+}
+
+// formatMinutesHours converts a duration to a minutes/hours-only string (e.g. "5m", "1h").
+func formatMinutesHours(d time.Duration) string {
+	if d%time.Hour == 0 {
+		return fmt.Sprintf("%dh", d/time.Hour)
+	}
+	return fmt.Sprintf("%dm", d/time.Minute)
 }
 
 // updateStatusWithError sets the rule status to Error and records a failing condition.
