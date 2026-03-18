@@ -2,6 +2,11 @@
 
 Production-like setup with each OpenChoreo plane running in its own k3d cluster.
 
+> [!NOTE]
+> This guide is for **contributors and developers** working from a local checkout.
+> It uses local Helm charts (`install/helm/...`) and standalone setup scripts.
+> If you just want to try OpenChoreo, follow the [public getting-started guide](https://openchoreo.dev/docs/getting-started/try-it-out/on-your-environment/) instead.
+
 Planes communicate via **cluster agents** over WebSocket. Data/Build/Observability
 plane agents connect to the Control Plane's cluster-gateway. Secured with mTLS,
 no need to expose Kubernetes APIs externally.
@@ -375,7 +380,7 @@ docker exec k3d-openchoreo-op-server-0 sh -c \
 kubectl apply --context k3d-openchoreo-op --server-side \
   -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.1/experimental-install.yaml
 
-# Install kgateway
+# kgateway
 helm upgrade --install kgateway-crds oci://cr.kgateway.dev/kgateway-dev/charts/kgateway-crds \
   --create-namespace --namespace openchoreo-observability-plane --kube-context k3d-openchoreo-op \
   --version v2.2.1
@@ -385,7 +390,6 @@ helm upgrade --install kgateway oci://cr.kgateway.dev/kgateway-dev/charts/kgatew
   --version v2.2.1 \
   --set controller.extraEnv.KGW_ENABLE_GATEWAY_API_EXPERIMENTAL_FEATURES=true
 
-# Install Cert Manager (required for TLS certificates)
 # cert-manager
 helm upgrade --install cert-manager oci://quay.io/jetstack/charts/cert-manager \
   --kube-context k3d-openchoreo-op \
@@ -511,14 +515,14 @@ helm upgrade --install openchoreo-observability-plane install/helm/openchoreo-ob
   --timeout 10m
 ```
 
-#### Install Observability Modules
-
-Install the required logs, metrics and tracing modules. Refer https://openchoreo.dev/modules for more details
-
 ```bash
 kubectl --context k3d-openchoreo-op wait -n openchoreo-observability-plane \
   --for=condition=available --timeout=600s deployment --all
 ```
+
+#### Install Observability Modules
+
+Install the required logs, metrics and tracing modules. Refer https://openchoreo.dev/modules for more details.
 
 ### Register Observability Plane
 
