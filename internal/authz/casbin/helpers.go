@@ -233,11 +233,6 @@ func parseSubject(subject string) (claim, value string, err error) {
 	return parts[0], parts[1], nil
 }
 
-// isClusterScoped returns true if the namespace is empty (cluster-scoped)
-func isClusterScoped(namespace string) bool {
-	return namespace == ""
-}
-
 // validateBatchEvaluateRequest checks if each EvaluateRequest in the BatchEvaluateRequest has all required fields
 func validateBatchEvaluateRequest(req *authzcore.BatchEvaluateRequest) error {
 	if req == nil {
@@ -348,52 +343,6 @@ func validateProfileRequest(req *authzcore.ProfileRequest) error {
 	}
 	if req.SubjectContext == nil {
 		return fmt.Errorf("%w: subject context is required", authzcore.ErrInvalidRequest)
-	}
-	return nil
-}
-
-func validateRoleEntitlementMapping(mapping *authzcore.RoleEntitlementMapping) error {
-	if mapping == nil {
-		return fmt.Errorf("%w: role-entitlement mapping is nil", authzcore.ErrInvalidRequest)
-	}
-	if mapping.Name == "" {
-		return fmt.Errorf("%w: name is required", authzcore.ErrInvalidRequest)
-	}
-	if mapping.RoleRef.Name == "" {
-		return fmt.Errorf("%w: role name is required", authzcore.ErrInvalidRequest)
-	}
-	if mapping.Entitlement.Claim == "" {
-		return fmt.Errorf("%w: entitlement claim is required", authzcore.ErrInvalidRequest)
-	}
-	if mapping.Entitlement.Value == "" {
-		return fmt.Errorf("%w: entitlement value is required", authzcore.ErrInvalidRequest)
-	}
-	if mapping.RoleRef.Namespace != "" && mapping.RoleRef.Namespace != mapping.Hierarchy.Namespace {
-		return fmt.Errorf("%w: role namespace and mapping hierarchy namespace must match for namespace-scoped roles", authzcore.ErrInvalidRequest)
-	}
-	return nil
-}
-
-func validateRoleRef(roleRef *authzcore.RoleRef) error {
-	if roleRef == nil {
-		return fmt.Errorf("role reference cannot be nil")
-	}
-	if roleRef.Name == "" {
-		return fmt.Errorf("role name cannot be empty")
-	}
-	return nil
-}
-
-func ValidateCreateRoleRequest(req *authzcore.Role) error {
-	if req == nil {
-		return fmt.Errorf("%w: create role request is nil", authzcore.ErrInvalidRequest)
-	}
-	if req.Name == "" {
-		return fmt.Errorf("role name cannot be empty")
-	}
-
-	if len(req.Actions) == 0 {
-		return fmt.Errorf("role must have at least one action")
 	}
 	return nil
 }
