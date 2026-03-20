@@ -15,7 +15,7 @@ You need a running OpenChoreo instance. If you haven't set one up yet:
 
 ### 2. Configure MCP Server
 
-The OpenChoreo MCP server must be configured and accessible. See the [Configuration Guide](./configs/) for detailed instructions to obtain:
+The OpenChoreo MCP server must be configured and accessible. See the [Configuration Guide](https://openchoreo.dev/docs/ai/mcp-servers) for detailed instructions to obtain:
 
 - MCP server endpoint
 - An access token
@@ -46,6 +46,36 @@ Deploy a complete service from source code to production using the OpenChoreo MC
 - Component workflows configured (Docker or Buildpacks)
 
 **Time:** 15-20 minutes
+
+### 3. [Log Analysis & Debugging](./log-analysis/)
+Debug a cascading failure in the GCP Microservices Demo (Online Boutique) using logs, traces, and workload inspection. You'll intentionally break the product catalog service, then use AI-assisted observability to diagnose and fix the issue.
+
+**Prerequisites:** All prerequisites above, plus:
+- [GCP Microservices Demo](../gcp-microservices-demo/) deployed and running
+- Observability plane configured and running
+- Both Control Plane and Observability Plane MCP servers configured
+
+**Time:** ~10 minutes
+
+### 4. [Build Failure Diagnosis](./build-failures/)
+Debug a Docker build failure in the Go Greeter service. You'll trigger a build with a misconfigured Dockerfile path, then use AI-assisted workflow inspection and log analysis to diagnose and fix the issue.
+
+**Prerequisites:** All prerequisites above, plus:
+- [Go Docker Greeter](../from-source/services/go-docker-greeter/) sample deployed with a successful initial build
+- Workflow plane installed and running
+- Both Control Plane and Observability Plane MCP servers configured
+
+**Time:** ~10 minutes
+
+### 5. [Resource Optimization](./resource-optimization/)
+Detect and fix over-provisioned workloads in the GCP Microservices Demo. You'll intentionally allocate excessive CPU and memory, then use AI-assisted analysis to compare allocation vs actual usage and apply right-sized configurations.
+
+**Prerequisites:** All prerequisites above, plus:
+- [GCP Microservices Demo](../gcp-microservices-demo/) deployed and running
+- Observability plane configured and running
+- Both Control Plane and Observability Plane MCP servers configured
+
+**Time:** ~10 minutes
 
 ## Getting Help
 
