@@ -2,6 +2,41 @@
 
 All notable changes to OpenChoreo are documented in this file.
 
+## v1.0.0
+
+Changes since [v1.0.0-rc.2](https://github.com/openchoreo/openchoreo/releases/tag/v1.0.0-rc.2).
+
+### Features
+
+- **(Backstage UI)** Namespace definition editing with CRUD support via Definition tab for Domain
+  entities. ([#479](https://github.com/openchoreo/backstage-plugins/pull/479))
+
+### Enhancements
+
+- **(Backstage UI)** Customized About cards with permission-gated edit links and renamed labels
+  (Domain→Namespace, System→Project). ([#479](https://github.com/openchoreo/backstage-plugins/pull/479))
+- **(Backstage UI)** Responsive layout for environment cards on wider
+  screens. ([#471](https://github.com/openchoreo/backstage-plugins/pull/471))
+- **(Backstage UI)** Required field validation in environment variable and file mount
+  editors. ([#477](https://github.com/openchoreo/backstage-plugins/pull/477))
+- **(Backstage UI)** Pagination for environment cards in deploy
+  page. ([#476](https://github.com/openchoreo/backstage-plugins/pull/476))
+
+### Bug Fixes
+
+- **(Controller)** Repeated forbidden errors in controller logs from renderedrelease controller
+  Secret listing fixed. ([#2935](https://github.com/openchoreo/openchoreo/pull/2935))
+- **(API)** Component release generation missing `spec.workload.dependencies`
+  fixed. ([#2934](https://github.com/openchoreo/openchoreo/pull/2934))
+- **(MCP)** `create_component` tool parameter description for workflow parameters
+  fixed. ([#2925](https://github.com/openchoreo/openchoreo/pull/2925))
+- **(CLI)** `occ componentrelease generate` failing for ClusterComponentType and ClusterTrait
+  fixed. ([#2928](https://github.com/openchoreo/openchoreo/pull/2928))
+- **(Backstage UI)** Promotion path editor allowing same environment as source and target
+  fixed. ([#478](https://github.com/openchoreo/backstage-plugins/pull/478))
+- **(Backstage UI)** Missing namespace relationship for DeploymentPipeline entities in catalog
+  fixed. ([#469](https://github.com/openchoreo/backstage-plugins/pull/469))
+
 ## v1.0.0-rc.2
 
 Changes since [v1.0.0-rc.1](https://github.com/openchoreo/openchoreo/releases/tag/v1.0.0-rc.1).
