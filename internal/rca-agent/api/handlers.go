@@ -7,11 +7,12 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
 
+	authzcore "github.com/openchoreo/openchoreo/internal/authz/core"
+	rcaAuthz "github.com/openchoreo/openchoreo/internal/rca-agent/authz"
 	"github.com/openchoreo/openchoreo/internal/rca-agent/store"
 )
 
@@ -19,29 +20,16 @@ import (
 type Handler struct {
 	logger      *slog.Logger
 	reportStore store.ReportStore
+	authzClient authzcore.PDP
 }
 
 // NewHandler creates a new API handler.
-func NewHandler(logger *slog.Logger, reportStore store.ReportStore) *Handler {
+func NewHandler(logger *slog.Logger, reportStore store.ReportStore, authzClient authzcore.PDP) *Handler {
 	return &Handler{
 		logger:      logger,
 		reportStore: reportStore,
+		authzClient: authzClient,
 	}
-}
-
-// RegisterRoutes registers all API routes on the given mux.
-func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
-	// Agent endpoints (v1alpha1)
-	mux.HandleFunc("POST /api/v1alpha1/rca-agent/analyze", h.Analyze)
-	mux.HandleFunc("POST /api/v1alpha1/rca-agent/chat", h.Chat)
-
-	// Report endpoints (v1)
-	mux.HandleFunc("GET /api/v1/rca-agent/reports", h.ListReports)
-	mux.HandleFunc("GET /api/v1/rca-agent/reports/{report_id}", h.GetReport)
-	mux.HandleFunc("PUT /api/v1/rca-agent/reports/{report_id}", h.UpdateReport)
-
-	// Health check
-	mux.HandleFunc("GET /health", h.Health)
 }
 
 // Analyze handles POST /api/v1alpha1/rca-agent/analyze.
@@ -91,6 +79,16 @@ func (h *Handler) Chat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Authorize
+	resourceType, resourceID, hierarchy := rcaAuthz.ComponentScopeAuthz(req.Namespace, req.Project, "")
+	if err := rcaAuthz.CheckAuthorization(
+		r.Context(), h.logger, h.authzClient,
+		rcaAuthz.ActionViewRCAReport, resourceType, resourceID, hierarchy,
+	); err != nil {
+		handleAuthzError(w, err)
+		return
+	}
+
 	h.logger.Info("chat request received",
 		"report_id", req.ReportID,
 		"namespace", req.Namespace,
@@ -113,6 +111,16 @@ func (h *Handler) ListReports(w http.ResponseWriter, r *http.Request) {
 
 	if project == "" || environment == "" || namespace == "" || startTime == "" || endTime == "" {
 		writeError(w, http.StatusUnprocessableEntity, "project, environment, namespace, startTime, and endTime are required")
+		return
+	}
+
+	// Authorize
+	resourceType, resourceID, hierarchy := rcaAuthz.ComponentScopeAuthz(namespace, project, "")
+	if err := rcaAuthz.CheckAuthorization(
+		r.Context(), h.logger, h.authzClient,
+		rcaAuthz.ActionViewRCAReport, resourceType, resourceID, hierarchy,
+	); err != nil {
+		handleAuthzError(w, err)
 		return
 	}
 
@@ -197,6 +205,16 @@ func (h *Handler) GetReport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Authorize using the report's stored project
+	resourceType, resourceID2, hierarchy := rcaAuthz.ComponentScopeAuthz("", entry.ProjectUID, "")
+	if err := rcaAuthz.CheckAuthorization(
+		r.Context(), h.logger, h.authzClient,
+		rcaAuthz.ActionViewRCAReport, resourceType, resourceID2, hierarchy,
+	); err != nil {
+		handleAuthzError(w, err)
+		return
+	}
+
 	resp := RCAReportDetailed{
 		AlertID:   entry.AlertID,
 		ReportID:  entry.ReportID,
@@ -248,6 +266,16 @@ func (h *Handler) UpdateReport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Authorize using the report's stored project
+	resourceType, resourceID2, hierarchy := rcaAuthz.ComponentScopeAuthz("", entry.ProjectUID, "")
+	if err := rcaAuthz.CheckAuthorization(
+		r.Context(), h.logger, h.authzClient,
+		rcaAuthz.ActionUpdateRCAReport, resourceType, resourceID2, hierarchy,
+	); err != nil {
+		handleAuthzError(w, err)
+		return
+	}
+
 	if entry.Report == nil {
 		writeError(w, http.StatusBadRequest, "report has no content to update")
 		return
@@ -261,27 +289,30 @@ func (h *Handler) UpdateReport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Update action statuses in the report
-	if err := applyActionStatusUpdates(reportData, req.AppliedIndices, req.DismissedIndices); err != nil {
+	// Update action statuses in the report (only valid transitions)
+	changed, err := applyActionStatusUpdates(reportData, req.AppliedIndices, req.DismissedIndices)
+	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	updatedJSON, err := json.Marshal(reportData)
-	if err != nil {
-		h.logger.Error("failed to marshal updated report", "report_id", reportID, "error", err)
-		writeError(w, http.StatusInternalServerError, "failed to serialize updated report")
-		return
-	}
-
-	if err := h.reportStore.UpdateActionStatuses(r.Context(), reportID, string(updatedJSON)); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			writeError(w, http.StatusNotFound, "report not found")
+	if changed {
+		updatedJSON, err := json.Marshal(reportData)
+		if err != nil {
+			h.logger.Error("failed to marshal updated report", "report_id", reportID, "error", err)
+			writeError(w, http.StatusInternalServerError, "failed to serialize updated report")
 			return
 		}
-		h.logger.Error("failed to update report", "report_id", reportID, "error", err)
-		writeError(w, http.StatusInternalServerError, "failed to update report")
-		return
+
+		if err := h.reportStore.UpdateActionStatuses(r.Context(), reportID, string(updatedJSON)); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				writeError(w, http.StatusNotFound, "report not found")
+				return
+			}
+			h.logger.Error("failed to update report", "report_id", reportID, "error", err)
+			writeError(w, http.StatusInternalServerError, "failed to update report")
+			return
+		}
 	}
 
 	writeJSON(w, http.StatusOK, StatusResponse{Status: "ok"})
@@ -293,41 +324,53 @@ func (h *Handler) Health(w http.ResponseWriter, _ *http.Request) {
 }
 
 // applyActionStatusUpdates modifies the recommended_actions in the report JSON.
-func applyActionStatusUpdates(report map[string]any, applied, dismissed []int) error {
+// Returns true if any changes were made. Only performs valid transitions:
+//   - applied: revised → applied
+//   - dismissed: revised|suggested → dismissed
+func applyActionStatusUpdates(report map[string]any, applied, dismissed []int) (bool, error) {
 	result, ok := report["result"].(map[string]any)
 	if !ok {
-		return nil
+		return false, nil
 	}
 
 	recommendations, ok := result["recommendations"].(map[string]any)
 	if !ok {
-		return nil
+		return false, nil
 	}
 
 	actions, ok := recommendations["recommended_actions"].([]any)
 	if !ok {
-		return nil
+		return false, nil
 	}
 
+	appliedSet := make(map[int]struct{}, len(applied))
 	for _, idx := range applied {
-		if idx < 0 || idx >= len(actions) {
-			return fmt.Errorf("applied index %d out of range", idx)
-		}
-		if action, ok := actions[idx].(map[string]any); ok {
-			action["status"] = "applied"
-		}
+		appliedSet[idx] = struct{}{}
 	}
 
+	dismissedSet := make(map[int]struct{}, len(dismissed))
 	for _, idx := range dismissed {
-		if idx < 0 || idx >= len(actions) {
-			return fmt.Errorf("dismissed index %d out of range", idx)
+		dismissedSet[idx] = struct{}{}
+	}
+
+	changed := false
+	for i, raw := range actions {
+		action, ok := raw.(map[string]any)
+		if !ok {
+			continue
 		}
-		if action, ok := actions[idx].(map[string]any); ok {
+		current, _ := action["status"].(string)
+
+		if _, inApplied := appliedSet[i]; inApplied && current == "revised" {
+			action["status"] = "applied"
+			changed = true
+		} else if _, inDismissed := dismissedSet[i]; inDismissed && (current == "revised" || current == "suggested") {
 			action["status"] = "dismissed"
+			changed = true
 		}
 	}
 
-	return nil
+	return changed, nil
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -338,6 +381,17 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 
 func writeError(w http.ResponseWriter, status int, detail string) {
 	writeJSON(w, status, ErrorResponse{Detail: detail})
+}
+
+func handleAuthzError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, rcaAuthz.ErrAuthzUnauthorized):
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+	case errors.Is(err, rcaAuthz.ErrAuthzForbidden):
+		writeError(w, http.StatusForbidden, "insufficient permissions")
+	default:
+		writeError(w, http.StatusInternalServerError, "authorization check failed")
+	}
 }
 
 func hasOverlap(a, b []int) bool {
