@@ -15,8 +15,11 @@ import (
 	"syscall"
 
 	"github.com/openchoreo/openchoreo/internal/rca-agent/api"
+	rcaAuthz "github.com/openchoreo/openchoreo/internal/rca-agent/authz"
 	"github.com/openchoreo/openchoreo/internal/rca-agent/config"
 	"github.com/openchoreo/openchoreo/internal/rca-agent/store"
+	"github.com/openchoreo/openchoreo/internal/server/middleware"
+	"github.com/openchoreo/openchoreo/internal/server/middleware/auth/jwt"
 )
 
 func main() {
@@ -56,10 +59,33 @@ func main() {
 		}
 	}()
 
+	// Initialize authz client
+	authzClient, err := rcaAuthz.NewClient(&cfg.Authz, logger.With("component", "authz-client"))
+	if err != nil {
+		logger.Error("Failed to create authz client", "error", err)
+		os.Exit(1)
+	}
+
 	// Set up HTTP handler
 	mux := http.NewServeMux()
-	handler := api.NewHandler(logger.With("component", "api"), reportStore)
-	handler.RegisterRoutes(mux)
+	handler := api.NewHandler(logger.With("component", "api"), reportStore, authzClient)
+
+	// Initialize JWT middleware
+	jwtAuth := initJWTMiddleware(cfg, logger)
+
+	// Build routes with middleware
+	routes := middleware.NewRouteBuilder(mux)
+
+	// Public routes (no authentication)
+	routes.HandleFunc("GET /health", handler.Health)
+	routes.HandleFunc("POST /api/v1alpha1/rca-agent/analyze", handler.Analyze)
+
+	// Protected routes (JWT authentication required)
+	protected := routes.With(jwtAuth)
+	protected.HandleFunc("POST /api/v1alpha1/rca-agent/chat", handler.Chat)
+	protected.HandleFunc("GET /api/v1/rca-agent/reports", handler.ListReports)
+	protected.HandleFunc("GET /api/v1/rca-agent/reports/{report_id}", handler.GetReport)
+	protected.HandleFunc("PUT /api/v1/rca-agent/reports/{report_id}", handler.UpdateReport)
 
 	// Create HTTP server
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)
@@ -133,4 +159,36 @@ func createBootstrapLogger() *slog.Logger {
 
 	handler := slog.NewJSONHandler(os.Stderr, opts)
 	return slog.New(handler)
+}
+
+// initJWTMiddleware initializes the JWT authentication middleware from configuration.
+func initJWTMiddleware(cfg *config.Config, logger *slog.Logger) func(http.Handler) http.Handler {
+	var jwtAudiences []string
+	if cfg.Auth.JWTAudience != "" {
+		jwtAudiences = []string{cfg.Auth.JWTAudience}
+	}
+
+	// Create subject type resolver from configuration
+	var detector *jwt.Resolver
+	if len(cfg.Auth.SubjectTypes) > 0 {
+		var err error
+		detector, err = jwt.NewResolver(cfg.Auth.SubjectTypes)
+		if err != nil {
+			logger.Error("Failed to create JWT subject resolver", "error", err)
+		} else {
+			logger.Info("JWT subject resolver initialized", "subject_types_count", len(cfg.Auth.SubjectTypes))
+		}
+	}
+
+	jwtConfig := jwt.Config{
+		Disabled:                     cfg.Auth.JWTDisabled,
+		JWKSURL:                      cfg.Auth.JWTJWKSURL,
+		ValidateIssuer:               cfg.Auth.JWTIssuer,
+		ValidateAudiences:            jwtAudiences,
+		JWKSURLTLSInsecureSkipVerify: cfg.Auth.TLSInsecureSkipVerify,
+		Detector:                     detector,
+		Logger:                       logger,
+	}
+
+	return jwt.Middleware(jwtConfig)
 }

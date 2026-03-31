@@ -11,16 +11,20 @@ import (
 
 	"github.com/knadh/koanf/providers/confmap"
 	"github.com/knadh/koanf/v2"
+	"gopkg.in/yaml.v3"
+
+	"github.com/openchoreo/openchoreo/internal/server/middleware/auth/subject"
 )
 
 // Config holds all configuration for the RCA agent service.
 type Config struct {
-	Server  ServerConfig  `koanf:"server"`
-	LLM     LLMConfig     `koanf:"llm"`
-	MCP     MCPConfig     `koanf:"mcp"`
-	Report  ReportConfig  `koanf:"report"`
-	Auth    AuthConfig    `koanf:"auth"`
-	Agent   AgentConfig   `koanf:"agent"`
+	Server   ServerConfig `koanf:"server"`
+	LLM      LLMConfig    `koanf:"llm"`
+	MCP      MCPConfig    `koanf:"mcp"`
+	Report   ReportConfig `koanf:"report"`
+	Auth     AuthConfig   `koanf:"auth"`
+	Authz    AuthzConfig  `koanf:"authz"`
+	Agent    AgentConfig  `koanf:"agent"`
 	LogLevel string       `koanf:"loglevel"`
 }
 
@@ -50,17 +54,25 @@ type ReportConfig struct {
 	DatabaseURI string `koanf:"database.uri"`
 }
 
-// AuthConfig holds authentication and authorization configuration.
+// AuthConfig holds authentication configuration.
 type AuthConfig struct {
-	OAuthTokenURL         string        `koanf:"oauth.token.url"`
-	OAuthClientID         string        `koanf:"oauth.client.id"`
-	OAuthClientSecret     string        `koanf:"oauth.client.secret"`
-	JWTJWKSURL            string        `koanf:"jwt.jwks.url"`
-	JWTIssuer             string        `koanf:"jwt.issuer"`
-	JWTAudience           string        `koanf:"jwt.audience"`
+	JWTDisabled            bool          `koanf:"jwt.disabled"`
+	OAuthTokenURL          string        `koanf:"oauth.token.url"`
+	OAuthClientID          string        `koanf:"oauth.client.id"`
+	OAuthClientSecret      string        `koanf:"oauth.client.secret"`
+	JWTJWKSURL             string        `koanf:"jwt.jwks.url"`
+	JWTIssuer              string        `koanf:"jwt.issuer"`
+	JWTAudience            string        `koanf:"jwt.audience"`
 	JWTJWKSRefreshInterval time.Duration `koanf:"jwt.jwks.refresh.interval"`
-	AuthzTimeout          time.Duration `koanf:"authz.timeout"`
-	ConfigPath            string        `koanf:"config.path"`
+	ConfigPath             string        `koanf:"config.path"`
+	TLSInsecureSkipVerify  bool          `koanf:"tls.insecure.skip.verify"`
+	SubjectTypes           []subject.UserTypeConfig // loaded from YAML file
+}
+
+// AuthzConfig holds authorization service configuration.
+type AuthzConfig struct {
+	ServiceURL            string        `koanf:"service.url"`
+	Timeout               time.Duration `koanf:"timeout"`
 	TLSInsecureSkipVerify bool          `koanf:"tls.insecure.skip.verify"`
 }
 
@@ -101,21 +113,24 @@ func Load() (*Config, error) {
 		"OPENCHOREO_API_URL":  "mcp.openchoreo.api.url",
 
 		"REPORT_BACKEND":     "report.backend",
-		"REPORT_DATABASE_URI": "report.database.uri",
+		"SQL_BACKEND_URI":    "report.database.uri",
 
-		"OAUTH_TOKEN_URL":           "auth.oauth.token.url",
-		"OAUTH_CLIENT_ID":           "auth.oauth.client.id",
-		"OAUTH_CLIENT_SECRET":       "auth.oauth.client.secret",
-		"JWT_JWKS_URL":              "auth.jwt.jwks.url",
-		"JWT_ISSUER":                "auth.jwt.issuer",
-		"JWT_AUDIENCE":              "auth.jwt.audience",
-		"JWT_JWKS_REFRESH_INTERVAL": "auth.jwt.jwks.refresh.interval",
-		"AUTHZ_TIMEOUT":             "auth.authz.timeout",
-		"AUTH_CONFIG_PATH":          "auth.config.path",
-		"TLS_INSECURE_SKIP_VERIFY": "auth.tls.insecure.skip.verify",
+		"JWT_DISABLED":                "auth.jwt.disabled",
+		"OAUTH_TOKEN_URL":             "auth.oauth.token.url",
+		"OAUTH_CLIENT_ID":             "auth.oauth.client.id",
+		"OAUTH_CLIENT_SECRET":         "auth.oauth.client.secret",
+		"JWT_JWKS_URL":                "auth.jwt.jwks.url",
+		"JWT_ISSUER":                  "auth.jwt.issuer",
+		"JWT_AUDIENCE":                "auth.jwt.audience",
+		"JWT_JWKS_REFRESH_INTERVAL":   "auth.jwt.jwks.refresh.interval",
+		"AUTH_CONFIG_PATH":            "auth.config.path",
+		"TLS_INSECURE_SKIP_VERIFY":   "auth.tls.insecure.skip.verify",
+		"AUTHZ_SERVICE_URL":              "authz.service.url",
+		"AUTHZ_TIMEOUT_SECONDS":          "authz.timeout",
+		"AUTHZ_TLS_INSECURE_SKIP_VERIFY": "authz.tls.insecure.skip.verify",
 
-		"MAX_CONCURRENT_ANALYSES": "agent.max.concurrent.analyses",
-		"ANALYSIS_TIMEOUT":        "agent.analysis.timeout",
+		"MAX_CONCURRENT_ANALYSES":  "agent.max.concurrent.analyses",
+		"ANALYSIS_TIMEOUT_SECONDS": "agent.analysis.timeout",
 		"REMED_AGENT":             "agent.remediation.enabled",
 
 		"LOG_LEVEL": "loglevel",
@@ -148,6 +163,36 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
+	// Load auth config file for JWT subject resolution
+	authConfigPath := cfg.Auth.ConfigPath
+	if authConfigPath == "" {
+		authConfigPath = "auth-config.yaml"
+	}
+
+	var authCfg struct {
+		Auth struct {
+			SubjectTypes []subject.UserTypeConfig `yaml:"subject_types"`
+		} `yaml:"auth"`
+	}
+	if _, err := os.Stat(authConfigPath); err == nil {
+		data, err := os.ReadFile(authConfigPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read auth config file: %w", err)
+		}
+		if err := yaml.Unmarshal(data, &authCfg); err != nil {
+			return nil, fmt.Errorf("failed to parse auth config file: %w", err)
+		}
+	}
+
+	cfg.Auth.SubjectTypes = authCfg.Auth.SubjectTypes
+
+	if len(cfg.Auth.SubjectTypes) > 0 {
+		if err := subject.ValidateConfig(cfg.Auth.SubjectTypes); err != nil {
+			return nil, fmt.Errorf("invalid subject type config: %w", err)
+		}
+		subject.SortByPriority(cfg.Auth.SubjectTypes)
+	}
+
 	// Validate configuration
 	if err := cfg.validate(); err != nil {
 		return nil, fmt.Errorf("invalid configuration: %w", err)
@@ -177,6 +222,7 @@ func getDefaults() map[string]interface{} {
 			"database.uri": "sqlite:///data/rca_reports.db",
 		},
 		"auth": map[string]interface{}{
+			"jwt.disabled":               false,
 			"oauth.token.url":            "",
 			"oauth.client.id":            "",
 			"oauth.client.secret":        "",
@@ -184,9 +230,13 @@ func getDefaults() map[string]interface{} {
 			"jwt.issuer":                 "",
 			"jwt.audience":               "",
 			"jwt.jwks.refresh.interval":  "3600s",
-			"authz.timeout":              "30s",
 			"config.path":                "auth-config.yaml",
 			"tls.insecure.skip.verify":   false,
+		},
+		"authz": map[string]interface{}{
+			"service.url":              "http://localhost:8080",
+			"timeout":                  "30s",
+			"tls.insecure.skip.verify": false,
 		},
 		"agent": map[string]interface{}{
 			"max.concurrent.analyses": 5,
