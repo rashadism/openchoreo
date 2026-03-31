@@ -11,12 +11,18 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 	"os/signal"
 	"syscall"
 
+	anyllm "github.com/mozilla-ai/any-llm-go"
+	"github.com/mozilla-ai/any-llm-go/providers/openai"
+
+	observermiddleware "github.com/openchoreo/openchoreo/internal/observer/middleware"
 	"github.com/openchoreo/openchoreo/internal/rca-agent/api"
 	rcaAuthz "github.com/openchoreo/openchoreo/internal/rca-agent/authz"
 	"github.com/openchoreo/openchoreo/internal/rca-agent/config"
+	"github.com/openchoreo/openchoreo/internal/rca-agent/service"
 	"github.com/openchoreo/openchoreo/internal/rca-agent/store"
 	"github.com/openchoreo/openchoreo/internal/server/middleware"
 	"github.com/openchoreo/openchoreo/internal/server/middleware/auth/jwt"
@@ -66,9 +72,19 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Initialize LLM provider
+	llmProvider, err := openai.New(anyllm.WithAPIKey(cfg.LLM.APIKey))
+	if err != nil {
+		log.Fatalf("Failed to initialize LLM provider: %v", err)
+	}
+	logger.Info("LLM provider initialized", "model", cfg.LLM.ModelName)
+
+	// Initialize agent service
+	agentService := service.New(llmProvider, cfg, reportStore, logger.With("component", "agent-service"))
+
 	// Set up HTTP handler
 	mux := http.NewServeMux()
-	handler := api.NewHandler(logger.With("component", "api"), reportStore, authzClient)
+	handler := api.NewHandler(logger.With("component", "api"), reportStore, authzClient, agentService)
 
 	// Initialize JWT middleware
 	jwtAuth := initJWTMiddleware(cfg, logger)
@@ -87,11 +103,11 @@ func main() {
 	protected.HandleFunc("GET /api/v1/rca-agent/reports/{report_id}", handler.GetReport)
 	protected.HandleFunc("PUT /api/v1/rca-agent/reports/{report_id}", handler.UpdateReport)
 
-	// Create HTTP server
+	// Create HTTP server with CORS
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)
 	server := &http.Server{
 		Addr:         addr,
-		Handler:      mux,
+		Handler:      observermiddleware.CORS(cfg.CORS.AllowedOrigins)(mux),
 		ReadTimeout:  cfg.Server.ReadTimeout,
 		WriteTimeout: cfg.Server.WriteTimeout,
 	}
@@ -125,6 +141,7 @@ func main() {
 func initLogger(level string) *slog.Logger {
 	var logLevel slog.Level
 
+	level = strings.ToLower(level)
 	switch level {
 	case "debug":
 		logLevel = slog.LevelDebug

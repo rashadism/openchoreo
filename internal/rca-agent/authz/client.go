@@ -13,6 +13,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"time"
 
 	authzcore "github.com/openchoreo/openchoreo/internal/authz/core"
 	"github.com/openchoreo/openchoreo/internal/rca-agent/config"
@@ -39,7 +40,7 @@ func NewClient(cfg *config.AuthzConfig, logger *slog.Logger) (*Client, error) {
 	}
 
 	httpClient := &http.Client{
-		Timeout: cfg.Timeout,
+		Timeout: time.Duration(cfg.Timeout) * time.Second,
 	}
 	if cfg.TLSInsecureSkipVerify {
 		httpClient.Transport = &http.Transport{
