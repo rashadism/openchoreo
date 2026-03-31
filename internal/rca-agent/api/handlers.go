@@ -4,16 +4,22 @@
 package api
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
+	"time"
 
 	authzcore "github.com/openchoreo/openchoreo/internal/authz/core"
 	rcaAuthz "github.com/openchoreo/openchoreo/internal/rca-agent/authz"
+	"github.com/openchoreo/openchoreo/internal/rca-agent/prompts"
+	"github.com/openchoreo/openchoreo/internal/rca-agent/service"
 	"github.com/openchoreo/openchoreo/internal/rca-agent/store"
+	"github.com/openchoreo/openchoreo/internal/server/middleware/auth/jwt"
 )
 
 // Handler implements the RCA agent HTTP API.
@@ -21,14 +27,16 @@ type Handler struct {
 	logger      *slog.Logger
 	reportStore store.ReportStore
 	authzClient authzcore.PDP
+	service     *service.Service
 }
 
 // NewHandler creates a new API handler.
-func NewHandler(logger *slog.Logger, reportStore store.ReportStore, authzClient authzcore.PDP) *Handler {
+func NewHandler(logger *slog.Logger, reportStore store.ReportStore, authzClient authzcore.PDP, svc *service.Service) *Handler {
 	return &Handler{
 		logger:      logger,
 		reportStore: reportStore,
 		authzClient: authzClient,
+		service:     svc,
 	}
 }
 
@@ -57,8 +65,41 @@ func (h *Handler) Analyze(w http.ResponseWriter, r *http.Request) {
 		"alert_id", req.Alert.ID,
 	)
 
-	// TODO: implement analysis
-	writeJSON(w, http.StatusNotImplemented, ErrorResponse{Detail: "not implemented"})
+	// Resolve scope (names → UIDs) before creating the pending record.
+	// This matches Python's pattern where scope resolution happens in the handler.
+	scope, err := h.service.ResolveComponentScope(r.Context(),
+		req.Namespace, req.Project, req.Component, req.Environment,
+	)
+	if err != nil {
+		h.logger.Error("failed to resolve scope", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to resolve component scope")
+		return
+	}
+
+	// Generate report ID from alert ID + timestamp.
+	reportID := fmt.Sprintf("%s_%d", req.Alert.ID, time.Now().Unix())
+
+	// Store pending report with resolved UIDs.
+	if err := h.reportStore.UpsertReport(r.Context(), &store.ReportEntry{
+		ReportID:       reportID,
+		AlertID:        req.Alert.ID,
+		Status:         "pending",
+		Timestamp:      time.Now().UTC().Format(time.RFC3339),
+		EnvironmentUID: scope.EnvironmentUID,
+		ProjectUID:     scope.ProjectUID,
+	}); err != nil {
+		h.logger.Error("failed to create pending report", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to create report")
+		return
+	}
+
+	// Launch background analysis with scope already resolved.
+	go h.service.RunAnalysis(context.Background(), toAnalysisParams(reportID, &req, scope))
+
+	writeJSON(w, http.StatusOK, RCAResponse{
+		ReportID: reportID,
+		Status:   "pending",
+	})
 }
 
 // Chat handles POST /api/v1alpha1/rca-agent/chat.
@@ -95,8 +136,63 @@ func (h *Handler) Chat(w http.ResponseWriter, r *http.Request) {
 		"message_count", len(req.Messages),
 	)
 
-	// TODO: implement chat streaming
-	writeJSON(w, http.StatusNotImplemented, ErrorResponse{Detail: "not implemented"})
+	// Fetch report for context.
+	entry, err := h.reportStore.GetReport(r.Context(), req.ReportID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "report not found")
+			return
+		}
+		h.logger.Error("failed to get report for chat", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to get report")
+		return
+	}
+
+	// Parse report context if available.
+	var reportContext any
+	if entry.Report != nil {
+		var parsed any
+		if err := json.Unmarshal([]byte(*entry.Report), &parsed); err == nil {
+			reportContext = parsed
+		}
+	}
+
+	scope := &prompts.Scope{
+		Namespace:   req.Namespace,
+		Environment: req.Environment,
+		Project:     req.Project,
+	}
+
+	// Stream NDJSON events.
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		writeError(w, http.StatusInternalServerError, "streaming not supported")
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/x-ndjson")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.WriteHeader(http.StatusOK)
+
+	// Extract user's bearer token from JWT middleware for MCP auth.
+	bearerToken, _ := jwt.GetToken(r)
+
+	chatParams := toChatParams(&req, reportContext, scope)
+	chatEvents, errs := h.service.StreamChat(r.Context(), bearerToken, chatParams)
+
+	enc := json.NewEncoder(w)
+	for ev := range chatEvents {
+		if err := enc.Encode(ev); err != nil {
+			break
+		}
+		flusher.Flush()
+	}
+
+	if err := <-errs; err != nil {
+		h.logger.Error("chat stream error", "error", err)
+		_ = enc.Encode(service.ChatEvent{Type: "error", Content: "internal error"})
+		flusher.Flush()
+	}
 }
 
 // ListReports handles GET /api/v1/rca-agent/reports.
@@ -121,6 +217,14 @@ func (h *Handler) ListReports(w http.ResponseWriter, r *http.Request) {
 		rcaAuthz.ActionViewRCAReport, resourceType, resourceID, hierarchy,
 	); err != nil {
 		handleAuthzError(w, err)
+		return
+	}
+
+	// Resolve scope (names → UIDs) for querying.
+	scope, err := h.service.ResolveProjectScope(r.Context(), namespace, project, environment)
+	if err != nil {
+		h.logger.Error("failed to resolve scope for list", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to resolve project scope")
 		return
 	}
 
@@ -154,8 +258,8 @@ func (h *Handler) ListReports(w http.ResponseWriter, r *http.Request) {
 	}
 
 	entries, total, err := h.reportStore.ListReports(r.Context(), store.QueryParams{
-		ProjectUID:     project,
-		EnvironmentUID: environment,
+		ProjectUID:     scope.ProjectUID,
+		EnvironmentUID: scope.EnvironmentUID,
 		Namespace:      namespace,
 		StartTime:      startTime,
 		EndTime:        endTime,
@@ -405,4 +509,61 @@ func hasOverlap(a, b []int) bool {
 		}
 	}
 	return false
+}
+
+func toAnalysisParams(reportID string, req *AnalyzeRequest, scope *service.Scope) *service.AnalysisParams {
+	params := &service.AnalysisParams{
+		ReportID: reportID,
+		AlertID:  req.Alert.ID,
+		Scope:    scope,
+		Alert: service.AlertParams{
+			ID:        req.Alert.ID,
+			Timestamp: req.Alert.Timestamp,
+			Rule: service.AlertRuleParams{
+				Name: req.Alert.Rule.Name,
+			},
+		},
+		Meta: req.Meta,
+	}
+
+	if v, ok := req.Alert.Value.(float64); ok {
+		params.Alert.Value = v
+	}
+	if req.Alert.Rule.Description != nil {
+		params.Alert.Rule.Description = *req.Alert.Rule.Description
+	}
+	if req.Alert.Rule.Severity != nil {
+		params.Alert.Rule.Severity = *req.Alert.Rule.Severity
+	}
+	if req.Alert.Rule.Source != nil {
+		params.Alert.Rule.Source = &service.AlertSourceParams{Type: req.Alert.Rule.Source.Type}
+		if req.Alert.Rule.Source.Query != nil {
+			params.Alert.Rule.Source.Query = *req.Alert.Rule.Source.Query
+		}
+		if req.Alert.Rule.Source.Metric != nil {
+			params.Alert.Rule.Source.Metric = *req.Alert.Rule.Source.Metric
+		}
+	}
+	if req.Alert.Rule.Condition != nil {
+		params.Alert.Rule.Condition = &service.AlertConditionParams{
+			Window:    req.Alert.Rule.Condition.Window,
+			Interval:  req.Alert.Rule.Condition.Interval,
+			Operator:  req.Alert.Rule.Condition.Operator,
+			Threshold: req.Alert.Rule.Condition.Threshold,
+		}
+	}
+
+	return params
+}
+
+func toChatParams(req *ChatRequest, reportContext any, scope *prompts.Scope) *service.ChatParams {
+	msgs := make([]service.ChatMessage, len(req.Messages))
+	for i, m := range req.Messages {
+		msgs[i] = service.ChatMessage{Role: m.Role, Content: m.Content}
+	}
+	return &service.ChatParams{
+		Messages:      msgs,
+		ReportContext: reportContext,
+		Scope:         scope,
+	}
 }
