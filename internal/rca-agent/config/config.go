@@ -25,6 +25,7 @@ type Config struct {
 	Auth     AuthConfig   `koanf:"auth"`
 	Authz    AuthzConfig  `koanf:"authz"`
 	Agent    AgentConfig  `koanf:"agent"`
+	CORS     CORSConfig   `koanf:"cors"`
 	LogLevel string       `koanf:"loglevel"`
 }
 
@@ -71,21 +72,21 @@ type AuthConfig struct {
 
 // AuthzConfig holds authorization service configuration.
 type AuthzConfig struct {
-	ServiceURL            string        `koanf:"service.url"`
-	Timeout               time.Duration `koanf:"timeout"`
-	TLSInsecureSkipVerify bool          `koanf:"tls.insecure.skip.verify"`
+	ServiceURL            string `koanf:"service.url"`
+	Timeout               int    `koanf:"timeout"`               // seconds
+	TLSInsecureSkipVerify bool   `koanf:"tls.insecure.skip.verify"`
 }
 
 // AgentConfig holds agent behavior configuration.
 type AgentConfig struct {
-	MaxConcurrentAnalyses int           `koanf:"max.concurrent.analyses"`
-	AnalysisTimeout       time.Duration `koanf:"analysis.timeout"`
-	RemediationEnabled    bool          `koanf:"remediation.enabled"`
+	MaxConcurrentAnalyses int  `koanf:"max.concurrent.analyses"`
+	AnalysisTimeout       int  `koanf:"analysis.timeout"`        // seconds
+	RemediationEnabled    bool `koanf:"remediation.enabled"`
 }
 
 // CORSConfig holds CORS configuration.
 type CORSConfig struct {
-	AllowedOrigins []string
+	AllowedOrigins []string `koanf:"allowed.origins"`
 }
 
 // Load loads configuration from environment variables and defaults.
@@ -163,6 +164,11 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
+	// CORS_ALLOWED_ORIGINS is a comma-separated string; koanf doesn't split it.
+	if origins := os.Getenv("CORS_ALLOWED_ORIGINS"); origins != "" {
+		cfg.CORS.AllowedOrigins = strings.Split(origins, ",")
+	}
+
 	// Load auth config file for JWT subject resolution
 	authConfigPath := cfg.Auth.ConfigPath
 	if authConfigPath == "" {
@@ -193,6 +199,11 @@ func Load() (*Config, error) {
 		subject.SortByPriority(cfg.Auth.SubjectTypes)
 	}
 
+	// Derive authz service URL from OpenChoreo API URL (same service).
+	if cfg.Authz.ServiceURL == "" || cfg.Authz.ServiceURL == "http://localhost:8080" {
+		cfg.Authz.ServiceURL = strings.TrimRight(cfg.MCP.OpenChoreoAPIURL, "/")
+	}
+
 	// Validate configuration
 	if err := cfg.validate(); err != nil {
 		return nil, fmt.Errorf("invalid configuration: %w", err)
@@ -219,7 +230,7 @@ func getDefaults() map[string]interface{} {
 		},
 		"report": map[string]interface{}{
 			"backend":      "sqlite",
-			"database.uri": "sqlite:///data/rca_reports.db",
+			"database.uri": "file:/app/data/rca_reports.db?_journal=WAL",
 		},
 		"auth": map[string]interface{}{
 			"jwt.disabled":               false,
@@ -235,12 +246,12 @@ func getDefaults() map[string]interface{} {
 		},
 		"authz": map[string]interface{}{
 			"service.url":              "http://localhost:8080",
-			"timeout":                  "30s",
+			"timeout":                  30,
 			"tls.insecure.skip.verify": false,
 		},
 		"agent": map[string]interface{}{
 			"max.concurrent.analyses": 5,
-			"analysis.timeout":        "1500s",
+			"analysis.timeout":        1500,
 			"remediation.enabled":     false,
 		},
 		"loglevel": "info",
@@ -265,7 +276,7 @@ func (c *Config) validate() error {
 	case "", "sqlite":
 		c.Report.Backend = "sqlite"
 		if strings.TrimSpace(c.Report.DatabaseURI) == "" {
-			c.Report.DatabaseURI = "sqlite:///data/rca_reports.db"
+			c.Report.DatabaseURI = "file:/app/data/rca_reports.db?_journal=WAL"
 		}
 	case "postgresql":
 		if strings.TrimSpace(c.Report.DatabaseURI) == "" {
@@ -280,7 +291,7 @@ func (c *Config) validate() error {
 	}
 
 	if c.Agent.AnalysisTimeout <= 0 {
-		return fmt.Errorf("agent analysis timeout must be positive")
+		return fmt.Errorf("agent analysis timeout must be positive (seconds)")
 	}
 
 	return nil
