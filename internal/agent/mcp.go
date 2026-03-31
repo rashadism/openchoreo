@@ -73,8 +73,9 @@ func NewMCPClient(servers []MCPServer, opts ...MCPClientOption) *MCPClient {
 func (c *MCPClient) Connect(ctx context.Context) error {
 	for _, server := range c.servers {
 		transport := &mcp.StreamableClientTransport{
-			Endpoint:   server.URL,
-			HTTPClient: server.HTTPClient,
+			Endpoint:             server.URL,
+			HTTPClient:           server.HTTPClient,
+			DisableStandaloneSSE: true,
 		}
 
 		session, err := c.client.Connect(ctx, transport, nil)
