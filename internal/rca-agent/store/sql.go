@@ -8,6 +8,8 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -33,6 +35,19 @@ func newSQLStore(backend, dsn string, logger *slog.Logger) (ReportStore, error) 
 	driver := "sqlite"
 	if backend == BackendPostgreSQL {
 		driver = "pgx"
+	}
+
+	// Ensure parent directory exists for SQLite.
+	if backend == BackendSQLite {
+		dbPath := strings.TrimPrefix(dsn, "file:")
+		if idx := strings.IndexByte(dbPath, '?'); idx != -1 {
+			dbPath = dbPath[:idx]
+		}
+		if dir := filepath.Dir(dbPath); dir != "" && dir != "." {
+			if err := os.MkdirAll(dir, 0o755); err != nil {
+				return nil, fmt.Errorf("failed to create database directory %q: %w", dir, err)
+			}
+		}
 	}
 
 	db, err := sql.Open(driver, dsn)

@@ -66,7 +66,7 @@ func (h *Handler) Analyze(w http.ResponseWriter, r *http.Request) {
 	)
 
 	// Resolve scope (names → UIDs) before creating the pending record.
-	// This matches Python's pattern where scope resolution happens in the handler.
+	// Scope must be resolved before creating the pending report.
 	scope, err := h.service.ResolveComponentScope(r.Context(),
 		req.Namespace, req.Project, req.Component, req.Environment,
 	)
@@ -105,7 +105,9 @@ func (h *Handler) Analyze(w http.ResponseWriter, r *http.Request) {
 // Chat handles POST /api/v1alpha1/rca-agent/chat.
 func (h *Handler) Chat(w http.ResponseWriter, r *http.Request) {
 	var req ChatRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
 		return
 	}
@@ -118,6 +120,18 @@ func (h *Handler) Chat(w http.ResponseWriter, r *http.Request) {
 	if len(req.Messages) == 0 {
 		writeError(w, http.StatusBadRequest, "messages must not be empty")
 		return
+	}
+
+	if len(req.Messages) > 50 {
+		writeError(w, http.StatusBadRequest, "messages must not exceed 50")
+		return
+	}
+
+	for i, msg := range req.Messages {
+		if len(msg.Content) > 10000 {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("message %d content exceeds 10000 characters", i))
+			return
+		}
 	}
 
 	// Authorize
@@ -172,6 +186,11 @@ func (h *Handler) Chat(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/x-ndjson")
 	w.Header().Set("Cache-Control", "no-cache")
+
+	if rc := http.NewResponseController(w); rc != nil {
+		_ = rc.SetWriteDeadline(time.Now().Add(10 * time.Minute))
+	}
+
 	w.WriteHeader(http.StatusOK)
 
 	// Extract user's bearer token from JWT middleware for MCP auth.
@@ -188,11 +207,9 @@ func (h *Handler) Chat(w http.ResponseWriter, r *http.Request) {
 		flusher.Flush()
 	}
 
-	if err := <-errs; err != nil {
-		h.logger.Error("chat stream error", "error", err)
-		_ = enc.Encode(service.ChatEvent{Type: "error", Content: "internal error"})
-		flusher.Flush()
-	}
+	// Error events are emitted by the service into the events channel.
+	// Drain the error channel to avoid goroutine leak.
+	<-errs
 }
 
 // ListReports handles GET /api/v1/rca-agent/reports.
@@ -207,6 +224,22 @@ func (h *Handler) ListReports(w http.ResponseWriter, r *http.Request) {
 
 	if project == "" || environment == "" || namespace == "" || startTime == "" || endTime == "" {
 		writeError(w, http.StatusUnprocessableEntity, "project, environment, namespace, startTime, and endTime are required")
+		return
+	}
+
+	// Validate time range.
+	startParsed, err := time.Parse(time.RFC3339, startTime)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid startTime format, expected RFC3339")
+		return
+	}
+	endParsed, err := time.Parse(time.RFC3339, endTime)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid endTime format, expected RFC3339")
+		return
+	}
+	if !startParsed.Before(endParsed) {
+		writeError(w, http.StatusBadRequest, "startTime must be before endTime")
 		return
 	}
 
@@ -493,6 +526,8 @@ func handleAuthzError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusUnauthorized, "unauthorized")
 	case errors.Is(err, rcaAuthz.ErrAuthzForbidden):
 		writeError(w, http.StatusForbidden, "insufficient permissions")
+	case errors.Is(err, rcaAuthz.ErrAuthzServiceUnavailable):
+		writeError(w, http.StatusServiceUnavailable, "authorization service unavailable")
 	default:
 		writeError(w, http.StatusInternalServerError, "authorization check failed")
 	}

@@ -100,7 +100,7 @@ type RCAReportSummary struct {
 	AlertID   string  `json:"alertId"`
 	ReportID  string  `json:"reportId"`
 	Timestamp string  `json:"timestamp"`
-	Summary   *string `json:"summary,omitempty"`
+	Summary   *string `json:"summary"`
 	Status    string  `json:"status"`
 }
 

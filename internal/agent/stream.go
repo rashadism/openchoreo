@@ -222,13 +222,17 @@ func (a *Agent) executeModelCallStreaming(ctx context.Context, req *ModelRequest
 					Type:       StreamEventToolCallStart,
 					ToolName:   tc.Function.Name,
 					ToolCallID: tc.ID,
+					Args:       tc.Function.Arguments,
 				}
 			}
 
 			// Accumulate arguments.
 			if tc.Function.Arguments != "" {
 				id := tc.ID
-				if id == "" && len(toolCalls) > 0 {
+				if id == "" {
+					if len(toolCalls) == 0 {
+						continue
+					}
 					// No ID on delta — append to most recent tool call.
 					id = toolCalls[len(toolCalls)-1].ID
 				}

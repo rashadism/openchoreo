@@ -5,6 +5,7 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -16,14 +17,15 @@ import (
 
 	"github.com/openchoreo/openchoreo/internal/agent"
 	"github.com/openchoreo/openchoreo/internal/rca-agent/config"
+	rcamw "github.com/openchoreo/openchoreo/internal/rca-agent/middleware"
 	"github.com/openchoreo/openchoreo/internal/rca-agent/models"
 	"github.com/openchoreo/openchoreo/internal/rca-agent/prompts"
 	"github.com/openchoreo/openchoreo/internal/rca-agent/store"
 )
 
 // AnalysisParams holds the parameters for RunAnalysis.
-// Scope must be resolved before calling RunAnalysis (matching Python's pattern
-// where scope resolution happens in the HTTP handler).
+// Scope must be resolved before calling RunAnalysis — the HTTP handler resolves
+// scope and passes it here so UIDs are available for report storage.
 type AnalysisParams struct {
 	ReportID    string
 	AlertID     string
@@ -79,11 +81,13 @@ type ChatMessage struct {
 
 // ChatEvent is a streaming event emitted by StreamChat.
 type ChatEvent struct {
-	Type    string `json:"type"`
-	Content string `json:"content,omitempty"`
-	Tool    string `json:"tool,omitempty"`
-	Actions []any  `json:"actions,omitempty"`
-	Message string `json:"message,omitempty"`
+	Type       string `json:"type"`
+	Content    string `json:"content,omitempty"`
+	Tool       string `json:"tool,omitempty"`
+	ActiveForm string `json:"activeForm,omitempty"`
+	Args       string `json:"args,omitempty"`
+	Actions    []any  `json:"actions,omitempty"`
+	Message    string `json:"message,omitempty"`
 }
 
 // Service orchestrates RCA agent operations: analysis and chat.
@@ -106,9 +110,57 @@ func New(provider providers.Provider, cfg *config.Config, reportStore store.Repo
 	}
 }
 
+// ValidateConnectivity tests LLM, OAuth2, and MCP connections at startup.
+// Tests LLM, OAuth2, and MCP connections at startup. Fails fast if any dependency is unreachable.
+func (s *Service) ValidateConnectivity(ctx context.Context) error {
+	// 1. Test OAuth2 token fetch.
+	s.logger.Info("testing OAuth2 connectivity")
+	token, err := fetchOAuth2Token(ctx,
+		s.config.Auth.OAuthTokenURL,
+		s.config.Auth.OAuthClientID,
+		s.config.Auth.OAuthClientSecret,
+		s.config.Auth.TLSInsecureSkipVerify,
+	)
+	if err != nil {
+		return fmt.Errorf("OAuth2 connectivity check failed: %w", err)
+	}
+	s.logger.Info("OAuth2 connectivity OK")
+
+	// 2. Test MCP connectivity and list tools.
+	s.logger.Info("testing MCP connectivity")
+	httpClient := authedHTTPClient(token, s.config.Auth.TLSInsecureSkipVerify)
+	tools, cleanup, err := s.loadMCPTools(ctx, httpClient)
+	if err != nil {
+		return fmt.Errorf("MCP connectivity check failed: %w", err)
+	}
+	cleanup()
+	s.logger.Info("MCP connectivity OK", "tools_count", len(tools))
+
+	// 3. Test LLM connectivity.
+	s.logger.Info("testing LLM connectivity", "model", s.config.LLM.ModelName)
+	completion, err := s.provider.Completion(ctx, providers.CompletionParams{
+		Model: s.config.LLM.ModelName,
+		Messages: []providers.Message{
+			{Role: providers.RoleUser, Content: "Hello"},
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("LLM connectivity check failed: %w", err)
+	}
+	if len(completion.Choices) > 0 {
+		content := completion.Choices[0].Message.ContentString()
+		if len(content) > 50 {
+			content = content[:50]
+		}
+		s.logger.Info("LLM connectivity OK", "response_preview", content)
+	}
+
+	return nil
+}
+
 // ResolveComponentScope resolves namespace/project/component/environment names
 // to UIDs via the OpenChoreo API. Called from the HTTP handler before creating
-// the pending report, matching Python's pattern.
+// the pending report so UIDs are always available.
 func (s *Service) ResolveComponentScope(ctx context.Context, namespace, project, component, environment string) (*Scope, error) {
 	token, err := fetchOAuth2Token(ctx,
 		s.config.Auth.OAuthTokenURL,
@@ -172,6 +224,9 @@ func (s *Service) RunAnalysis(ctx context.Context, params *AnalysisParams) {
 		return
 	}
 
+	// Run remediation agent if enabled and root cause was identified.
+	report = s.maybeRunRemediation(ctx, report, params, logger)
+
 	// Store completed report.
 	reportJSON, err := json.Marshal(report)
 	if err != nil {
@@ -208,8 +263,16 @@ func (s *Service) StreamChat(ctx context.Context, bearerToken string, params *Ch
 		defer close(events)
 		defer close(errs)
 
+		// Generate request ID for log correlation.
+		requestID := fmt.Sprintf("msg_%s", randomHex(6))
+
 		if err := s.runChatAgent(ctx, bearerToken, params, events); err != nil {
-			errs <- err
+			s.logger.Error("chat stream error", "request_id", requestID, "error", err)
+			// NOTE: "occured" is an intentional typo preserved for client compatibility.
+			events <- ChatEvent{
+				Type:    "error",
+				Message: fmt.Sprintf("An error occured (request_id: %s)", requestID),
+			}
 		}
 	}()
 
@@ -272,10 +335,19 @@ func (s *Service) runRCAAgent(ctx context.Context, params *AnalysisParams, logge
 		return nil, fmt.Errorf("loading RCA schema: %w", err)
 	}
 
-	logger.Info("creating RCA agent", "model", s.config.LLM.ModelName, "tools", len(tools))
+	// Middleware: logging (outermost), error handler, output transformer (innermost).
+	rcaTools := filterTools(tools, rcaToolWhitelist)
+	rcaTools = append(rcaTools, newWriteTodosTool())
+	loggingMW := rcamw.NewLogging(logger)
+	logger.Info("creating RCA agent", "model", s.config.LLM.ModelName, "tools", len(rcaTools))
 	rcaAgent, err := agent.CreateAgent(s.provider, s.config.LLM.ModelName,
 		agent.WithSystemPrompt(systemPrompt),
-		agent.WithTools(tools...),
+		agent.WithTools(rcaTools...),
+		agent.WithMiddleware(
+			loggingMW,
+			rcamw.NewToolErrorHandler(logger),
+			rcamw.NewOutputTransformer(logger),
+		),
 		agent.WithStructuredOutput(&agent.StructuredOutput{
 			Strategy: agent.OutputStrategyProvider,
 			Name:     "rca_report",
@@ -330,9 +402,15 @@ func (s *Service) runChatAgent(ctx context.Context, bearerToken string, params *
 		return fmt.Errorf("loading chat schema: %w", err)
 	}
 
+	chatTools := filterTools(tools, chatToolWhitelist)
 	chatAgent, err := agent.CreateAgent(s.provider, s.config.LLM.ModelName,
 		agent.WithSystemPrompt(systemPrompt),
-		agent.WithTools(tools...),
+		agent.WithTools(chatTools...),
+		agent.WithMiddleware(
+			rcamw.NewLogging(s.logger),
+			rcamw.NewToolErrorHandler(s.logger),
+			rcamw.NewOutputTransformer(s.logger),
+		),
 		agent.WithStructuredOutput(&agent.StructuredOutput{
 			Strategy: agent.OutputStrategyProvider,
 			Name:     "chat_response",
@@ -352,28 +430,35 @@ func (s *Service) runChatAgent(ctx context.Context, bearerToken string, params *
 
 	agentEvents, agentErrs := chatAgent.Stream(ctx, msgs)
 
+	parser := &chatResponseParser{}
+
 	for ev := range agentEvents {
 		switch ev.Type {
 		case agent.StreamEventTextDelta:
-			events <- ChatEvent{Type: "message_chunk", Content: ev.Delta}
+			// Feed through parser for clean message deltas (not raw JSON).
+			if delta := parser.push(ev.Delta); delta != "" {
+				events <- ChatEvent{Type: "message_chunk", Content: delta}
+			}
 		case agent.StreamEventToolCallStart:
-			events <- ChatEvent{Type: "tool_call", Tool: ev.ToolName}
+			events <- ChatEvent{
+				Type:       "tool_call",
+				Tool:       ev.ToolName,
+				ActiveForm: toolActiveForms[ev.ToolName],
+				Args:       ev.Args,
+			}
 		case agent.StreamEventToolResult:
 			// Internal; not forwarded to client.
 		case agent.StreamEventComplete:
-			if ev.Result != nil && ev.Result.StructuredResponse != nil {
-				var parsed struct {
-					Message string `json:"message"`
-					Actions []any  `json:"actions"`
-				}
-				if err := json.Unmarshal(ev.Result.StructuredResponse, &parsed); err == nil {
-					if len(parsed.Actions) > 0 {
-						events <- ChatEvent{Type: "actions", Actions: parsed.Actions}
-					}
-					events <- ChatEvent{Type: "done", Message: parsed.Message}
-				} else {
-					events <- ChatEvent{Type: "done", Message: string(ev.Result.StructuredResponse)}
-				}
+			// Emit actions from parser (accumulated during streaming).
+			if len(parser.actions) > 0 {
+				events <- ChatEvent{Type: "actions", Actions: parser.actions}
+			}
+			// Emit done with parser's accumulated message.
+			if parser.message != "" {
+				events <- ChatEvent{Type: "done", Message: parser.message}
+			} else if ev.Result != nil && ev.Result.StructuredResponse != nil {
+				// Fallback: use structured response if parser didn't capture.
+				events <- ChatEvent{Type: "done", Message: string(ev.Result.StructuredResponse)}
 			} else {
 				events <- ChatEvent{Type: "done"}
 			}
@@ -402,6 +487,142 @@ func (s *Service) loadMCPTools(ctx context.Context, httpClient *http.Client) ([]
 	return tools, func() { _ = mcpClient.Close() }, nil
 }
 
+// maybeRunRemediation runs the remediation agent if enabled and root cause was identified.
+// On failure, returns the original report unchanged (graceful degradation).
+func (s *Service) maybeRunRemediation(_ context.Context, report json.RawMessage, params *AnalysisParams, logger *slog.Logger) json.RawMessage {
+	if !s.config.Agent.RemediationEnabled {
+		return report
+	}
+
+	// Check if result type is "root_cause_identified".
+	var parsed struct {
+		Result struct {
+			Type string `json:"type"`
+		} `json:"result"`
+	}
+	if err := json.Unmarshal(report, &parsed); err != nil || parsed.Result.Type != "root_cause_identified" {
+		return report
+	}
+
+	logger.Info("running remediation agent")
+
+	// Exclude observability_recommendations from the message to remed agent.
+	var reportMap map[string]any
+	if err := json.Unmarshal(report, &reportMap); err != nil {
+		logger.Error("failed to parse report for remediation", "error", err)
+		return report
+	}
+	if result, ok := reportMap["result"].(map[string]any); ok {
+		if recs, ok := result["recommendations"].(map[string]any); ok {
+			delete(recs, "observability_recommendations")
+		}
+	}
+	reportForRemed, _ := json.Marshal(reportMap)
+
+	// Fresh timeout for remediation — each agent gets its own budget.
+	remedCtx, remedCancel := context.WithTimeout(context.Background(), time.Duration(s.config.Agent.AnalysisTimeout)*time.Second)
+	defer remedCancel()
+
+	remedResult, err := s.runRemedAgent(remedCtx, string(reportForRemed), params, logger)
+	if err != nil {
+		logger.Error("remediation agent failed, saving RCA report without it", "error", err)
+		return report
+	}
+
+	// Merge: replace recommended_actions in the RCA report.
+	var remedParsed struct {
+		RecommendedActions json.RawMessage `json:"recommended_actions"`
+	}
+	if err := json.Unmarshal(remedResult, &remedParsed); err != nil {
+		logger.Error("failed to parse remediation result", "error", err)
+		return report
+	}
+
+	if result, ok := reportMap["result"].(map[string]any); ok {
+		if recs, ok := result["recommendations"].(map[string]any); ok {
+			var actions []any
+			if err := json.Unmarshal(remedParsed.RecommendedActions, &actions); err == nil {
+				recs["recommended_actions"] = actions
+			}
+		}
+	}
+
+	merged, err := json.Marshal(reportMap)
+	if err != nil {
+		logger.Error("failed to marshal merged report", "error", err)
+		return report
+	}
+
+	logger.Info("remediation completed, merged into report")
+	return merged
+}
+
+func (s *Service) runRemedAgent(ctx context.Context, rcaReportJSON string, params *AnalysisParams, logger *slog.Logger) (json.RawMessage, error) {
+	token, err := fetchOAuth2Token(ctx,
+		s.config.Auth.OAuthTokenURL,
+		s.config.Auth.OAuthClientID,
+		s.config.Auth.OAuthClientSecret,
+		s.config.Auth.TLSInsecureSkipVerify,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("fetching OAuth2 token: %w", err)
+	}
+
+	httpClient := authedHTTPClient(token, s.config.Auth.TLSInsecureSkipVerify)
+
+	// Local tools calling the OpenChoreo REST API directly (not MCP).
+	remedTools := newRemedTools(s.config.MCP.OpenChoreoAPIURL, httpClient)
+
+	scope := params.Scope
+	systemPrompt, err := prompts.RenderRemedPrompt(&prompts.RemedPromptData{
+		Scope: &prompts.Scope{
+			Namespace:   scope.Namespace,
+			Environment: scope.Environment,
+			Project:     scope.Project,
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("rendering remed prompt: %w", err)
+	}
+
+	remedSchema, err := models.RemediationResultSchema()
+	if err != nil {
+		return nil, fmt.Errorf("loading remed schema: %w", err)
+	}
+
+	remedAgent, err := agent.CreateAgent(s.provider, s.config.LLM.ModelName,
+		agent.WithSystemPrompt(systemPrompt),
+		agent.WithTools(remedTools...),
+		agent.WithMiddleware(
+			rcamw.NewLogging(logger),
+			rcamw.NewToolErrorHandler(logger),
+		),
+		agent.WithStructuredOutput(&agent.StructuredOutput{
+			Strategy: agent.OutputStrategyProvider,
+			Name:     "remediation_result",
+			Schema:   remedSchema,
+		}),
+		agent.WithMaxIterations(50),
+		agent.WithLogger(logger),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("creating remed agent: %w", err)
+	}
+
+	result, err := remedAgent.Run(ctx, []providers.Message{
+		{Role: providers.RoleUser, Content: rcaReportJSON},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("running remed agent: %w", err)
+	}
+
+	if result.StructuredResponse == nil {
+		return nil, fmt.Errorf("remed agent did not produce structured output")
+	}
+
+	return result.StructuredResponse, nil
+}
+
 func (s *Service) markFailed(ctx context.Context, params *AnalysisParams, summary string, logger *slog.Logger) {
 	summaryPtr := &summary
 	entry := &store.ReportEntry{
@@ -420,11 +641,66 @@ func (s *Service) markFailed(ctx context.Context, params *AnalysisParams, summar
 	}
 }
 
+// toolActiveForms maps tool names to friendly UI labels for streaming.
+// toolActiveForms maps tool names to friendly UI labels for streaming.
+var toolActiveForms = map[string]string{
+	"query_component_logs":    "Fetching component logs...",
+	"query_workflow_logs":     "Fetching workflow logs...",
+	"query_resource_metrics":  "Gathering resource metrics...",
+	"query_http_metrics":      "Gathering HTTP metrics...",
+	"query_traces":            "Retrieving traces...",
+	"query_trace_spans":       "Retrieving trace spans...",
+	"get_span_details":        "Fetching span details...",
+	"list_environments":       "Loading environments...",
+	"list_namespaces":         "Loading namespaces...",
+	"list_projects":           "Loading projects...",
+	"list_components":         "Loading components...",
+	"patch_releasebinding":    "Patching release binding...",
+	"get_resource":            "Fetching resource...",
+	"get_component_release":   "Fetching component release...",
+	"get_component_release_schema": "Fetching release schema...",
+	"create_workload":         "Creating workload...",
+	"get_component_workloads": "Fetching component workloads...",
+	"list_release_bindings":   "Loading release bindings...",
+	"list_component_traits":   "Loading component traits...",
+	"get_trait_schema":        "Fetching trait schema...",
+}
+
 var observabilityToolNames = map[string]bool{
 	"query_component_logs":   true,
 	"query_resource_metrics": true,
 	"query_traces":           true,
 	"query_trace_spans":      true,
+}
+
+// rcaToolWhitelist is the set of MCP tools available to the RCA agent.
+var rcaToolWhitelist = map[string]bool{
+	"query_component_logs":   true,
+	"query_resource_metrics": true,
+	"query_traces":           true,
+	"query_trace_spans":      true,
+	"list_components":        true,
+	"get_component_release":  true,
+}
+
+// chatToolWhitelist is the set of MCP tools available to the chat agent.
+var chatToolWhitelist = map[string]bool{
+	"query_component_logs":   true,
+	"query_resource_metrics": true,
+	"query_traces":           true,
+	"query_trace_spans":      true,
+	"list_components":        true,
+}
+
+// filterTools returns only tools whose names are in the whitelist.
+func filterTools(tools []agent.Tool, whitelist map[string]bool) []agent.Tool {
+	var filtered []agent.Tool
+	for _, t := range tools {
+		if whitelist[t.Name] {
+			filtered = append(filtered, t)
+		}
+	}
+	return filtered
 }
 
 func classifyTools(tools []agent.Tool) (obs []prompts.ToolInfo, oc []prompts.ToolInfo) {
@@ -466,6 +742,12 @@ func toPromptAlert(a *AlertParams) *prompts.AlertData {
 		}
 	}
 	return data
+}
+
+func randomHex(n int) string {
+	b := make([]byte, n)
+	_, _ = rand.Read(b)
+	return fmt.Sprintf("%x", b)
 }
 
 func extractSummary(report json.RawMessage) *string {

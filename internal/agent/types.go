@@ -75,7 +75,7 @@ type State struct {
 	StructuredResponse json.RawMessage
 	// Done can be set by middleware hooks to signal the agent should stop
 	// the loop gracefully (without erroring). This is the equivalent of
-	// langchain's Command(goto="end") / can_jump_to=["end"].
+	// Middleware hooks can set this to exit the loop without erroring.
 	Done bool
 }
 
@@ -114,6 +114,9 @@ type StreamEvent struct {
 	ToolName string
 	// ToolCallID is the provider-assigned tool call ID.
 	ToolCallID string
+	// Args is the tool call arguments (StreamEventToolCallStart only).
+	// May be partial during streaming.
+	Args string
 	// Content is the tool execution result (StreamEventToolResult only).
 	Content string
 	// Result is the final agent result (StreamEventComplete only).

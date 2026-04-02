@@ -82,6 +82,11 @@ func main() {
 	// Initialize agent service
 	agentService := service.New(llmProvider, cfg, reportStore, logger.With("component", "agent-service"))
 
+	// Validate external dependencies (LLM, OAuth2, MCP) — fail fast like Python.
+	if err := agentService.ValidateConnectivity(context.Background()); err != nil {
+		log.Fatalf("Startup validation failed: %v", err)
+	}
+
 	// Set up HTTP handler
 	mux := http.NewServeMux()
 	handler := api.NewHandler(logger.With("component", "api"), reportStore, authzClient, agentService)
@@ -103,11 +108,17 @@ func main() {
 	protected.HandleFunc("GET /api/v1/rca-agent/reports/{report_id}", handler.GetReport)
 	protected.HandleFunc("PUT /api/v1/rca-agent/reports/{report_id}", handler.UpdateReport)
 
-	// Create HTTP server with CORS
+	// Create HTTP server with middleware chain: recovery → logging → CORS → routes
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)
+	httpHandler := observermiddleware.Chain(
+		observermiddleware.Recovery(logger),
+		observermiddleware.Logger(logger),
+		observermiddleware.CORS(cfg.CORS.AllowedOrigins),
+	)(mux)
+
 	server := &http.Server{
-		Addr:         addr,
-		Handler:      observermiddleware.CORS(cfg.CORS.AllowedOrigins)(mux),
+		Addr:    addr,
+		Handler: httpHandler,
 		ReadTimeout:  cfg.Server.ReadTimeout,
 		WriteTimeout: cfg.Server.WriteTimeout,
 	}

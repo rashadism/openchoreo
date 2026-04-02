@@ -23,7 +23,7 @@ type Scope struct {
 }
 
 // resolveComponentScope resolves all four resource UIDs from the OpenChoreo API.
-// Matches Python's resolve_component_scope().
+// resolveComponentScope resolves all four resource UIDs from the OpenChoreo API.
 func resolveComponentScope(ctx context.Context, apiBaseURL string, client *http.Client, namespace, project, component, environment string) (*Scope, error) {
 	base := strings.TrimRight(apiBaseURL, "/") + "/api/v1"
 
@@ -54,7 +54,7 @@ func resolveComponentScope(ctx context.Context, apiBaseURL string, client *http.
 }
 
 // resolveProjectScope resolves project and environment UIDs from the OpenChoreo API.
-// Matches Python's resolve_project_scope().
+// resolveProjectScope resolves project and environment UIDs from the OpenChoreo API.
 func resolveProjectScope(ctx context.Context, apiBaseURL string, client *http.Client, namespace, project, environment string) (*Scope, error) {
 	base := strings.TrimRight(apiBaseURL, "/") + "/api/v1"
 

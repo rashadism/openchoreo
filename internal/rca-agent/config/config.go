@@ -166,7 +166,13 @@ func Load() (*Config, error) {
 
 	// CORS_ALLOWED_ORIGINS is a comma-separated string; koanf doesn't split it.
 	if origins := os.Getenv("CORS_ALLOWED_ORIGINS"); origins != "" {
-		cfg.CORS.AllowedOrigins = strings.Split(origins, ",")
+		parts := strings.Split(origins, ",")
+		cfg.CORS.AllowedOrigins = make([]string, 0, len(parts))
+		for _, o := range parts {
+			if trimmed := strings.TrimSpace(o); trimmed != "" {
+				cfg.CORS.AllowedOrigins = append(cfg.CORS.AllowedOrigins, trimmed)
+			}
+		}
 	}
 
 	// Load auth config file for JWT subject resolution

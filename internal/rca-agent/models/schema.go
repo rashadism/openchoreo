@@ -12,6 +12,9 @@ var rcaSchemaYAML []byte
 //go:embed chat_response_schema.yaml
 var chatSchemaYAML []byte
 
+//go:embed remediation_result_schema.yaml
+var remediationSchemaYAML []byte
+
 // RCAReportSchema returns the RCA report JSON Schema as a map,
 // ready to pass to agent.StructuredOutput.Schema.
 func RCAReportSchema() (map[string]any, error) {
@@ -21,6 +24,11 @@ func RCAReportSchema() (map[string]any, error) {
 // ChatResponseSchema returns the chat response JSON Schema as a map.
 func ChatResponseSchema() (map[string]any, error) {
 	return SchemaFromYAML(chatSchemaYAML)
+}
+
+// RemediationResultSchema returns the remediation result JSON Schema as a map.
+func RemediationResultSchema() (map[string]any, error) {
+	return SchemaFromYAML(remediationSchemaYAML)
 }
 
 // SchemaFromYAML parses a YAML-encoded JSON Schema into a map[string]any.

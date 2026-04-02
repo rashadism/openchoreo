@@ -17,6 +17,9 @@ var chatPromptTmpl string
 //go:embed rca_request.tmpl
 var rcaRequestTmpl string
 
+//go:embed remed_prompt.tmpl
+var remedPromptTmpl string
+
 var funcMap = template.FuncMap{
 	"joinToolNames": func(tools []ToolInfo) string {
 		names := make([]string, len(tools))
@@ -43,6 +46,7 @@ var (
 	rcaPrompt   = template.Must(template.New("rca_prompt").Funcs(funcMap).Parse(rcaPromptTmpl))
 	chatPrompt  = template.Must(template.New("chat_prompt").Funcs(funcMap).Parse(chatPromptTmpl))
 	rcaRequest  = template.Must(template.New("rca_request").Funcs(funcMap).Parse(rcaRequestTmpl))
+	remedPrompt = template.Must(template.New("remed_prompt").Funcs(funcMap).Parse(remedPromptTmpl))
 )
 
 // ToolInfo describes a tool available to the agent, used in prompt rendering.
@@ -111,6 +115,11 @@ type RCARequestData struct {
 	Meta  any
 }
 
+// RemedPromptData is the template context for the remediation agent system prompt.
+type RemedPromptData struct {
+	Scope *Scope
+}
+
 // RenderRCAPrompt renders the RCA agent system prompt.
 func RenderRCAPrompt(data *RCAPromptData) (string, error) {
 	return render(rcaPrompt, data)
@@ -124,6 +133,11 @@ func RenderChatPrompt(data *ChatPromptData) (string, error) {
 // RenderRCARequest renders the analysis user message.
 func RenderRCARequest(data *RCARequestData) (string, error) {
 	return render(rcaRequest, data)
+}
+
+// RenderRemedPrompt renders the remediation agent system prompt.
+func RenderRemedPrompt(data *RemedPromptData) (string, error) {
+	return render(remedPrompt, data)
 }
 
 func render(tmpl *template.Template, data any) (string, error) {

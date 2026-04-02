@@ -296,7 +296,7 @@ type toolResult struct {
 // Structured output tool calls are intercepted and parsed rather than executed.
 // If events is non-nil, StreamEventToolResult events are emitted for each tool.
 // Returns (returnDirect, error) where returnDirect is true if ALL executed tools
-// have ReturnDirect=true (matching langchain's tools_to_model_edge behavior).
+// have ReturnDirect=true (all executed tools have ReturnDirect=true).
 func (a *Agent) processToolCalls(ctx context.Context, state *State, toolCalls []providers.ToolCall, strategy OutputStrategy, events chan<- StreamEvent) (bool, error) {
 	isOutputTool := a.isStructuredOutputTool(strategy)
 
@@ -404,7 +404,7 @@ func (a *Agent) isStructuredOutputTool(strategy OutputStrategy) func(string) boo
 }
 
 // handleStructuredToolCalls processes structured output tool calls.
-// Matches langchain's _handle_model_output behavior:
+// handleStructuredToolCalls processes structured output tool calls:
 // - 0 calls: no-op
 // - 1 call: parse arguments, set structured response
 // - >1 calls: MultipleStructuredOutputsError, optionally retry
@@ -498,7 +498,7 @@ func (a *Agent) shouldFallbackToTool(currentStrategy OutputStrategy, err error) 
 }
 
 // buildModelRequest constructs a ModelRequest for the current strategy.
-// System message is kept separate from conversation messages (langchain pattern).
+// System message is kept separate from conversation messages.
 func (a *Agent) buildModelRequest(state *State, strategy OutputStrategy) *ModelRequest {
 	req := &ModelRequest{
 		Provider: a.provider,
@@ -546,7 +546,7 @@ func (a *Agent) buildModelRequest(state *State, strategy OutputStrategy) *ModelR
 // executeModelCall is the innermost handler that calls the LLM provider.
 // System message is prepended to messages here (not stored in state).
 func (a *Agent) executeModelCall(ctx context.Context, req *ModelRequest) (*ModelResponse, error) {
-	// Prepend system message at invocation time (langchain pattern).
+	// Prepend system message at invocation time.
 	messages := req.Messages
 	if req.SystemMessage != nil {
 		messages = make([]providers.Message, 0, len(req.Messages)+1)
@@ -586,7 +586,7 @@ func (a *Agent) executeModelCall(ctx context.Context, req *ModelRequest) (*Model
 }
 
 // handleModelOutput extracts structured response from model output.
-// Matches langchain's _handle_model_output behavior per strategy.
+// handleModelOutput extracts structured response from model output per strategy.
 func (a *Agent) handleModelOutput(req *ModelRequest, msg providers.Message) (json.RawMessage, error) {
 	// Provider strategy: extract structured response from message content,
 	// but ONLY when the model did NOT call any tools. If tools were called,
