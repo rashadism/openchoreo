@@ -5,11 +5,11 @@ package api
 
 // AnalyzeRequest is the request body for POST /api/v1alpha1/rca-agent/analyze.
 type AnalyzeRequest struct {
-	Namespace   string        `json:"namespace"`
-	Project     string        `json:"project"`
-	Component   string        `json:"component"`
-	Environment string        `json:"environment"`
-	Alert       AlertContext  `json:"alert"`
+	Namespace   string         `json:"namespace"`
+	Project     string         `json:"project"`
+	Component   string         `json:"component"`
+	Environment string         `json:"environment"`
+	Alert       AlertContext   `json:"alert"`
 	Meta        map[string]any `json:"meta,omitempty"`
 }
 
@@ -23,10 +23,10 @@ type AlertContext struct {
 
 // AlertRuleInfo describes the alert rule.
 type AlertRuleInfo struct {
-	Name        string             `json:"name"`
-	Description *string            `json:"description,omitempty"`
-	Severity    *string            `json:"severity,omitempty"`
-	Source      *AlertRuleSource   `json:"source,omitempty"`
+	Name        string              `json:"name"`
+	Description *string             `json:"description,omitempty"`
+	Severity    *string             `json:"severity,omitempty"`
+	Source      *AlertRuleSource    `json:"source,omitempty"`
 	Condition   *AlertRuleCondition `json:"condition,omitempty"`
 }
 
@@ -39,15 +39,15 @@ type AlertRuleSource struct {
 
 // AlertRuleCondition describes the alert rule condition.
 type AlertRuleCondition struct {
-	Window   string `json:"window"`
-	Interval string `json:"interval"`
-	Operator string `json:"operator"`
-	Threshold int   `json:"threshold"`
+	Window    string `json:"window"`
+	Interval  string `json:"interval"`
+	Operator  string `json:"operator"`
+	Threshold int    `json:"threshold"`
 }
 
 // RCAResponse is the response for a triggered analysis.
 type RCAResponse struct {
-	ReportID string `json:"report_id"`
+	ReportID string `json:"reportId"`
 	Status   string `json:"status"`
 }
 
@@ -77,18 +77,6 @@ type StreamEvent struct {
 	Message    string `json:"message,omitempty"`
 }
 
-// ListReportsParams holds the query parameters for GET /api/v1/rca-agent/reports.
-type ListReportsParams struct {
-	Project     string
-	Environment string
-	Namespace   string
-	StartTime   string
-	EndTime     string
-	Limit       int
-	Sort        string
-	Status      string
-}
-
 // RCAReportsResponse is the response for listing reports.
 type RCAReportsResponse struct {
 	Reports    []RCAReportSummary `json:"reports"`
@@ -100,7 +88,7 @@ type RCAReportSummary struct {
 	AlertID   string  `json:"alertId"`
 	ReportID  string  `json:"reportId"`
 	Timestamp string  `json:"timestamp"`
-	Summary   *string `json:"summary,omitempty"`
+	Summary   *string `json:"summary"`
 	Status    string  `json:"status"`
 }
 
@@ -115,27 +103,27 @@ type RCAReportDetailed struct {
 
 // RCAReport is the full RCA report content.
 type RCAReport struct {
-	AlertContext      ReportAlertContext `json:"alert_context"`
-	Summary           string            `json:"summary"`
-	Result            any               `json:"result"`
+	AlertContext      ReportAlertContext  `json:"alert_context"`
+	Summary           string              `json:"summary"`
+	Result            any                 `json:"result"`
 	InvestigationPath []InvestigationStep `json:"investigation_path"`
 }
 
 // ReportAlertContext is the alert context as stored in the report.
 type ReportAlertContext struct {
-	AlertID          string              `json:"alert_id"`
-	AlertName        string              `json:"alert_name"`
-	AlertDescription *string             `json:"alert_description,omitempty"`
-	Severity         *string             `json:"severity,omitempty"`
-	TriggeredAt      string              `json:"triggered_at"`
-	TriggerValue     float64             `json:"trigger_value"`
-	SourceType       *string             `json:"source_type,omitempty"`
-	SourceQuery      *string             `json:"source_query,omitempty"`
-	SourceMetric     *string             `json:"source_metric,omitempty"`
-	Condition        ReportAlertCondition `json:"condition"`
-	Component        string              `json:"component"`
-	Project          string              `json:"project"`
-	Environment      string              `json:"environment"`
+	AlertID          string                `json:"alert_id"`
+	AlertName        string                `json:"alert_name"`
+	AlertDescription *string               `json:"alert_description,omitempty"`
+	Severity         *string               `json:"severity,omitempty"`
+	TriggeredAt      string                `json:"triggered_at"`
+	TriggerValue     float64               `json:"trigger_value"`
+	SourceType       *string               `json:"source_type,omitempty"`
+	SourceQuery      *string               `json:"source_query,omitempty"`
+	SourceMetric     *string               `json:"source_metric,omitempty"`
+	Condition        *ReportAlertCondition `json:"condition,omitempty"`
+	Component        string                `json:"component"`
+	Project          string                `json:"project"`
+	Environment      string                `json:"environment"`
 }
 
 // ReportAlertCondition is the alert condition as stored in the report.
@@ -148,10 +136,10 @@ type ReportAlertCondition struct {
 
 // RootCauseIdentified is the result when root causes are found.
 type RootCauseIdentified struct {
-	Type            string          `json:"type"`
-	RootCauses      []RootCause     `json:"root_causes"`
-	Timeline        []TimelineEvent `json:"timeline"`
-	ExcludedCauses  []ExcludedCause `json:"excluded_causes,omitempty"`
+	Type            string           `json:"type"`
+	RootCauses      []RootCause      `json:"root_causes"`
+	Timeline        []TimelineEvent  `json:"timeline"`
+	ExcludedCauses  []ExcludedCause  `json:"excluded_causes,omitempty"`
 	Recommendations *Recommendations `json:"recommendations"`
 }
 
@@ -238,8 +226,8 @@ type ExcludedCause struct {
 
 // Recommendations holds recommended and observability actions.
 type Recommendations struct {
-	RecommendedActions          []RecommendedAction `json:"recommended_actions,omitempty"`
-	ObservabilityRecommendations []Action           `json:"observability_recommendations,omitempty"`
+	RecommendedActions           []RecommendedAction `json:"recommended_actions,omitempty"`
+	ObservabilityRecommendations []Action            `json:"observability_recommendations,omitempty"`
 }
 
 // Action is a generic action.
@@ -258,10 +246,10 @@ type RecommendedAction struct {
 
 // ResourceChange describes a change to a resource.
 type ResourceChange struct {
-	ReleaseBinding string        `json:"release_binding"`
+	ReleaseBinding string         `json:"release_binding"`
 	Env            []EnvVarChange `json:"env,omitempty"`
-	Files          []FileChange  `json:"files,omitempty"`
-	Fields         []FieldChange `json:"fields,omitempty"`
+	Files          []FileChange   `json:"files,omitempty"`
+	Fields         []FieldChange  `json:"fields,omitempty"`
 }
 
 // EnvVarChange describes an environment variable change.

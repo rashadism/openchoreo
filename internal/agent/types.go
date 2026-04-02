@@ -1,3 +1,6 @@
+// Copyright 2026 The OpenChoreo Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package agent
 
 import (
@@ -73,9 +76,7 @@ type State struct {
 	// StructuredResponse holds the structured output once obtained.
 	// Nil until the agent produces structured output via either strategy.
 	StructuredResponse json.RawMessage
-	// Done can be set by middleware hooks to signal the agent should stop
-	// the loop gracefully (without erroring). This is the equivalent of
-	// langchain's Command(goto="end") / can_jump_to=["end"].
+	// Done can be set by middleware hooks to exit the loop gracefully.
 	Done bool
 }
 
@@ -114,6 +115,9 @@ type StreamEvent struct {
 	ToolName string
 	// ToolCallID is the provider-assigned tool call ID.
 	ToolCallID string
+	// Args is the tool call arguments (StreamEventToolCallStart only).
+	// May be partial during streaming.
+	Args string
 	// Content is the tool execution result (StreamEventToolResult only).
 	Content string
 	// Result is the final agent result (StreamEventComplete only).

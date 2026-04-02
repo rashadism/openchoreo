@@ -13,6 +13,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	authzcore "github.com/openchoreo/openchoreo/internal/authz/core"
@@ -70,8 +71,8 @@ func (c *Client) Evaluate(ctx context.Context, request *authzcore.EvaluateReques
 		return nil, err
 	}
 
-	if len(decisions) == 0 {
-		c.logger.Error("Authz service returned empty decisions array")
+	if len(decisions) != 1 {
+		c.logger.Error("Authz service returned unexpected decisions count", "count", len(decisions))
 		return nil, ErrAuthzInvalidResponse
 	}
 
@@ -118,7 +119,7 @@ func (c *Client) evaluate(ctx context.Context, requests []authzcore.EvaluateRequ
 		return nil, fmt.Errorf("failed to marshal evaluate request: %w", err)
 	}
 
-	url := c.baseURL + evaluatesEndpoint
+	url := strings.TrimRight(c.baseURL, "/") + evaluatesEndpoint
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		c.logger.Error("Failed to create HTTP request", "error", err)
@@ -156,6 +157,9 @@ func (c *Client) evaluate(ctx context.Context, requests []authzcore.EvaluateRequ
 
 	if resp.StatusCode != http.StatusOK {
 		c.logger.Error("Authz service returned error", "status", resp.StatusCode, "response_body", string(bodyBytes))
+		if resp.StatusCode >= 500 {
+			return nil, ErrAuthzServiceUnavailable
+		}
 		return nil, fmt.Errorf("authz service returned %d", resp.StatusCode)
 	}
 

@@ -11,8 +11,9 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"strings"
 	"os/signal"
+	"strings"
+	"sync"
 	"syscall"
 
 	anyllm "github.com/mozilla-ai/any-llm-go"
@@ -82,6 +83,11 @@ func main() {
 	// Initialize agent service
 	agentService := service.New(llmProvider, cfg, reportStore, logger.With("component", "agent-service"))
 
+	// Validate external dependencies (LLM, OAuth2, MCP) — fail fast like Python.
+	if err := agentService.ValidateConnectivity(context.Background()); err != nil {
+		log.Fatalf("Startup validation failed: %v", err)
+	}
+
 	// Set up HTTP handler
 	mux := http.NewServeMux()
 	handler := api.NewHandler(logger.With("component", "api"), reportStore, authzClient, agentService)
@@ -90,11 +96,13 @@ func main() {
 	jwtAuth := initJWTMiddleware(cfg, logger)
 
 	// Build routes with middleware
+	recoveryMiddleware := observermiddleware.Recovery(logger)
+	loggerMiddleware := observermiddleware.Logger(logger)
+
 	routes := middleware.NewRouteBuilder(mux)
 
 	// Public routes (no authentication)
 	routes.HandleFunc("GET /health", handler.Health)
-	routes.HandleFunc("POST /api/v1alpha1/rca-agent/analyze", handler.Analyze)
 
 	// Protected routes (JWT authentication required)
 	protected := routes.With(jwtAuth)
@@ -103,20 +111,47 @@ func main() {
 	protected.HandleFunc("GET /api/v1/rca-agent/reports/{report_id}", handler.GetReport)
 	protected.HandleFunc("PUT /api/v1/rca-agent/reports/{report_id}", handler.UpdateReport)
 
-	// Create HTTP server with CORS
+	// Create external HTTP server with middleware chain: recovery → logging → CORS → routes
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)
+	httpHandler := observermiddleware.Chain(
+		recoveryMiddleware,
+		loggerMiddleware,
+		observermiddleware.CORS(cfg.CORS.AllowedOrigins),
+	)(mux)
+
 	server := &http.Server{
 		Addr:         addr,
-		Handler:      observermiddleware.CORS(cfg.CORS.AllowedOrigins)(mux),
+		Handler:      httpHandler,
 		ReadTimeout:  cfg.Server.ReadTimeout,
 		WriteTimeout: cfg.Server.WriteTimeout,
 	}
 
-	// Start server
+	internalMux := http.NewServeMux()
+	internalRoutes := middleware.NewRouteBuilder(internalMux).With(loggerMiddleware)
+	internalRoutes.HandleFunc("POST /api/v1alpha1/rca-agent/analyze", handler.Analyze)
+
+	internalAddr := fmt.Sprintf(":%d", cfg.Server.InternalPort)
+	internalServer := &http.Server{
+		Addr:         internalAddr,
+		Handler:      internalMux,
+		ReadTimeout:  cfg.Server.ReadTimeout,
+		WriteTimeout: cfg.Server.WriteTimeout,
+	}
+
+	// Start external server
+	serverErr := make(chan error, 2)
 	go func() {
 		logger.Info("Starting server", "address", addr)
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatalf("Failed to start server: %v", err)
+			serverErr <- fmt.Errorf("external server: %w", err)
+		}
+	}()
+
+	// Start internal server
+	go func() {
+		logger.Info("Starting internal server", "address", internalAddr)
+		if err := internalServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			serverErr <- fmt.Errorf("internal server: %w", err)
 		}
 	}()
 
@@ -124,17 +159,35 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	// Wait for interrupt signal
-	<-ctx.Done()
+	// Wait for interrupt signal or server error
+	select {
+	case <-ctx.Done():
+	case err := <-serverErr:
+		logger.Error("Server failed", "error", err)
+	}
 
-	logger.Info("Shutting down server...")
+	logger.Info("Shutting down servers...")
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.Server.ShutdownTimeout)
 	defer cancel()
 
-	if err := server.Shutdown(shutdownCtx); err != nil {
-		log.Printf("Server forced to shutdown: %v", err)
-	}
+	var wg sync.WaitGroup
+	wg.Add(2)
 
+	go func() {
+		defer wg.Done()
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			log.Printf("Main server forced to shutdown: %v", err)
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		if err := internalServer.Shutdown(shutdownCtx); err != nil {
+			log.Printf("Internal server forced to shutdown: %v", err)
+		}
+	}()
+
+	wg.Wait()
 	logger.Info("Server shutdown complete")
 }
 
