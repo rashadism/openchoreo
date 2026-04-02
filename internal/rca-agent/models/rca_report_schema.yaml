@@ -29,7 +29,7 @@ $defs:
         type: string
         description: Comparison operator
       threshold:
-        type: integer
+        type: number
         description: Threshold value that was exceeded
 
   ReportAlertContext:

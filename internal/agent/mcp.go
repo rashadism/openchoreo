@@ -1,3 +1,6 @@
+// Copyright 2026 The OpenChoreo Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package agent
 
 import (
@@ -180,7 +183,7 @@ func mcpToolExecutor(session *mcp.ClientSession, toolName string) func(context.C
 			Arguments: arguments,
 		})
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("tool %q: %w", toolName, err)
 		}
 
 		text := mcpContentToString(result.Content)

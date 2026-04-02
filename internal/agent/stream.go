@@ -1,12 +1,30 @@
+// Copyright 2026 The OpenChoreo Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package agent
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/mozilla-ai/any-llm-go/providers"
 )
+
+// errStreamCancelled is returned when context is cancelled during event emission.
+var errStreamCancelled = errors.New("stream cancelled")
+
+// trySend sends an event or returns an error if context is done.
+func trySend(ctx context.Context, events chan<- StreamEvent, ev StreamEvent) error {
+	select {
+	case events <- ev:
+		return nil
+	case <-ctx.Done():
+		return errStreamCancelled
+	}
+}
 
 // Stream executes the agent like Run but emits streaming events as the model
 // generates output. Returns two channels: events (buffered) and errors (at most
@@ -49,6 +67,8 @@ func (a *Agent) Stream(ctx context.Context, messages []providers.Message) (<-cha
 // runStream is the streaming ReAct loop. It mirrors Run() but uses
 // CompletionStream for model calls and emits events to the channel.
 func (a *Agent) runStream(ctx context.Context, messages []providers.Message, events chan<- StreamEvent) error {
+	logger := a.newRunLogger()
+
 	state := &State{
 		Messages: make([]providers.Message, 0, len(messages)),
 	}
@@ -84,18 +104,22 @@ func (a *Agent) runStream(ctx context.Context, messages []providers.Message, eve
 
 		// Streaming model call.
 		req := a.buildModelRequest(state, strategy)
+		modelStart := time.Now()
 		resp, err := streamModelCallChain(ctx, req)
 
 		// Auto-strategy fallback: provider -> tool.
 		if err != nil && a.shouldFallbackToTool(strategy, err) {
-			a.logger.InfoContext(ctx, "provider strategy unsupported, falling back to tool strategy")
+			logger.InfoContext(ctx, "provider strategy unsupported, falling back to tool strategy")
 			strategy = OutputStrategyTool
 			req = a.buildModelRequest(state, strategy)
+			modelStart = time.Now()
 			resp, err = streamModelCallChain(ctx, req)
 		}
 		if err != nil {
+			logger.ErrorContext(ctx, "model call failed", "iteration", i+1, "elapsed_s", time.Since(modelStart).Seconds(), "error", err)
 			return fmt.Errorf("model call (iteration %d): %w", i+1, err)
 		}
+		logger.InfoContext(ctx, "model call completed", "iteration", i+1, "elapsed_s", time.Since(modelStart).Seconds())
 
 		// Append assistant message.
 		state.Messages = append(state.Messages, resp.Message)
@@ -123,7 +147,7 @@ func (a *Agent) runStream(ctx context.Context, messages []providers.Message, eve
 		}
 
 		// Process tool calls (parallel, with event emission).
-		returnDirect, err := a.processToolCalls(ctx, state, resp.Message.ToolCalls, strategy, events)
+		returnDirect, err := a.processToolCalls(ctx, logger, state, resp.Message.ToolCalls, strategy, events)
 		if err != nil {
 			return err
 		}
@@ -150,14 +174,13 @@ func (a *Agent) runStream(ctx context.Context, messages []providers.Message, eve
 		}
 	}
 
-	// Emit final complete event.
-	events <- StreamEvent{
+	_ = trySend(ctx, events, StreamEvent{
 		Type: StreamEventComplete,
 		Result: &Result{
 			Messages:           state.Messages,
 			StructuredResponse: state.StructuredResponse,
 		},
-	}
+	})
 
 	return nil
 }
@@ -199,9 +222,11 @@ func (a *Agent) executeModelCallStreaming(ctx context.Context, req *ModelRequest
 		// Text content.
 		if delta.Content != "" {
 			content.WriteString(delta.Content)
-			events <- StreamEvent{
+			if err := trySend(ctx, events, StreamEvent{
 				Type:  StreamEventTextDelta,
 				Delta: delta.Content,
+			}); err != nil {
+				return nil, err
 			}
 		}
 
@@ -218,17 +243,23 @@ func (a *Agent) executeModelCallStreaming(ctx context.Context, req *ModelRequest
 				})
 				toolCallArgs[tc.ID] = &strings.Builder{}
 
-				events <- StreamEvent{
+				if err := trySend(ctx, events, StreamEvent{
 					Type:       StreamEventToolCallStart,
 					ToolName:   tc.Function.Name,
 					ToolCallID: tc.ID,
+					Args:       tc.Function.Arguments,
+				}); err != nil {
+					return nil, err
 				}
 			}
 
 			// Accumulate arguments.
 			if tc.Function.Arguments != "" {
 				id := tc.ID
-				if id == "" && len(toolCalls) > 0 {
+				if id == "" {
+					if len(toolCalls) == 0 {
+						continue
+					}
 					// No ID on delta — append to most recent tool call.
 					id = toolCalls[len(toolCalls)-1].ID
 				}

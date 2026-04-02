@@ -8,6 +8,8 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -20,6 +22,10 @@ const (
 	initializeTimeout = 30 * time.Second
 	maxQueryLimit     = 10000
 	sortOrderDesc     = "DESC"
+
+	// timestampFormat is a fixed-width UTC timestamp layout so that TEXT
+	// timestamps stored in SQLite/PostgreSQL are lexically comparable.
+	timestampFormat = "2006-01-02T15:04:05.000Z"
 )
 
 type sqlStore struct {
@@ -33,6 +39,19 @@ func newSQLStore(backend, dsn string, logger *slog.Logger) (ReportStore, error) 
 	driver := "sqlite"
 	if backend == BackendPostgreSQL {
 		driver = "pgx"
+	}
+
+	// Ensure parent directory exists for SQLite.
+	if backend == BackendSQLite {
+		dbPath := strings.TrimPrefix(dsn, "file:")
+		if idx := strings.IndexByte(dbPath, '?'); idx != -1 {
+			dbPath = dbPath[:idx]
+		}
+		if dir := filepath.Dir(dbPath); dir != "" && dir != "." {
+			if err := os.MkdirAll(dir, 0o755); err != nil {
+				return nil, fmt.Errorf("failed to create database directory %q: %w", dir, err)
+			}
+		}
 	}
 
 	db, err := sql.Open(driver, dsn)
@@ -86,7 +105,13 @@ func (s *sqlStore) UpsertReport(ctx context.Context, entry *ReportEntry) error {
 
 	timestamp := strings.TrimSpace(entry.Timestamp)
 	if timestamp == "" {
-		timestamp = time.Now().UTC().Format(time.RFC3339Nano)
+		timestamp = time.Now().UTC().Format(timestampFormat)
+	} else {
+		normalized, err := normalizeTimestamp(timestamp)
+		if err != nil {
+			return fmt.Errorf("invalid timestamp %q: %w", timestamp, err)
+		}
+		timestamp = normalized
 	}
 
 	var query string
@@ -112,6 +137,10 @@ func (s *sqlStore) UpsertReport(ctx context.Context, entry *ReportEntry) error {
 		entry.Status,
 		summary,
 		timestamp,
+		entry.NamespaceName,
+		entry.ProjectName,
+		entry.EnvironmentName,
+		entry.ComponentName,
 		entry.EnvironmentUID,
 		entry.ProjectUID,
 		report,
@@ -124,9 +153,9 @@ func (s *sqlStore) UpsertReport(ctx context.Context, entry *ReportEntry) error {
 func (s *sqlStore) GetReport(ctx context.Context, reportID string) (*ReportEntry, error) {
 	var query string
 	if s.backend == BackendPostgreSQL {
-		query = "SELECT report_id, alert_id, status, summary, timestamp, environment_uid, project_uid, report FROM rca_reports WHERE report_id = $1"
+		query = "SELECT report_id, alert_id, status, summary, timestamp, namespace_name, project_name, environment_name, component_name, environment_uid, project_uid, report FROM rca_reports WHERE report_id = $1"
 	} else {
-		query = "SELECT report_id, alert_id, status, summary, timestamp, environment_uid, project_uid, report FROM rca_reports WHERE report_id = ?"
+		query = "SELECT report_id, alert_id, status, summary, timestamp, namespace_name, project_name, environment_name, component_name, environment_uid, project_uid, report FROM rca_reports WHERE report_id = ?"
 	}
 
 	var entry ReportEntry
@@ -137,6 +166,10 @@ func (s *sqlStore) GetReport(ctx context.Context, reportID string) (*ReportEntry
 		&entry.Status,
 		&summary,
 		&entry.Timestamp,
+		&entry.NamespaceName,
+		&entry.ProjectName,
+		&entry.EnvironmentName,
+		&entry.ComponentName,
 		&entry.EnvironmentUID,
 		&entry.ProjectUID,
 		&report,
@@ -299,12 +332,12 @@ func (s *sqlStore) enableSQLiteWAL(ctx context.Context) error {
 func normalizeTimestamp(value string) (string, error) {
 	parsed, err := time.Parse(time.RFC3339Nano, value)
 	if err == nil {
-		return parsed.UTC().Format(time.RFC3339Nano), nil
+		return parsed.UTC().Format(timestampFormat), nil
 	}
 
 	parsed, err = time.Parse(time.RFC3339, value)
 	if err == nil {
-		return parsed.UTC().Format(time.RFC3339Nano), nil
+		return parsed.UTC().Format(timestampFormat), nil
 	}
 
 	return "", err
@@ -317,6 +350,10 @@ CREATE TABLE IF NOT EXISTS rca_reports (
 	status TEXT NOT NULL DEFAULT 'pending',
 	summary TEXT,
 	timestamp TEXT NOT NULL,
+	namespace_name TEXT,
+	project_name TEXT,
+	environment_name TEXT,
+	component_name TEXT,
 	environment_uid TEXT,
 	project_uid TEXT,
 	report TEXT
@@ -339,21 +376,31 @@ CREATE INDEX IF NOT EXISTS idx_rca_reports_status
 ON rca_reports(status);`
 
 const upsertReportSQLiteQuery = `
-INSERT INTO rca_reports (report_id, alert_id, status, summary, timestamp, environment_uid, project_uid, report)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO rca_reports (report_id, alert_id, status, summary, timestamp, namespace_name, project_name, environment_name, component_name, environment_uid, project_uid, report)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(report_id) DO UPDATE SET
 	status = excluded.status,
 	summary = excluded.summary,
+	timestamp = excluded.timestamp,
+	namespace_name = excluded.namespace_name,
+	project_name = excluded.project_name,
+	environment_name = excluded.environment_name,
+	component_name = excluded.component_name,
 	environment_uid = excluded.environment_uid,
 	project_uid = excluded.project_uid,
 	report = COALESCE(excluded.report, rca_reports.report);`
 
 const upsertReportPostgresQuery = `
-INSERT INTO rca_reports (report_id, alert_id, status, summary, timestamp, environment_uid, project_uid, report)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO rca_reports (report_id, alert_id, status, summary, timestamp, namespace_name, project_name, environment_name, component_name, environment_uid, project_uid, report)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 ON CONFLICT(report_id) DO UPDATE SET
 	status = EXCLUDED.status,
 	summary = EXCLUDED.summary,
+	timestamp = EXCLUDED.timestamp,
+	namespace_name = EXCLUDED.namespace_name,
+	project_name = EXCLUDED.project_name,
+	environment_name = EXCLUDED.environment_name,
+	component_name = EXCLUDED.component_name,
 	environment_uid = EXCLUDED.environment_uid,
 	project_uid = EXCLUDED.project_uid,
 	report = COALESCE(EXCLUDED.report, rca_reports.report);`

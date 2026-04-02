@@ -20,7 +20,7 @@ import (
 type Config struct {
 	Server   ServerConfig `koanf:"server"`
 	LLM      LLMConfig    `koanf:"llm"`
-	MCP      MCPConfig    `koanf:"mcp"`
+	API      APIConfig    `koanf:"api"`
 	Report   ReportConfig `koanf:"report"`
 	Auth     AuthConfig   `koanf:"auth"`
 	Authz    AuthzConfig  `koanf:"authz"`
@@ -32,6 +32,7 @@ type Config struct {
 // ServerConfig holds HTTP server configuration.
 type ServerConfig struct {
 	Port            int           `koanf:"port"`
+	InternalPort    int           `koanf:"internal.port"`
 	ReadTimeout     time.Duration `koanf:"read.timeout"`
 	WriteTimeout    time.Duration `koanf:"write.timeout"`
 	ShutdownTimeout time.Duration `koanf:"shutdown.timeout"`
@@ -43,9 +44,9 @@ type LLMConfig struct {
 	APIKey    string `koanf:"api.key"`
 }
 
-// MCPConfig holds MCP server connection configuration.
-type MCPConfig struct {
-	ObserverURL      string `koanf:"observer.url"`
+// APIConfig holds API server connection configuration.
+type APIConfig struct {
+	ObserverAPIURL   string `koanf:"observer.api.url"`
 	OpenChoreoAPIURL string `koanf:"openchoreo.api.url"`
 }
 
@@ -57,30 +58,30 @@ type ReportConfig struct {
 
 // AuthConfig holds authentication configuration.
 type AuthConfig struct {
-	JWTDisabled            bool          `koanf:"jwt.disabled"`
-	OAuthTokenURL          string        `koanf:"oauth.token.url"`
-	OAuthClientID          string        `koanf:"oauth.client.id"`
-	OAuthClientSecret      string        `koanf:"oauth.client.secret"`
-	JWTJWKSURL             string        `koanf:"jwt.jwks.url"`
-	JWTIssuer              string        `koanf:"jwt.issuer"`
-	JWTAudience            string        `koanf:"jwt.audience"`
-	JWTJWKSRefreshInterval time.Duration `koanf:"jwt.jwks.refresh.interval"`
-	ConfigPath             string        `koanf:"config.path"`
-	TLSInsecureSkipVerify  bool          `koanf:"tls.insecure.skip.verify"`
+	JWTDisabled            bool                     `koanf:"jwt.disabled"`
+	OAuthTokenURL          string                   `koanf:"oauth.token.url"`
+	OAuthClientID          string                   `koanf:"oauth.client.id"`
+	OAuthClientSecret      string                   `koanf:"oauth.client.secret"`
+	JWTJWKSURL             string                   `koanf:"jwt.jwks.url"`
+	JWTIssuer              string                   `koanf:"jwt.issuer"`
+	JWTAudience            string                   `koanf:"jwt.audience"`
+	JWTJWKSRefreshInterval time.Duration            `koanf:"jwt.jwks.refresh.interval"`
+	ConfigPath             string                   `koanf:"config.path"`
+	TLSInsecureSkipVerify  bool                     `koanf:"tls.insecure.skip.verify"`
 	SubjectTypes           []subject.UserTypeConfig // loaded from YAML file
 }
 
 // AuthzConfig holds authorization service configuration.
 type AuthzConfig struct {
 	ServiceURL            string `koanf:"service.url"`
-	Timeout               int    `koanf:"timeout"`               // seconds
+	Timeout               int    `koanf:"timeout"` // seconds
 	TLSInsecureSkipVerify bool   `koanf:"tls.insecure.skip.verify"`
 }
 
 // AgentConfig holds agent behavior configuration.
 type AgentConfig struct {
 	MaxConcurrentAnalyses int  `koanf:"max.concurrent.analyses"`
-	AnalysisTimeout       int  `koanf:"analysis.timeout"`        // seconds
+	AnalysisTimeout       int  `koanf:"analysis.timeout"` // seconds
 	RemediationEnabled    bool `koanf:"remediation.enabled"`
 }
 
@@ -102,7 +103,8 @@ func Load() (*Config, error) {
 	envOverrides := make(map[string]interface{})
 
 	envMappings := map[string]string{
-		"SERVER_PORT":              "server.port",
+		"SERVER_PORT":             "server.port",
+		"SERVER_INTERNAL_PORT":    "server.internal.port",
 		"SERVER_READ_TIMEOUT":     "server.read.timeout",
 		"SERVER_WRITE_TIMEOUT":    "server.write.timeout",
 		"SERVER_SHUTDOWN_TIMEOUT": "server.shutdown.timeout",
@@ -110,29 +112,29 @@ func Load() (*Config, error) {
 		"RCA_MODEL_NAME":  "llm.model.name",
 		"RCA_LLM_API_KEY": "llm.api.key",
 
-		"OBSERVER_API_URL":    "mcp.observer.url",
-		"OPENCHOREO_API_URL":  "mcp.openchoreo.api.url",
+		"OBSERVER_API_URL":   "api.observer.api.url",
+		"OPENCHOREO_API_URL": "api.openchoreo.api.url",
 
-		"REPORT_BACKEND":     "report.backend",
-		"SQL_BACKEND_URI":    "report.database.uri",
+		"REPORT_BACKEND":  "report.backend",
+		"SQL_BACKEND_URI": "report.database.uri",
 
-		"JWT_DISABLED":                "auth.jwt.disabled",
-		"OAUTH_TOKEN_URL":             "auth.oauth.token.url",
-		"OAUTH_CLIENT_ID":             "auth.oauth.client.id",
-		"OAUTH_CLIENT_SECRET":         "auth.oauth.client.secret",
-		"JWT_JWKS_URL":                "auth.jwt.jwks.url",
-		"JWT_ISSUER":                  "auth.jwt.issuer",
-		"JWT_AUDIENCE":                "auth.jwt.audience",
-		"JWT_JWKS_REFRESH_INTERVAL":   "auth.jwt.jwks.refresh.interval",
-		"AUTH_CONFIG_PATH":            "auth.config.path",
-		"TLS_INSECURE_SKIP_VERIFY":   "auth.tls.insecure.skip.verify",
+		"JWT_DISABLED":                   "auth.jwt.disabled",
+		"OAUTH_TOKEN_URL":                "auth.oauth.token.url",
+		"OAUTH_CLIENT_ID":                "auth.oauth.client.id",
+		"OAUTH_CLIENT_SECRET":            "auth.oauth.client.secret",
+		"JWT_JWKS_URL":                   "auth.jwt.jwks.url",
+		"JWT_ISSUER":                     "auth.jwt.issuer",
+		"JWT_AUDIENCE":                   "auth.jwt.audience",
+		"JWT_JWKS_REFRESH_INTERVAL":      "auth.jwt.jwks.refresh.interval",
+		"AUTH_CONFIG_PATH":               "auth.config.path",
+		"TLS_INSECURE_SKIP_VERIFY":       "auth.tls.insecure.skip.verify",
 		"AUTHZ_SERVICE_URL":              "authz.service.url",
 		"AUTHZ_TIMEOUT_SECONDS":          "authz.timeout",
 		"AUTHZ_TLS_INSECURE_SKIP_VERIFY": "authz.tls.insecure.skip.verify",
 
 		"MAX_CONCURRENT_ANALYSES":  "agent.max.concurrent.analyses",
 		"ANALYSIS_TIMEOUT_SECONDS": "agent.analysis.timeout",
-		"REMED_AGENT":             "agent.remediation.enabled",
+		"REMED_AGENT":              "agent.remediation.enabled",
 
 		"LOG_LEVEL": "loglevel",
 	}
@@ -166,7 +168,13 @@ func Load() (*Config, error) {
 
 	// CORS_ALLOWED_ORIGINS is a comma-separated string; koanf doesn't split it.
 	if origins := os.Getenv("CORS_ALLOWED_ORIGINS"); origins != "" {
-		cfg.CORS.AllowedOrigins = strings.Split(origins, ",")
+		parts := strings.Split(origins, ",")
+		cfg.CORS.AllowedOrigins = make([]string, 0, len(parts))
+		for _, o := range parts {
+			if trimmed := strings.TrimSpace(o); trimmed != "" {
+				cfg.CORS.AllowedOrigins = append(cfg.CORS.AllowedOrigins, trimmed)
+			}
+		}
 	}
 
 	// Load auth config file for JWT subject resolution
@@ -201,7 +209,7 @@ func Load() (*Config, error) {
 
 	// Derive authz service URL from OpenChoreo API URL (same service).
 	if cfg.Authz.ServiceURL == "" || cfg.Authz.ServiceURL == "http://localhost:8080" {
-		cfg.Authz.ServiceURL = strings.TrimRight(cfg.MCP.OpenChoreoAPIURL, "/")
+		cfg.Authz.ServiceURL = strings.TrimRight(cfg.API.OpenChoreoAPIURL, "/")
 	}
 
 	// Validate configuration
@@ -216,16 +224,17 @@ func getDefaults() map[string]interface{} {
 	return map[string]interface{}{
 		"server": map[string]interface{}{
 			"port":             8080,
-			"read.timeout":    "15s",
-			"write.timeout":   "15s",
+			"internal.port":    8081,
+			"read.timeout":     "15s",
+			"write.timeout":    "15s",
 			"shutdown.timeout": "30s",
 		},
 		"llm": map[string]interface{}{
 			"model.name": "",
 			"api.key":    "",
 		},
-		"mcp": map[string]interface{}{
-			"observer.url":      "http://observer:8080",
+		"api": map[string]interface{}{
+			"observer.api.url":   "http://observer:8080",
 			"openchoreo.api.url": "http://openchoreo-api.openchoreo-control-plane.svc.cluster.local:8080",
 		},
 		"report": map[string]interface{}{
@@ -233,16 +242,16 @@ func getDefaults() map[string]interface{} {
 			"database.uri": "file:/app/data/rca_reports.db?_journal=WAL",
 		},
 		"auth": map[string]interface{}{
-			"jwt.disabled":               false,
-			"oauth.token.url":            "",
-			"oauth.client.id":            "",
-			"oauth.client.secret":        "",
-			"jwt.jwks.url":               "",
-			"jwt.issuer":                 "",
-			"jwt.audience":               "",
-			"jwt.jwks.refresh.interval":  "3600s",
-			"config.path":                "auth-config.yaml",
-			"tls.insecure.skip.verify":   false,
+			"jwt.disabled":              false,
+			"oauth.token.url":           "",
+			"oauth.client.id":           "",
+			"oauth.client.secret":       "",
+			"jwt.jwks.url":              "",
+			"jwt.issuer":                "",
+			"jwt.audience":              "",
+			"jwt.jwks.refresh.interval": "3600s",
+			"config.path":               "auth-config.yaml",
+			"tls.insecure.skip.verify":  false,
 		},
 		"authz": map[string]interface{}{
 			"service.url":              "http://localhost:8080",
@@ -261,6 +270,14 @@ func getDefaults() map[string]interface{} {
 func (c *Config) validate() error {
 	if c.Server.Port <= 0 || c.Server.Port > 65535 {
 		return fmt.Errorf("invalid server port: %d", c.Server.Port)
+	}
+
+	if c.Server.InternalPort <= 0 || c.Server.InternalPort > 65535 {
+		return fmt.Errorf("invalid internal server port: %d", c.Server.InternalPort)
+	}
+
+	if c.Server.Port == c.Server.InternalPort {
+		return fmt.Errorf("server port and internal port must differ: %d", c.Server.Port)
 	}
 
 	if c.LLM.ModelName == "" {

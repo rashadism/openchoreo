@@ -1,16 +1,29 @@
+// Copyright 2026 The OpenChoreo Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package agent
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
+	"time"
 
 	anyllmerrors "github.com/mozilla-ai/any-llm-go/errors"
 	"github.com/mozilla-ai/any-llm-go/providers"
 )
+
+// newRunLogger creates a logger scoped to a single agent run.
+func (a *Agent) newRunLogger() *slog.Logger {
+	var b [4]byte
+	_, _ = rand.Read(b[:])
+	return a.logger.With("run_id", hex.EncodeToString(b[:]))
+}
 
 const defaultMaxIterations = 100
 
@@ -24,7 +37,7 @@ type Agent struct {
 	model            string
 	systemPrompt     string
 	tools            []Tool
-	middlewares       []Middleware
+	middlewares      []Middleware
 	structuredOutput *StructuredOutput
 	maxIterations    int
 	logger           *slog.Logger
@@ -141,6 +154,9 @@ func (a *Agent) init() error {
 	allTools = append(allTools, middlewareTools...)
 	a.toolsByName = make(map[string]*Tool, len(allTools))
 	for i := range allTools {
+		if _, exists := a.toolsByName[allTools[i].Name]; exists {
+			return fmt.Errorf("agent: duplicate tool name %q", allTools[i].Name)
+		}
 		a.toolsByName[allTools[i].Name] = &allTools[i]
 	}
 	a.tools = allTools
@@ -180,6 +196,8 @@ func (a *Agent) init() error {
 // The agent runs a ReAct loop: model call -> tool execution -> model call -> ...
 // until the model stops calling tools or structured output is obtained.
 func (a *Agent) Run(ctx context.Context, messages []providers.Message) (*Result, error) {
+	logger := a.newRunLogger()
+
 	state := &State{
 		Messages: make([]providers.Message, 0, len(messages)),
 	}
@@ -210,18 +228,22 @@ func (a *Agent) Run(ctx context.Context, messages []providers.Message) (*Result,
 
 		// Model call.
 		req := a.buildModelRequest(state, strategy)
+		modelStart := time.Now()
 		resp, err := a.modelCallChain(ctx, req)
 
 		// Auto-strategy fallback: provider -> tool.
 		if err != nil && a.shouldFallbackToTool(strategy, err) {
-			a.logger.InfoContext(ctx, "provider strategy unsupported, falling back to tool strategy")
+			logger.InfoContext(ctx, "provider strategy unsupported, falling back to tool strategy")
 			strategy = OutputStrategyTool
 			req = a.buildModelRequest(state, strategy)
+			modelStart = time.Now()
 			resp, err = a.modelCallChain(ctx, req)
 		}
 		if err != nil {
+			logger.ErrorContext(ctx, "model call failed", "iteration", i+1, "elapsed_s", time.Since(modelStart).Seconds(), "error", err)
 			return nil, fmt.Errorf("model call (iteration %d): %w", i+1, err)
 		}
+		logger.InfoContext(ctx, "model call completed", "iteration", i+1, "elapsed_s", time.Since(modelStart).Seconds())
 
 		// Append assistant message.
 		state.Messages = append(state.Messages, resp.Message)
@@ -250,7 +272,7 @@ func (a *Agent) Run(ctx context.Context, messages []providers.Message) (*Result,
 		}
 
 		// Process tool calls (parallel execution).
-		returnDirect, err := a.processToolCalls(ctx, state, resp.Message.ToolCalls, strategy, nil)
+		returnDirect, err := a.processToolCalls(ctx, logger, state, resp.Message.ToolCalls, strategy, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -296,8 +318,8 @@ type toolResult struct {
 // Structured output tool calls are intercepted and parsed rather than executed.
 // If events is non-nil, StreamEventToolResult events are emitted for each tool.
 // Returns (returnDirect, error) where returnDirect is true if ALL executed tools
-// have ReturnDirect=true (matching langchain's tools_to_model_edge behavior).
-func (a *Agent) processToolCalls(ctx context.Context, state *State, toolCalls []providers.ToolCall, strategy OutputStrategy, events chan<- StreamEvent) (bool, error) {
+// have ReturnDirect=true (all executed tools have ReturnDirect=true).
+func (a *Agent) processToolCalls(ctx context.Context, logger *slog.Logger, state *State, toolCalls []providers.ToolCall, strategy OutputStrategy, events chan<- StreamEvent) (bool, error) {
 	isOutputTool := a.isStructuredOutputTool(strategy)
 
 	// Separate structured output tool calls from regular ones.
@@ -321,6 +343,16 @@ func (a *Agent) processToolCalls(ctx context.Context, state *State, toolCalls []
 	}
 
 	// Execute regular tool calls in parallel.
+	// Each goroutine receives a shallow snapshot of the current state so that
+	// ToolCallMiddleware can safely read state fields without racing against
+	// other goroutines. The snapshot shares the same Messages slice header
+	// (read-only during tool execution) but is a distinct State value.
+	stateSnapshot := &State{
+		Messages:           state.Messages,
+		StructuredResponse: state.StructuredResponse,
+		Done:               state.Done,
+	}
+
 	results := make([]toolResult, len(regularCalls))
 	var wg sync.WaitGroup
 
@@ -328,7 +360,7 @@ func (a *Agent) processToolCalls(ctx context.Context, state *State, toolCalls []
 		wg.Add(1)
 		go func(idx int, tc providers.ToolCall) {
 			defer wg.Done()
-			results[idx] = a.executeSingleToolCall(ctx, tc, state)
+			results[idx] = a.executeSingleToolCall(ctx, logger, tc, stateSnapshot)
 		}(i, tc)
 	}
 
@@ -342,12 +374,12 @@ func (a *Agent) processToolCalls(ctx context.Context, state *State, toolCalls []
 			allReturnDirect = false
 		}
 		if events != nil && r.toolName != "" {
-			events <- StreamEvent{
+			_ = trySend(ctx, events, StreamEvent{
 				Type:       StreamEventToolResult,
 				ToolName:   r.toolName,
 				ToolCallID: r.message.ToolCallID,
 				Content:    r.message.ContentString(),
-			}
+			})
 		}
 	}
 
@@ -356,7 +388,7 @@ func (a *Agent) processToolCalls(ctx context.Context, state *State, toolCalls []
 
 // executeSingleToolCall runs one tool call through the middleware chain.
 // Returns a toolResult that is always valid (errors become error messages).
-func (a *Agent) executeSingleToolCall(ctx context.Context, tc providers.ToolCall, state *State) toolResult {
+func (a *Agent) executeSingleToolCall(ctx context.Context, logger *slog.Logger, tc providers.ToolCall, state *State) toolResult {
 	tool := a.toolsByName[tc.Function.Name]
 	if tool == nil {
 		return toolResult{
@@ -365,22 +397,33 @@ func (a *Agent) executeSingleToolCall(ctx context.Context, tc providers.ToolCall
 				Content:    fmt.Sprintf("Error: unknown tool %q", tc.Function.Name),
 				ToolCallID: tc.ID,
 			},
+			toolName: tc.Function.Name,
 		}
 	}
 
+	logger.DebugContext(ctx, "tool call starting", "tool", tool.Name, "args", tc.Function.Arguments)
+
 	toolReq := &ToolCallRequest{ToolCall: tc, Tool: tool, State: state}
+	toolStart := time.Now()
 	toolResp, err := a.toolCallChain(ctx, toolReq)
+	elapsed := time.Since(toolStart).Seconds()
+
 	if err != nil {
+		logger.ErrorContext(ctx, "tool call failed", "tool", tool.Name, "elapsed_s", elapsed, "error", err)
+		// On error, never honor ReturnDirect — let the model see the error
+		// and decide how to recover rather than returning an error as the
+		// final result.
 		return toolResult{
 			message: providers.Message{
 				Role:       providers.RoleTool,
 				Content:    fmt.Sprintf("Error executing tool %q: %v", tc.Function.Name, err),
 				ToolCallID: tc.ID,
 			},
-			toolName:     tool.Name,
-			returnDirect: tool.ReturnDirect,
+			toolName: tool.Name,
 		}
 	}
+
+	logger.InfoContext(ctx, "tool call completed", "tool", tool.Name, "elapsed_s", elapsed, "result_chars", len(toolResp.Content))
 
 	return toolResult{
 		message: providers.Message{
@@ -404,7 +447,7 @@ func (a *Agent) isStructuredOutputTool(strategy OutputStrategy) func(string) boo
 }
 
 // handleStructuredToolCalls processes structured output tool calls.
-// Matches langchain's _handle_model_output behavior:
+// handleStructuredToolCalls processes structured output tool calls:
 // - 0 calls: no-op
 // - 1 call: parse arguments, set structured response
 // - >1 calls: MultipleStructuredOutputsError, optionally retry
@@ -498,7 +541,7 @@ func (a *Agent) shouldFallbackToTool(currentStrategy OutputStrategy, err error) 
 }
 
 // buildModelRequest constructs a ModelRequest for the current strategy.
-// System message is kept separate from conversation messages (langchain pattern).
+// System message is kept separate from conversation messages.
 func (a *Agent) buildModelRequest(state *State, strategy OutputStrategy) *ModelRequest {
 	req := &ModelRequest{
 		Provider: a.provider,
@@ -546,7 +589,7 @@ func (a *Agent) buildModelRequest(state *State, strategy OutputStrategy) *ModelR
 // executeModelCall is the innermost handler that calls the LLM provider.
 // System message is prepended to messages here (not stored in state).
 func (a *Agent) executeModelCall(ctx context.Context, req *ModelRequest) (*ModelResponse, error) {
-	// Prepend system message at invocation time (langchain pattern).
+	// Prepend system message at invocation time.
 	messages := req.Messages
 	if req.SystemMessage != nil {
 		messages = make([]providers.Message, 0, len(req.Messages)+1)
@@ -586,7 +629,7 @@ func (a *Agent) executeModelCall(ctx context.Context, req *ModelRequest) (*Model
 }
 
 // handleModelOutput extracts structured response from model output.
-// Matches langchain's _handle_model_output behavior per strategy.
+// handleModelOutput extracts structured response from model output per strategy.
 func (a *Agent) handleModelOutput(req *ModelRequest, msg providers.Message) (json.RawMessage, error) {
 	// Provider strategy: extract structured response from message content,
 	// but ONLY when the model did NOT call any tools. If tools were called,

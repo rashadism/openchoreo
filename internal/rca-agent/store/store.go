@@ -19,14 +19,18 @@ const (
 
 // ReportEntry represents a stored RCA report.
 type ReportEntry struct {
-	ReportID       string  `json:"reportId"`
-	AlertID        string  `json:"alertId"`
-	Status         string  `json:"status"`
-	Summary        *string `json:"summary,omitempty"`
-	Timestamp      string  `json:"timestamp"`
-	EnvironmentUID string  `json:"environmentUid,omitempty"`
-	ProjectUID     string  `json:"projectUid,omitempty"`
-	Report         *string `json:"report,omitempty"` // JSON-encoded report
+	ReportID        string  `json:"reportId"`
+	AlertID         string  `json:"alertId"`
+	Status          string  `json:"status"`
+	Summary         *string `json:"summary,omitempty"`
+	Timestamp       string  `json:"timestamp"`
+	NamespaceName   string  `json:"namespaceName,omitempty"`
+	ProjectName     string  `json:"projectName,omitempty"`
+	EnvironmentName string  `json:"environmentName,omitempty"`
+	ComponentName   string  `json:"componentName,omitempty"`
+	EnvironmentUID  string  `json:"environmentUid,omitempty"`
+	ProjectUID      string  `json:"projectUid,omitempty"`
+	Report          *string `json:"report,omitempty"`
 }
 
 // QueryParams defines the query parameters for listing reports.

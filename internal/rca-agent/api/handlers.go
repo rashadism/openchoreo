@@ -66,7 +66,7 @@ func (h *Handler) Analyze(w http.ResponseWriter, r *http.Request) {
 	)
 
 	// Resolve scope (names → UIDs) before creating the pending record.
-	// This matches Python's pattern where scope resolution happens in the handler.
+	// Scope must be resolved before creating the pending report.
 	scope, err := h.service.ResolveComponentScope(r.Context(),
 		req.Namespace, req.Project, req.Component, req.Environment,
 	)
@@ -79,14 +79,17 @@ func (h *Handler) Analyze(w http.ResponseWriter, r *http.Request) {
 	// Generate report ID from alert ID + timestamp.
 	reportID := fmt.Sprintf("%s_%d", req.Alert.ID, time.Now().Unix())
 
-	// Store pending report with resolved UIDs.
 	if err := h.reportStore.UpsertReport(r.Context(), &store.ReportEntry{
-		ReportID:       reportID,
-		AlertID:        req.Alert.ID,
-		Status:         "pending",
-		Timestamp:      time.Now().UTC().Format(time.RFC3339),
-		EnvironmentUID: scope.EnvironmentUID,
-		ProjectUID:     scope.ProjectUID,
+		ReportID:        reportID,
+		AlertID:         req.Alert.ID,
+		Status:          "pending",
+		Timestamp:       time.Now().UTC().Format(time.RFC3339),
+		NamespaceName:   req.Namespace,
+		ProjectName:     req.Project,
+		EnvironmentName: req.Environment,
+		ComponentName:   req.Component,
+		EnvironmentUID:  scope.EnvironmentUID,
+		ProjectUID:      scope.ProjectUID,
 	}); err != nil {
 		h.logger.Error("failed to create pending report", "error", err)
 		writeError(w, http.StatusInternalServerError, "failed to create report")
@@ -94,7 +97,7 @@ func (h *Handler) Analyze(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Launch background analysis with scope already resolved.
-	go h.service.RunAnalysis(context.Background(), toAnalysisParams(reportID, &req, scope))
+	go h.service.RunAnalysis(context.Background(), toAnalysisParams(reportID, &req, scope)) //nolint:gosec // intentional: analysis must outlive the HTTP request
 
 	writeJSON(w, http.StatusOK, RCAResponse{
 		ReportID: reportID,
@@ -105,7 +108,9 @@ func (h *Handler) Analyze(w http.ResponseWriter, r *http.Request) {
 // Chat handles POST /api/v1alpha1/rca-agent/chat.
 func (h *Handler) Chat(w http.ResponseWriter, r *http.Request) {
 	var req ChatRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
 		return
 	}
@@ -120,7 +125,23 @@ func (h *Handler) Chat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Authorize
+	if len(req.Messages) > 50 {
+		writeError(w, http.StatusBadRequest, "messages must not exceed 50")
+		return
+	}
+
+	for i, msg := range req.Messages {
+		if msg.Role != "user" && msg.Role != "assistant" {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("message %d has invalid role %q: must be \"user\" or \"assistant\"", i, msg.Role))
+			return
+		}
+		if len(msg.Content) > 10000 {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("message %d content exceeds 10000 characters", i))
+			return
+		}
+	}
+
+	// Authorize against caller-supplied scope (names, not UIDs).
 	resourceType, resourceID, hierarchy := rcaAuthz.ComponentScopeAuthz(req.Namespace, req.Project, "")
 	if err := rcaAuthz.CheckAuthorization(
 		r.Context(), h.logger, h.authzClient,
@@ -136,7 +157,6 @@ func (h *Handler) Chat(w http.ResponseWriter, r *http.Request) {
 		"message_count", len(req.Messages),
 	)
 
-	// Fetch report for context.
 	entry, err := h.reportStore.GetReport(r.Context(), req.ReportID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -145,6 +165,11 @@ func (h *Handler) Chat(w http.ResponseWriter, r *http.Request) {
 		}
 		h.logger.Error("failed to get report for chat", "error", err)
 		writeError(w, http.StatusInternalServerError, "failed to get report")
+		return
+	}
+
+	if entry.ProjectName != "" && entry.ProjectName != req.Project {
+		writeError(w, http.StatusForbidden, "report does not belong to the specified project")
 		return
 	}
 
@@ -172,25 +197,24 @@ func (h *Handler) Chat(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/x-ndjson")
 	w.Header().Set("Cache-Control", "no-cache")
+
+	if rc := http.NewResponseController(w); rc != nil {
+		_ = rc.SetWriteDeadline(time.Now().Add(10 * time.Minute))
+	}
+
 	w.WriteHeader(http.StatusOK)
 
-	// Extract user's bearer token from JWT middleware for MCP auth.
+	// Extract user's bearer token from JWT middleware for API auth.
 	bearerToken, _ := jwt.GetToken(r)
 
 	chatParams := toChatParams(&req, reportContext, scope)
-	chatEvents, errs := h.service.StreamChat(r.Context(), bearerToken, chatParams)
+	chatEvents := h.service.StreamChat(r.Context(), bearerToken, chatParams)
 
 	enc := json.NewEncoder(w)
 	for ev := range chatEvents {
 		if err := enc.Encode(ev); err != nil {
 			break
 		}
-		flusher.Flush()
-	}
-
-	if err := <-errs; err != nil {
-		h.logger.Error("chat stream error", "error", err)
-		_ = enc.Encode(service.ChatEvent{Type: "error", Content: "internal error"})
 		flusher.Flush()
 	}
 }
@@ -207,6 +231,22 @@ func (h *Handler) ListReports(w http.ResponseWriter, r *http.Request) {
 
 	if project == "" || environment == "" || namespace == "" || startTime == "" || endTime == "" {
 		writeError(w, http.StatusUnprocessableEntity, "project, environment, namespace, startTime, and endTime are required")
+		return
+	}
+
+	// Validate time range.
+	startParsed, err := time.Parse(time.RFC3339, startTime)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid startTime format, expected RFC3339")
+		return
+	}
+	endParsed, err := time.Parse(time.RFC3339, endTime)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid endTime format, expected RFC3339")
+		return
+	}
+	if !startParsed.Before(endParsed) {
+		writeError(w, http.StatusBadRequest, "startTime must be before endTime")
 		return
 	}
 
@@ -310,7 +350,7 @@ func (h *Handler) GetReport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Authorize using the report's stored project
-	resourceType, resourceID2, hierarchy := rcaAuthz.ComponentScopeAuthz("", entry.ProjectUID, "")
+	resourceType, resourceID2, hierarchy := rcaAuthz.ComponentScopeAuthz(entry.NamespaceName, entry.ProjectName, "")
 	if err := rcaAuthz.CheckAuthorization(
 		r.Context(), h.logger, h.authzClient,
 		rcaAuthz.ActionViewRCAReport, resourceType, resourceID2, hierarchy,
@@ -371,7 +411,7 @@ func (h *Handler) UpdateReport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Authorize using the report's stored project
-	resourceType, resourceID2, hierarchy := rcaAuthz.ComponentScopeAuthz("", entry.ProjectUID, "")
+	resourceType, resourceID2, hierarchy := rcaAuthz.ComponentScopeAuthz(entry.NamespaceName, entry.ProjectName, "")
 	if err := rcaAuthz.CheckAuthorization(
 		r.Context(), h.logger, h.authzClient,
 		rcaAuthz.ActionUpdateRCAReport, resourceType, resourceID2, hierarchy,
@@ -394,11 +434,7 @@ func (h *Handler) UpdateReport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Update action statuses in the report (only valid transitions)
-	changed, err := applyActionStatusUpdates(reportData, req.AppliedIndices, req.DismissedIndices)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
+	changed := applyActionStatusUpdates(reportData, req.AppliedIndices, req.DismissedIndices)
 
 	if changed {
 		updatedJSON, err := json.Marshal(reportData)
@@ -431,20 +467,20 @@ func (h *Handler) Health(w http.ResponseWriter, _ *http.Request) {
 // Returns true if any changes were made. Only performs valid transitions:
 //   - applied: revised → applied
 //   - dismissed: revised|suggested → dismissed
-func applyActionStatusUpdates(report map[string]any, applied, dismissed []int) (bool, error) {
+func applyActionStatusUpdates(report map[string]any, applied, dismissed []int) bool {
 	result, ok := report["result"].(map[string]any)
 	if !ok {
-		return false, nil
+		return false
 	}
 
 	recommendations, ok := result["recommendations"].(map[string]any)
 	if !ok {
-		return false, nil
+		return false
 	}
 
 	actions, ok := recommendations["recommended_actions"].([]any)
 	if !ok {
-		return false, nil
+		return false
 	}
 
 	appliedSet := make(map[int]struct{}, len(applied))
@@ -474,7 +510,7 @@ func applyActionStatusUpdates(report map[string]any, applied, dismissed []int) (
 		}
 	}
 
-	return changed, nil
+	return changed
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -493,6 +529,8 @@ func handleAuthzError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusUnauthorized, "unauthorized")
 	case errors.Is(err, rcaAuthz.ErrAuthzForbidden):
 		writeError(w, http.StatusForbidden, "insufficient permissions")
+	case errors.Is(err, rcaAuthz.ErrAuthzServiceUnavailable):
+		writeError(w, http.StatusServiceUnavailable, "authorization service unavailable")
 	default:
 		writeError(w, http.StatusInternalServerError, "authorization check failed")
 	}
