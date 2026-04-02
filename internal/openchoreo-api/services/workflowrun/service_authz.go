@@ -19,6 +19,9 @@ import (
 )
 
 const (
+	actionCreateWorkflowRun = "workflowrun:create"
+	actionUpdateWorkflowRun = "workflowrun:update"
+	actionViewWorkflowRun   = "workflowrun:view"
 	resourceTypeWorkflowRun = "workflowrun"
 )
 
@@ -107,6 +110,22 @@ func (s *workflowRunServiceWithAuthz) GetWorkflowRun(ctx context.Context, namesp
 		return nil, err
 	}
 	return wr, nil
+}
+
+func (s *workflowRunServiceWithAuthz) DeleteWorkflowRun(ctx context.Context, namespaceName, runName string) error {
+	wr, err := s.internal.GetWorkflowRun(ctx, namespaceName, runName)
+	if err != nil {
+		return err
+	}
+	if err := s.authz.Check(ctx, services.CheckRequest{
+		Action:       authz.ActionDeleteWorkflowRun,
+		ResourceType: resourceTypeWorkflowRun,
+		ResourceID:   runName,
+		Hierarchy:    constructHierarchyForAuthzCheck(namespaceName, wr.Labels),
+	}); err != nil {
+		return err
+	}
+	return s.internal.DeleteWorkflowRun(ctx, namespaceName, runName)
 }
 
 func (s *workflowRunServiceWithAuthz) GetWorkflowRunLogs(ctx context.Context, namespaceName, runName, taskName, gatewayURL string, sinceSeconds *int64) ([]models.WorkflowRunLogEntry, error) {
