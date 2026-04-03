@@ -53,7 +53,7 @@ func (p *chatResponseParser) emitDelta(newMessage string) string {
 // a potentially incomplete JSON buffer. Handles escape sequences.
 //
 // For input `{"message": "Hello, wor` it returns "Hello, wor".
-func extractPartialStringValue(buf, key string) string {
+func extractPartialStringValue(buf, key string) string { //nolint:unparam // key is parameterized for testability
 	// Find "key": "
 	needle := `"` + key + `"`
 	idx := strings.Index(buf, needle)

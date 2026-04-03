@@ -196,7 +196,7 @@ func NewCPTools(baseURL string, httpClient *http.Client) ([]agent.Tool, error) {
 				if err := json.Unmarshal([]byte(body), &comp); err != nil {
 					return "", fmt.Errorf("decoding component response: %w", err)
 				}
-				if comp.Spec.Traits == nil {
+				if comp.Spec.Traits == nil || string(comp.Spec.Traits) == "null" {
 					return "[]", nil
 				}
 				return string(comp.Spec.Traits), nil

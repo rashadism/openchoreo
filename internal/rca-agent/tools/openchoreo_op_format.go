@@ -1,20 +1,17 @@
 // Copyright 2026 The OpenChoreo Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package middleware
+package tools
 
 import (
 	"bytes"
-	"context"
 	_ "embed"
 	"encoding/json"
-	"log/slog"
 	"sort"
 	"strings"
 	"text/template"
 	"time"
 
-	"github.com/openchoreo/openchoreo/internal/agent"
 	obstypes "github.com/openchoreo/openchoreo/internal/observer/types"
 )
 
@@ -51,45 +48,6 @@ var (
 	traceSpanTpl = template.Must(template.New("trace_spans").Funcs(templateFuncs).Parse(traceSpansTmpl))
 )
 
-// processors maps tool names to their transform functions.
-var processors = map[string]func(json.RawMessage, *slog.Logger) string{
-	"query_component_logs":   processLogs,
-	"query_resource_metrics": processMetrics,
-	"query_traces":           processTraces,
-	"query_trace_spans":      processTraceSpans,
-}
-
-// OutputTransformer transforms raw tool output into LLM-friendly markdown.
-type OutputTransformer struct {
-	logger *slog.Logger
-}
-
-func NewOutputTransformer(logger *slog.Logger) *OutputTransformer {
-	return &OutputTransformer{logger: logger}
-}
-
-func (m *OutputTransformer) Name() string { return "output_transformer" }
-
-func (m *OutputTransformer) WrapToolCall(ctx context.Context, req *agent.ToolCallRequest, next agent.ToolCallHandler) (*agent.ToolCallResponse, error) {
-	resp, err := next(ctx, req)
-	if err != nil {
-		return resp, err
-	}
-
-	toolName := req.ToolCall.Function.Name
-	processor, ok := processors[toolName]
-	if !ok {
-		return resp, nil
-	}
-
-	m.logger.Info("transforming tool output", "tool", toolName)
-
-	transformed := processor(json.RawMessage(resp.Content), m.logger)
-	return &agent.ToolCallResponse{Content: transformed}, nil
-}
-
-// --- Log processor ---
-
 type logComponent struct {
 	ComponentName string
 	Logs          []obstypes.LogEntry
@@ -102,18 +60,16 @@ type logContext struct {
 	Components      []logComponent
 }
 
-func processLogs(raw json.RawMessage, logger *slog.Logger) string {
+func formatLogs(raw string) string {
 	var data obstypes.LogsQueryResponse
-	if err := json.Unmarshal(raw, &data); err != nil {
-		logger.Error("failed to parse logs", "error", err)
-		return string(raw)
+	if err := json.Unmarshal([]byte(raw), &data); err != nil {
+		return raw
 	}
 
 	if len(data.Logs) == 0 {
 		return "No logs found"
 	}
 
-	// Group by component.
 	groups := make(map[string]*logComponent)
 	var order []string
 	for _, entry := range data.Logs {
@@ -140,10 +96,8 @@ func processLogs(raw json.RawMessage, logger *slog.Logger) string {
 		ctx.EnvironmentName = firstNonEmpty(first.EnvironmentName, "N/A")
 	}
 
-	return renderTemplate(logsTpl, ctx, raw, logger)
+	return renderTemplate(logsTpl, ctx, raw)
 }
-
-// --- Metrics processor ---
 
 type metricsContext struct {
 	Stats          map[string]*MetricStats
@@ -154,11 +108,10 @@ type metricsContext struct {
 	Correlations   map[string]float64
 }
 
-func processMetrics(raw json.RawMessage, logger *slog.Logger) string {
+func formatMetrics(raw string) string {
 	var data obstypes.ResourceMetricsQueryResponse
-	if err := json.Unmarshal(raw, &data); err != nil {
-		logger.Error("failed to parse metrics", "error", err)
-		return string(raw)
+	if err := json.Unmarshal([]byte(raw), &data); err != nil {
+		return raw
 	}
 
 	extractValues := func(items []obstypes.MetricsTimeSeriesItem) ([]float64, []string) {
@@ -218,10 +171,8 @@ func processMetrics(raw json.RawMessage, logger *slog.Logger) string {
 		ctx.Correlations["CPUMemory"] = correlation(cpuUsage, memUsage)
 	}
 
-	return renderTemplate(metricsTpl, ctx, raw, logger)
+	return renderTemplate(metricsTpl, ctx, raw)
 }
-
-// --- Traces processor ---
 
 type traceRow struct {
 	TraceID    string
@@ -236,11 +187,10 @@ type tracesContext struct {
 	Total  int
 }
 
-func processTraces(raw json.RawMessage, logger *slog.Logger) string {
+func formatTraces(raw string) string {
 	var data obstypes.TracesQueryResponse
-	if err := json.Unmarshal(raw, &data); err != nil {
-		logger.Error("failed to parse traces", "error", err)
-		return string(raw)
+	if err := json.Unmarshal([]byte(raw), &data); err != nil {
+		return raw
 	}
 
 	if len(data.Traces) == 0 {
@@ -267,10 +217,8 @@ func processTraces(raw json.RawMessage, logger *slog.Logger) string {
 		total = len(data.Traces)
 	}
 
-	return renderTemplate(tracesTpl, tracesContext{Traces: rows, Total: total}, raw, logger)
+	return renderTemplate(tracesTpl, tracesContext{Traces: rows, Total: total}, raw)
 }
-
-// --- Trace spans processor ---
 
 type spanRow struct {
 	SpanName    string
@@ -289,11 +237,10 @@ type spansContext struct {
 	Total int
 }
 
-func processTraceSpans(raw json.RawMessage, logger *slog.Logger) string {
+func formatTraceSpans(raw string) string {
 	var data obstypes.SpansQueryResponse
-	if err := json.Unmarshal(raw, &data); err != nil {
-		logger.Error("failed to parse spans", "error", err)
-		return string(raw)
+	if err := json.Unmarshal([]byte(raw), &data); err != nil {
+		return raw
 	}
 
 	if len(data.Spans) == 0 {
@@ -306,14 +253,12 @@ func processTraceSpans(raw json.RawMessage, logger *slog.Logger) string {
 		total = len(data.Spans)
 	}
 
-	return renderTemplate(traceSpanTpl, spansContext{Spans: tree, Total: total}, raw, logger)
+	return renderTemplate(traceSpanTpl, spansContext{Spans: tree, Total: total}, raw)
 }
 
-// buildSpanTree transforms flat spans into a depth-first tree order.
 func buildSpanTree(spans []obstypes.SpanInfo) []spanRow {
-	// Two-pass: first build the full map, then classify roots.
 	spanMap := make(map[string]*obstypes.SpanInfo, len(spans))
-	children := make(map[string][]string) // parentID → child IDs
+	children := make(map[string][]string)
 
 	for i := range spans {
 		spanMap[spans[i].SpanID] = &spans[i]
@@ -328,14 +273,22 @@ func buildSpanTree(spans []obstypes.SpanInfo) []spanRow {
 		children[s.ParentSpanID] = append(children[s.ParentSpanID], s.SpanID)
 	}
 
-	// Sort roots and children by start time.
 	sortByStartTime := func(ids []string) {
-		sort.Slice(ids, func(i, j int) bool {
+		sort.SliceStable(ids, func(i, j int) bool {
 			si, sj := spanMap[ids[i]], spanMap[ids[j]]
-			if si.StartTime == nil || sj.StartTime == nil {
-				return false
+			ti, tj := si.StartTime, sj.StartTime
+			switch {
+			case ti == nil && tj == nil:
+				return ids[i] < ids[j]
+			case ti == nil:
+				return false // nil sorts after non-nil
+			case tj == nil:
+				return true
+			case ti.Equal(*tj):
+				return ids[i] < ids[j]
+			default:
+				return ti.Before(*tj)
 			}
-			return si.StartTime.Before(*sj.StartTime)
 		})
 	}
 
@@ -355,7 +308,6 @@ func buildSpanTree(spans []obstypes.SpanInfo) []spanRow {
 		project := attrStr(resAttrs, "openchoreo.dev/project", "")
 		namespace := attrStr(resAttrs, "openchoreo.dev/namespace", "")
 
-		// Filter out internal attributes.
 		filtered := make(map[string]interface{})
 		for k, v := range s.Attributes {
 			if !strings.HasPrefix(k, "data_stream") {
@@ -389,13 +341,10 @@ func buildSpanTree(spans []obstypes.SpanInfo) []spanRow {
 	return result
 }
 
-// --- Helpers ---
-
-func renderTemplate(tmpl *template.Template, data any, raw json.RawMessage, logger *slog.Logger) string {
+func renderTemplate(tmpl *template.Template, data any, raw string) string {
 	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, data); err != nil {
-		logger.Error("template render failed", "template", tmpl.Name(), "error", err)
-		return string(raw)
+		return raw
 	}
 	return buf.String()
 }

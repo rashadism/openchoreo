@@ -209,11 +209,17 @@ func (a *Agent) executeModelCallStreaming(ctx context.Context, req *ModelRequest
 	chunks, errs := a.provider.CompletionStream(ctx, params)
 
 	// Accumulate the full message from stream chunks.
+	// On send failure (context cancelled), we keep draining chunks so the
+	// provider goroutine can complete and channels are properly closed.
 	var content strings.Builder
 	var toolCalls []providers.ToolCall
 	toolCallArgs := make(map[string]*strings.Builder) // keyed by tool call ID
+	var sendErr error
 
 	for chunk := range chunks {
+		if sendErr != nil {
+			continue // drain remaining chunks to unblock provider
+		}
 		if len(chunk.Choices) == 0 {
 			continue
 		}
@@ -226,7 +232,8 @@ func (a *Agent) executeModelCallStreaming(ctx context.Context, req *ModelRequest
 				Type:  StreamEventTextDelta,
 				Delta: delta.Content,
 			}); err != nil {
-				return nil, err
+				sendErr = err
+				continue
 			}
 		}
 
@@ -249,7 +256,8 @@ func (a *Agent) executeModelCallStreaming(ctx context.Context, req *ModelRequest
 					ToolCallID: tc.ID,
 					Args:       tc.Function.Arguments,
 				}); err != nil {
-					return nil, err
+					sendErr = err
+					break
 				}
 			}
 
@@ -270,9 +278,13 @@ func (a *Agent) executeModelCallStreaming(ctx context.Context, req *ModelRequest
 		}
 	}
 
-	// Check for stream errors.
-	if err := <-errs; err != nil {
-		return nil, err
+	// Always read the stream error to prevent goroutine leak.
+	streamErr := <-errs
+	if sendErr != nil {
+		return nil, sendErr
+	}
+	if streamErr != nil {
+		return nil, streamErr
 	}
 
 	// Build the accumulated message.

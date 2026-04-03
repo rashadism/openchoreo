@@ -341,7 +341,9 @@ func (s *Service) runRCAAgent(ctx context.Context, params *AnalysisParams, logge
 		return nil, fmt.Errorf("loading RCA schema: %w", err)
 	}
 
-	allTools := append(opTools, cpTools...)
+	allTools := make([]agent.Tool, 0, len(opTools)+len(cpTools))
+	allTools = append(allTools, opTools...)
+	allTools = append(allTools, cpTools...)
 	rcaTools := filterTools(allTools, rcaAgentTools)
 	rcaTools = append(rcaTools, agent.NewWriteTodosTool())
 	logger.Info("creating RCA agent", "model", s.config.LLM.ModelName, "tools", len(rcaTools))
@@ -350,7 +352,6 @@ func (s *Service) runRCAAgent(ctx context.Context, params *AnalysisParams, logge
 		agent.WithTools(rcaTools...),
 		agent.WithMiddleware(
 			rcamw.NewToolErrorHandler(logger),
-			rcamw.NewOutputTransformer(logger),
 		),
 		agent.WithStructuredOutput(&agent.StructuredOutput{
 			Strategy: agent.OutputStrategyProvider,
@@ -406,14 +407,15 @@ func (s *Service) runChatAgent(ctx context.Context, bearerToken string, params *
 		return fmt.Errorf("loading chat schema: %w", err)
 	}
 
-	allTools := append(opTools, cpTools...)
+	allTools := make([]agent.Tool, 0, len(opTools)+len(cpTools))
+	allTools = append(allTools, opTools...)
+	allTools = append(allTools, cpTools...)
 	chatTools := filterTools(allTools, chatAgentTools)
 	chatAgent, err := agent.CreateAgent(s.provider, s.config.LLM.ModelName,
 		agent.WithSystemPrompt(systemPrompt),
 		agent.WithTools(chatTools...),
 		agent.WithMiddleware(
 			rcamw.NewToolErrorHandler(s.logger),
-			rcamw.NewOutputTransformer(s.logger),
 		),
 		agent.WithStructuredOutput(&agent.StructuredOutput{
 			Strategy: agent.OutputStrategyProvider,
