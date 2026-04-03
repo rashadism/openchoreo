@@ -92,6 +92,7 @@ type ChatEvent struct {
 
 // Service orchestrates RCA agent operations: analysis and chat.
 type Service struct {
+	ctx      context.Context
 	provider providers.Provider
 	config   *config.Config
 	store    store.ReportStore
@@ -99,9 +100,11 @@ type Service struct {
 	sem      chan struct{}
 }
 
-// New creates a new agent service.
-func New(provider providers.Provider, cfg *config.Config, reportStore store.ReportStore, logger *slog.Logger) *Service {
+// New creates a new agent service. The context controls the lifetime of
+// background analyses — cancel it during shutdown to stop in-flight work.
+func New(ctx context.Context, provider providers.Provider, cfg *config.Config, reportStore store.ReportStore, logger *slog.Logger) *Service {
 	return &Service{
+		ctx:      ctx,
 		provider: provider,
 		config:   cfg,
 		store:    reportStore,
@@ -185,7 +188,8 @@ func (s *Service) ResolveProjectScope(ctx context.Context, namespace, project, e
 // RunAnalysis runs the RCA agent. Intended to be called as a goroutine.
 // It acquires a semaphore slot, creates an agent, runs analysis, and stores
 // the result. On any failure the report is marked as "failed".
-func (s *Service) RunAnalysis(ctx context.Context, params *AnalysisParams) {
+func (s *Service) RunAnalysis(params *AnalysisParams) {
+	ctx := s.ctx
 	logger := s.logger.With("report_id", params.ReportID, "alert_id", params.AlertID)
 
 	defer func() {

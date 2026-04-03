@@ -5,7 +5,7 @@ package agent
 
 import (
 	"context"
-	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/mozilla-ai/any-llm-go/providers"
@@ -371,4 +371,52 @@ func TestStream_StructuredOutput_ToolStrategy(t *testing.T) {
 	assert.Equal(t, `{"answer":42}`, string(last.Result.StructuredResponse))
 }
 
-var _ json.Marshaler = json.RawMessage{} // suppress unused import
+func TestStream_ProviderError(t *testing.T) {
+	t.Parallel()
+
+	sp := &errorStreamProvider{
+		chunks: []providers.ChatCompletionChunk{textChunk("partial")},
+		err:    fmt.Errorf("connection reset"),
+	}
+
+	a, err := CreateAgent(sp, "m")
+	require.NoError(t, err)
+
+	events, errs := a.Stream(context.Background(), []providers.Message{userMsg("go")})
+
+	// Drain events.
+	for range events {
+	}
+
+	err = <-errs
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "connection reset")
+}
+
+// errorStreamProvider sends chunks followed by an error on the errs channel.
+type errorStreamProvider struct {
+	chunks []providers.ChatCompletionChunk
+	err    error
+}
+
+func (e *errorStreamProvider) Name() string { return "error-stream-fake" }
+
+func (e *errorStreamProvider) Completion(context.Context, providers.CompletionParams) (*providers.ChatCompletion, error) {
+	panic("use CompletionStream")
+}
+
+func (e *errorStreamProvider) CompletionStream(_ context.Context, _ providers.CompletionParams) (<-chan providers.ChatCompletionChunk, <-chan error) {
+	chunks := make(chan providers.ChatCompletionChunk, 64)
+	errs := make(chan error, 1)
+
+	go func() {
+		defer close(chunks)
+		defer close(errs)
+		for _, c := range e.chunks {
+			chunks <- c
+		}
+		errs <- e.err
+	}()
+
+	return chunks, errs
+}

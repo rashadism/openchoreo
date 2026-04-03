@@ -114,6 +114,10 @@ func CreateAgent(provider providers.Provider, model string, opts ...Option) (*Ag
 		opt(a)
 	}
 
+	if a.maxIterations <= 0 {
+		return nil, errors.New("agent: maxIterations must be positive")
+	}
+
 	if a.structuredOutput != nil {
 		if a.structuredOutput.Name == "" {
 			return nil, errors.New("agent: structured output name must not be empty")

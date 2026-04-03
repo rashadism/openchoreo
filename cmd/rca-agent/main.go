@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"log/slog"
 	"net/http"
 	"os"
@@ -55,10 +54,12 @@ func main() {
 		logger.With("component", "report-store"),
 	)
 	if err != nil {
-		log.Fatalf("Failed to initialize report store: %v", err)
+		logger.Error("Failed to initialize report store", "error", err)
+		os.Exit(1)
 	}
 	if err := reportStore.Initialize(context.Background()); err != nil {
-		log.Fatalf("Failed to initialize report store schema: %v", err)
+		logger.Error("Failed to initialize report store schema", "error", err)
+		os.Exit(1)
 	}
 	defer func() {
 		if closeErr := reportStore.Close(); closeErr != nil {
@@ -76,21 +77,28 @@ func main() {
 	// Initialize LLM provider
 	llmProvider, err := openai.New(anyllm.WithAPIKey(cfg.LLM.APIKey))
 	if err != nil {
-		log.Fatalf("Failed to initialize LLM provider: %v", err)
+		logger.Error("Failed to initialize LLM provider", "error", err)
+		os.Exit(1)
 	}
 	logger.Info("LLM provider initialized", "model", cfg.LLM.ModelName)
 
+	// Graceful shutdown using signal context — created early so the service
+	// can derive background-analysis contexts from it.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	// Initialize agent service
-	agentService := service.New(llmProvider, cfg, reportStore, logger.With("component", "agent-service"))
+	agentService := service.New(ctx, llmProvider, cfg, reportStore, logger.With("component", "agent-service"))
 
 	// Validate external dependencies (LLM, OAuth2, MCP) — fail fast like Python.
 	if err := agentService.ValidateConnectivity(context.Background()); err != nil {
-		log.Fatalf("Startup validation failed: %v", err)
+		logger.Error("Startup validation failed", "error", err)
+		os.Exit(1)
 	}
 
 	// Set up HTTP handler
 	mux := http.NewServeMux()
-	handler := api.NewHandler(logger.With("component", "api"), reportStore, authzClient, agentService)
+	handler := api.NewHandler(logger.With("component", "api"), reportStore, authzClient, agentService, cfg.Server.StreamWriteTimeout)
 
 	// Initialize JWT middleware
 	jwtAuth := initJWTMiddleware(cfg, logger)
@@ -155,10 +163,6 @@ func main() {
 		}
 	}()
 
-	// Graceful shutdown using signal context
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
 	// Wait for interrupt signal or server error
 	select {
 	case <-ctx.Done():
@@ -176,14 +180,14 @@ func main() {
 	go func() {
 		defer wg.Done()
 		if err := server.Shutdown(shutdownCtx); err != nil {
-			log.Printf("Main server forced to shutdown: %v", err)
+			logger.Error("Main server forced to shutdown", "error", err)
 		}
 	}()
 
 	go func() {
 		defer wg.Done()
 		if err := internalServer.Shutdown(shutdownCtx); err != nil {
-			log.Printf("Internal server forced to shutdown: %v", err)
+			logger.Error("Internal server forced to shutdown", "error", err)
 		}
 	}()
 

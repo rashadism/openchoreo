@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -23,24 +24,24 @@ type Scope struct {
 }
 
 // resolveComponentScope resolves all four resource UIDs from the OpenChoreo API.
-// resolveComponentScope resolves all four resource UIDs from the OpenChoreo API.
 func resolveComponentScope(ctx context.Context, apiBaseURL string, client *http.Client, namespace, project, component, environment string) (*Scope, error) {
 	base := strings.TrimRight(apiBaseURL, "/")
 	if !strings.HasSuffix(base, "/api/v1") {
 		base += "/api/v1"
 	}
 
-	projectUID, err := fetchResourceUID(ctx, client, base+"/namespaces/"+namespace+"/projects/"+project)
+	ns := url.PathEscape(namespace)
+	projectUID, err := fetchResourceUID(ctx, client, base+"/namespaces/"+ns+"/projects/"+url.PathEscape(project))
 	if err != nil {
 		return nil, fmt.Errorf("resolving project UID: %w", err)
 	}
 
-	componentUID, err := fetchResourceUID(ctx, client, base+"/namespaces/"+namespace+"/components/"+component)
+	componentUID, err := fetchResourceUID(ctx, client, base+"/namespaces/"+ns+"/components/"+url.PathEscape(component))
 	if err != nil {
 		return nil, fmt.Errorf("resolving component UID: %w", err)
 	}
 
-	environmentUID, err := fetchResourceUID(ctx, client, base+"/namespaces/"+namespace+"/environments/"+environment)
+	environmentUID, err := fetchResourceUID(ctx, client, base+"/namespaces/"+ns+"/environments/"+url.PathEscape(environment))
 	if err != nil {
 		return nil, fmt.Errorf("resolving environment UID: %w", err)
 	}
@@ -63,12 +64,13 @@ func resolveProjectScope(ctx context.Context, apiBaseURL string, client *http.Cl
 		base += "/api/v1"
 	}
 
-	projectUID, err := fetchResourceUID(ctx, client, base+"/namespaces/"+namespace+"/projects/"+project)
+	ns := url.PathEscape(namespace)
+	projectUID, err := fetchResourceUID(ctx, client, base+"/namespaces/"+ns+"/projects/"+url.PathEscape(project))
 	if err != nil {
 		return nil, fmt.Errorf("resolving project UID: %w", err)
 	}
 
-	environmentUID, err := fetchResourceUID(ctx, client, base+"/namespaces/"+namespace+"/environments/"+environment)
+	environmentUID, err := fetchResourceUID(ctx, client, base+"/namespaces/"+ns+"/environments/"+url.PathEscape(environment))
 	if err != nil {
 		return nil, fmt.Errorf("resolving environment UID: %w", err)
 	}

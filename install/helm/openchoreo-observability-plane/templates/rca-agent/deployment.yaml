@@ -43,6 +43,9 @@ spec:
         - name: http
           containerPort: {{ .Values.rca.service.port }}
           protocol: TCP
+        - name: http-internal
+          containerPort: {{ if .Values.rca.internalService }}{{ .Values.rca.internalService.port | default 8081 }}{{ else }}8081{{ end }}
+          protocol: TCP
         envFrom:
         - secretRef:
             name: {{ .Values.rca.secretName }}

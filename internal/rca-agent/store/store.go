@@ -37,7 +37,6 @@ type ReportEntry struct {
 type QueryParams struct {
 	ProjectUID     string
 	EnvironmentUID string
-	Namespace      string
 	StartTime      string // RFC3339
 	EndTime        string // RFC3339
 	Limit          int

@@ -14,6 +14,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -82,10 +83,11 @@ func authedContext() context.Context {
 // newTestHandler creates a Handler wired to the given mocks.
 func newTestHandler(mockStore *storemocks.MockReportStore, pdp authzcore.PDP, mockSvc *apimocks.MockAgentService) *Handler {
 	return &Handler{
-		logger:      testLogger(),
-		reportStore: mockStore,
-		authzClient: pdp,
-		service:     mockSvc,
+		logger:            testLogger(),
+		reportStore:       mockStore,
+		authzClient:       pdp,
+		service:           mockSvc,
+		streamWriteTimeout: 10 * time.Minute,
 	}
 }
 
@@ -662,7 +664,7 @@ func TestAnalyze_Success(t *testing.T) {
 		return e.Status == "pending" && e.NamespaceName == "ns" && e.ProjectName == "proj"
 	})).Return(nil)
 
-	mockSvc.On("RunAnalysis", mock.Anything, mock.Anything).Maybe().Return()
+	mockSvc.On("RunAnalysis", mock.Anything).Maybe().Return()
 
 	body := `{"namespace":"ns","project":"proj","component":"comp","environment":"dev","alert":{"id":"alert-1","value":95}}`
 	rec := doPost(t, h.Analyze, body)

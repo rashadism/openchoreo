@@ -105,11 +105,12 @@ func extractPartialStringValue(buf, key string) string { //nolint:unparam // key
 			case 'u':
 				// Unicode escape: \uXXXX — need 4 hex digits.
 				if i+5 >= len(rest) {
-					break // Incomplete unicode escape.
+					i = len(rest) // Incomplete unicode escape, stop scanning.
+				} else {
+					// Pass through as-is for simplicity.
+					sb.WriteString(rest[i : i+6])
+					i += 6
 				}
-				// Pass through as-is for simplicity.
-				sb.WriteString(rest[i : i+6])
-				i += 6
 			default:
 				sb.WriteByte(next)
 				i += 2

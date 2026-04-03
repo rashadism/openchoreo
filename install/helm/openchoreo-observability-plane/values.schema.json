@@ -1486,6 +1486,23 @@
           "title": "image",
           "type": "object"
         },
+        "internalService": {
+          "additionalProperties": false,
+          "description": "Internal Kubernetes service configuration (for analyze endpoint)",
+          "properties": {
+            "port": {
+              "default": 8081,
+              "description": "Internal service port",
+              "maximum": 65535,
+              "minimum": 1,
+              "title": "port",
+              "type": "integer"
+            }
+          },
+          "required": [],
+          "title": "internalService",
+          "type": "object"
+        },
         "llm": {
           "additionalProperties": false,
           "description": "LLM configuration for AI-powered analysis",

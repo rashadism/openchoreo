@@ -145,9 +145,9 @@ func (_c *MockAgentService_ResolveProjectScope_Call) RunAndReturn(run func(conte
 	return _c
 }
 
-// RunAnalysis provides a mock function with given fields: ctx, params
-func (_m *MockAgentService) RunAnalysis(ctx context.Context, params *service.AnalysisParams) {
-	_m.Called(ctx, params)
+// RunAnalysis provides a mock function with given fields: params
+func (_m *MockAgentService) RunAnalysis(params *service.AnalysisParams) {
+	_m.Called(params)
 }
 
 // MockAgentService_RunAnalysis_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RunAnalysis'
@@ -156,15 +156,14 @@ type MockAgentService_RunAnalysis_Call struct {
 }
 
 // RunAnalysis is a helper method to define mock.On call
-//   - ctx context.Context
 //   - params *service.AnalysisParams
-func (_e *MockAgentService_Expecter) RunAnalysis(ctx interface{}, params interface{}) *MockAgentService_RunAnalysis_Call {
-	return &MockAgentService_RunAnalysis_Call{Call: _e.mock.On("RunAnalysis", ctx, params)}
+func (_e *MockAgentService_Expecter) RunAnalysis(params interface{}) *MockAgentService_RunAnalysis_Call {
+	return &MockAgentService_RunAnalysis_Call{Call: _e.mock.On("RunAnalysis", params)}
 }
 
-func (_c *MockAgentService_RunAnalysis_Call) Run(run func(ctx context.Context, params *service.AnalysisParams)) *MockAgentService_RunAnalysis_Call {
+func (_c *MockAgentService_RunAnalysis_Call) Run(run func(params *service.AnalysisParams)) *MockAgentService_RunAnalysis_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*service.AnalysisParams))
+		run(args[0].(*service.AnalysisParams))
 	})
 	return _c
 }
@@ -174,7 +173,7 @@ func (_c *MockAgentService_RunAnalysis_Call) Return() *MockAgentService_RunAnaly
 	return _c
 }
 
-func (_c *MockAgentService_RunAnalysis_Call) RunAndReturn(run func(context.Context, *service.AnalysisParams)) *MockAgentService_RunAnalysis_Call {
+func (_c *MockAgentService_RunAnalysis_Call) RunAndReturn(run func(*service.AnalysisParams)) *MockAgentService_RunAnalysis_Call {
 	_c.Run(run)
 	return _c
 }

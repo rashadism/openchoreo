@@ -31,11 +31,12 @@ type Config struct {
 
 // ServerConfig holds HTTP server configuration.
 type ServerConfig struct {
-	Port            int           `koanf:"port"`
-	InternalPort    int           `koanf:"internal.port"`
-	ReadTimeout     time.Duration `koanf:"read.timeout"`
-	WriteTimeout    time.Duration `koanf:"write.timeout"`
-	ShutdownTimeout time.Duration `koanf:"shutdown.timeout"`
+	Port                int           `koanf:"port"`
+	InternalPort        int           `koanf:"internal.port"`
+	ReadTimeout         time.Duration `koanf:"read.timeout"`
+	WriteTimeout        time.Duration `koanf:"write.timeout"`
+	StreamWriteTimeout  time.Duration `koanf:"stream.write.timeout"`
+	ShutdownTimeout     time.Duration `koanf:"shutdown.timeout"`
 }
 
 // LLMConfig holds LLM provider configuration.
@@ -103,11 +104,12 @@ func Load() (*Config, error) {
 	envOverrides := make(map[string]interface{})
 
 	envMappings := map[string]string{
-		"SERVER_PORT":             "server.port",
-		"SERVER_INTERNAL_PORT":    "server.internal.port",
-		"SERVER_READ_TIMEOUT":     "server.read.timeout",
-		"SERVER_WRITE_TIMEOUT":    "server.write.timeout",
-		"SERVER_SHUTDOWN_TIMEOUT": "server.shutdown.timeout",
+		"SERVER_PORT":                 "server.port",
+		"SERVER_INTERNAL_PORT":        "server.internal.port",
+		"SERVER_READ_TIMEOUT":         "server.read.timeout",
+		"SERVER_WRITE_TIMEOUT":        "server.write.timeout",
+		"SERVER_STREAM_WRITE_TIMEOUT": "server.stream.write.timeout",
+		"SERVER_SHUTDOWN_TIMEOUT":     "server.shutdown.timeout",
 
 		"RCA_MODEL_NAME":  "llm.model.name",
 		"RCA_LLM_API_KEY": "llm.api.key",
@@ -223,11 +225,12 @@ func Load() (*Config, error) {
 func getDefaults() map[string]interface{} {
 	return map[string]interface{}{
 		"server": map[string]interface{}{
-			"port":             8080,
-			"internal.port":    8081,
-			"read.timeout":     "15s",
-			"write.timeout":    "15s",
-			"shutdown.timeout": "30s",
+			"port":                  8080,
+			"internal.port":         8081,
+			"read.timeout":          "15s",
+			"write.timeout":         "15s",
+			"stream.write.timeout":  "10m",
+			"shutdown.timeout":      "30s",
 		},
 		"llm": map[string]interface{}{
 			"model.name": "",

@@ -26,32 +26,36 @@ import (
 type AgentService interface {
 	ResolveComponentScope(ctx context.Context, namespace, project, component, environment string) (*service.Scope, error)
 	ResolveProjectScope(ctx context.Context, namespace, project, environment string) (*service.Scope, error)
-	RunAnalysis(ctx context.Context, params *service.AnalysisParams)
+	RunAnalysis(params *service.AnalysisParams)
 	StreamChat(ctx context.Context, bearerToken string, params *service.ChatParams) <-chan service.ChatEvent
 }
 
 // Handler implements the RCA agent HTTP API.
 type Handler struct {
-	logger      *slog.Logger
-	reportStore store.ReportStore
-	authzClient authzcore.PDP
-	service     AgentService
+	logger            *slog.Logger
+	reportStore       store.ReportStore
+	authzClient       authzcore.PDP
+	service           AgentService
+	streamWriteTimeout time.Duration
 }
 
 // NewHandler creates a new API handler.
-func NewHandler(logger *slog.Logger, reportStore store.ReportStore, authzClient authzcore.PDP, svc AgentService) *Handler {
+func NewHandler(logger *slog.Logger, reportStore store.ReportStore, authzClient authzcore.PDP, svc AgentService, streamWriteTimeout time.Duration) *Handler {
 	return &Handler{
-		logger:      logger,
-		reportStore: reportStore,
-		authzClient: authzClient,
-		service:     svc,
+		logger:            logger,
+		reportStore:       reportStore,
+		authzClient:       authzClient,
+		service:           svc,
+		streamWriteTimeout: streamWriteTimeout,
 	}
 }
 
 // Analyze handles POST /api/v1alpha1/rca-agent/analyze.
 func (h *Handler) Analyze(w http.ResponseWriter, r *http.Request) {
 	var req AnalyzeRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
 		return
 	}
@@ -105,7 +109,8 @@ func (h *Handler) Analyze(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Launch background analysis with scope already resolved.
-	go h.service.RunAnalysis(context.Background(), toAnalysisParams(reportID, &req, scope)) //nolint:gosec // intentional: analysis must outlive the HTTP request
+	// No authz check: this endpoint is served on the internal port only.
+	go h.service.RunAnalysis(toAnalysisParams(reportID, &req, scope))
 
 	writeJSON(w, http.StatusOK, RCAResponse{
 		ReportID: reportID,
@@ -125,6 +130,11 @@ func (h *Handler) Chat(w http.ResponseWriter, r *http.Request) {
 
 	if req.ReportID == "" {
 		writeError(w, http.StatusBadRequest, "reportId is required")
+		return
+	}
+
+	if req.Namespace == "" || req.Project == "" {
+		writeError(w, http.StatusBadRequest, "namespace and project are required")
 		return
 	}
 
@@ -176,6 +186,10 @@ func (h *Handler) Chat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if entry.NamespaceName != "" && entry.NamespaceName != req.Namespace {
+		writeError(w, http.StatusForbidden, "report does not belong to the specified namespace")
+		return
+	}
 	if entry.ProjectName != "" && entry.ProjectName != req.Project {
 		writeError(w, http.StatusForbidden, "report does not belong to the specified project")
 		return
@@ -197,19 +211,11 @@ func (h *Handler) Chat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Stream NDJSON events.
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		writeError(w, http.StatusInternalServerError, "streaming not supported")
-		return
-	}
+	rc := http.NewResponseController(w)
+	_ = rc.SetWriteDeadline(time.Now().Add(h.streamWriteTimeout))
 
 	w.Header().Set("Content-Type", "application/x-ndjson")
 	w.Header().Set("Cache-Control", "no-cache")
-
-	if rc := http.NewResponseController(w); rc != nil {
-		_ = rc.SetWriteDeadline(time.Now().Add(10 * time.Minute))
-	}
-
 	w.WriteHeader(http.StatusOK)
 
 	// Extract user's bearer token from JWT middleware for API auth.
@@ -223,7 +229,7 @@ func (h *Handler) Chat(w http.ResponseWriter, r *http.Request) {
 		if err := enc.Encode(ev); err != nil {
 			break
 		}
-		flusher.Flush()
+		_ = rc.Flush()
 	}
 }
 
@@ -308,7 +314,6 @@ func (h *Handler) ListReports(w http.ResponseWriter, r *http.Request) {
 	entries, total, err := h.reportStore.ListReports(r.Context(), store.QueryParams{
 		ProjectUID:     scope.ProjectUID,
 		EnvironmentUID: scope.EnvironmentUID,
-		Namespace:      namespace,
 		StartTime:      startTime,
 		EndTime:        endTime,
 		Limit:          limit,

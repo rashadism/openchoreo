@@ -263,7 +263,7 @@ func (s *sqlStore) ListReports(ctx context.Context, params QueryParams) ([]Repor
 	}
 	defer rows.Close()
 
-	entries := make([]ReportEntry, 0, limit)
+	entries := make([]ReportEntry, 0, min(limit, 64))
 	for rows.Next() {
 		var entry ReportEntry
 		var summary sql.NullString
