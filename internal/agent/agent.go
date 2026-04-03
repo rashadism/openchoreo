@@ -446,7 +446,6 @@ func (a *Agent) isStructuredOutputTool(strategy OutputStrategy) func(string) boo
 	return func(n string) bool { return n == name }
 }
 
-// handleStructuredToolCalls processes structured output tool calls.
 // handleStructuredToolCalls processes structured output tool calls:
 // - 0 calls: no-op
 // - 1 call: parse arguments, set structured response
@@ -628,7 +627,6 @@ func (a *Agent) executeModelCall(ctx context.Context, req *ModelRequest) (*Model
 	}, nil
 }
 
-// handleModelOutput extracts structured response from model output.
 // handleModelOutput extracts structured response from model output per strategy.
 func (a *Agent) handleModelOutput(req *ModelRequest, msg providers.Message) (json.RawMessage, error) {
 	// Provider strategy: extract structured response from message content,

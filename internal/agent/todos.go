@@ -55,6 +55,9 @@ func executeTodos(_ context.Context, args json.RawMessage) (string, error) {
 	if err := json.Unmarshal(args, &params); err != nil {
 		return "", fmt.Errorf("invalid todos params: %w", err)
 	}
+	if params.Todos == nil {
+		return "", fmt.Errorf("missing required field: todos")
+	}
 
 	for _, todo := range params.Todos {
 		if strings.TrimSpace(todo.Content) == "" {

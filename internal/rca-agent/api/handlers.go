@@ -22,16 +22,24 @@ import (
 	"github.com/openchoreo/openchoreo/internal/server/middleware/auth/jwt"
 )
 
+// AgentService defines the service methods that the HTTP handlers depend on.
+type AgentService interface {
+	ResolveComponentScope(ctx context.Context, namespace, project, component, environment string) (*service.Scope, error)
+	ResolveProjectScope(ctx context.Context, namespace, project, environment string) (*service.Scope, error)
+	RunAnalysis(ctx context.Context, params *service.AnalysisParams)
+	StreamChat(ctx context.Context, bearerToken string, params *service.ChatParams) <-chan service.ChatEvent
+}
+
 // Handler implements the RCA agent HTTP API.
 type Handler struct {
 	logger      *slog.Logger
 	reportStore store.ReportStore
 	authzClient authzcore.PDP
-	service     *service.Service
+	service     AgentService
 }
 
 // NewHandler creates a new API handler.
-func NewHandler(logger *slog.Logger, reportStore store.ReportStore, authzClient authzcore.PDP, svc *service.Service) *Handler {
+func NewHandler(logger *slog.Logger, reportStore store.ReportStore, authzClient authzcore.PDP, svc AgentService) *Handler {
 	return &Handler{
 		logger:      logger,
 		reportStore: reportStore,

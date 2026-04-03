@@ -267,6 +267,21 @@ func getDefaults() map[string]interface{} {
 	}
 }
 
+const (
+	backendSQLite     = "sqlite"
+	backendPostgreSQL = "postgresql"
+)
+
+func (c *Config) normalizeReport() {
+	c.Report.Backend = strings.ToLower(strings.TrimSpace(c.Report.Backend))
+	if c.Report.Backend == "" {
+		c.Report.Backend = backendSQLite
+	}
+	if c.Report.Backend == backendSQLite && strings.TrimSpace(c.Report.DatabaseURI) == "" {
+		c.Report.DatabaseURI = "file:/app/data/rca_reports.db?_journal=WAL"
+	}
+}
+
 func (c *Config) validate() error {
 	if c.Server.Port <= 0 || c.Server.Port > 65535 {
 		return fmt.Errorf("invalid server port: %d", c.Server.Port)
@@ -288,14 +303,11 @@ func (c *Config) validate() error {
 		return fmt.Errorf("llm api key is required (RCA_LLM_API_KEY)")
 	}
 
-	c.Report.Backend = strings.ToLower(strings.TrimSpace(c.Report.Backend))
+	c.normalizeReport()
 	switch c.Report.Backend {
-	case "", "sqlite":
-		c.Report.Backend = "sqlite"
-		if strings.TrimSpace(c.Report.DatabaseURI) == "" {
-			c.Report.DatabaseURI = "file:/app/data/rca_reports.db?_journal=WAL"
-		}
-	case "postgresql":
+	case backendSQLite:
+		// OK
+	case backendPostgreSQL:
 		if strings.TrimSpace(c.Report.DatabaseURI) == "" {
 			return fmt.Errorf("report.database.uri is required when report.backend=postgresql")
 		}

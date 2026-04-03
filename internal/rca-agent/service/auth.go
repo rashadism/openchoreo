@@ -8,6 +8,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -107,7 +108,8 @@ func fetchOAuth2Token(ctx context.Context, tokenURL, clientID, clientSecret stri
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("OAuth2 token endpoint returned %d", resp.StatusCode)
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("OAuth2 token endpoint returned %d: %s", resp.StatusCode, string(body))
 	}
 
 	var tokenResp struct {

@@ -14,6 +14,41 @@ import (
 	obsgen "github.com/openchoreo/openchoreo/internal/observer/api/gen"
 )
 
+type baseParams struct {
+	Namespace   string `json:"namespace"`
+	Project     string `json:"project"`
+	Component   string `json:"component"`
+	Environment string `json:"environment"`
+	StartTime   string `json:"start_time"`
+	EndTime     string `json:"end_time"`
+}
+
+func (p *baseParams) parseTimeRange() (time.Time, time.Time, error) {
+	start, err := time.Parse(time.RFC3339, p.StartTime)
+	if err != nil {
+		return time.Time{}, time.Time{}, fmt.Errorf("invalid start_time: %w", err)
+	}
+	end, err := time.Parse(time.RFC3339, p.EndTime)
+	if err != nil {
+		return time.Time{}, time.Time{}, fmt.Errorf("invalid end_time: %w", err)
+	}
+	return start, end, nil
+}
+
+func (p *baseParams) buildScope() obsgen.ComponentSearchScope {
+	scope := obsgen.ComponentSearchScope{Namespace: p.Namespace}
+	if p.Project != "" {
+		scope.Project = &p.Project
+	}
+	if p.Component != "" {
+		scope.Component = &p.Component
+	}
+	if p.Environment != "" {
+		scope.Environment = &p.Environment
+	}
+	return scope
+}
+
 // NewOPTools creates the observability-plane tools that call the Observer API
 // using the generated client.
 func NewOPTools(baseURL string, httpClient *http.Client) ([]agent.Tool, error) {
@@ -38,8 +73,8 @@ func NewOPTools(baseURL string, httpClient *http.Client) ([]agent.Tool, error) {
 					"end_time":      map[string]any{"type": "string", "description": "End time in RFC3339 format"},
 					"search_phrase": map[string]any{"type": "string", "description": "Text to search for in log messages"},
 					"log_levels": map[string]any{
-						"type":  "array",
-						"items": map[string]any{"type": "string", "enum": []string{"ERROR", "WARN", "INFO", "DEBUG"}},
+						"type":        "array",
+						"items":       map[string]any{"type": "string", "enum": []string{"ERROR", "WARN", "INFO", "DEBUG"}},
 						"description": "Log levels to filter by",
 					},
 					"limit":      map[string]any{"type": "integer", "description": "Maximum number of results (default 100)"},
@@ -48,12 +83,7 @@ func NewOPTools(baseURL string, httpClient *http.Client) ([]agent.Tool, error) {
 			},
 			Execute: func(ctx context.Context, args json.RawMessage) (string, error) {
 				var p struct {
-					Namespace    string   `json:"namespace"`
-					Project      string   `json:"project"`
-					Component    string   `json:"component"`
-					Environment  string   `json:"environment"`
-					StartTime    string   `json:"start_time"`
-					EndTime      string   `json:"end_time"`
+					baseParams
 					SearchPhrase string   `json:"search_phrase"`
 					LogLevels    []string `json:"log_levels"`
 					Limit        int      `json:"limit"`
@@ -63,28 +93,13 @@ func NewOPTools(baseURL string, httpClient *http.Client) ([]agent.Tool, error) {
 					return "", err
 				}
 
-				startTime, err := time.Parse(time.RFC3339, p.StartTime)
+				startTime, endTime, err := p.parseTimeRange()
 				if err != nil {
-					return "", fmt.Errorf("invalid start_time: %w", err)
-				}
-				endTime, err := time.Parse(time.RFC3339, p.EndTime)
-				if err != nil {
-					return "", fmt.Errorf("invalid end_time: %w", err)
-				}
-
-				scope := obsgen.ComponentSearchScope{Namespace: p.Namespace}
-				if p.Project != "" {
-					scope.Project = &p.Project
-				}
-				if p.Component != "" {
-					scope.Component = &p.Component
-				}
-				if p.Environment != "" {
-					scope.Environment = &p.Environment
+					return "", err
 				}
 
 				var searchScope obsgen.LogsQueryRequest_SearchScope
-				if err := searchScope.FromComponentSearchScope(scope); err != nil {
+				if err := searchScope.FromComponentSearchScope(p.buildScope()); err != nil {
 					return "", fmt.Errorf("building search scope: %w", err)
 				}
 
@@ -115,7 +130,11 @@ func NewOPTools(baseURL string, httpClient *http.Client) ([]agent.Tool, error) {
 				if err != nil {
 					return "", err
 				}
-				return readResponse(resp)
+				raw, err := readResponse(resp)
+				if err != nil {
+					return "", err
+				}
+				return formatLogs(raw), nil
 			},
 		},
 		{
@@ -136,42 +155,22 @@ func NewOPTools(baseURL string, httpClient *http.Client) ([]agent.Tool, error) {
 			},
 			Execute: func(ctx context.Context, args json.RawMessage) (string, error) {
 				var p struct {
-					Namespace   string `json:"namespace"`
-					Project     string `json:"project"`
-					Component   string `json:"component"`
-					Environment string `json:"environment"`
-					StartTime   string `json:"start_time"`
-					EndTime     string `json:"end_time"`
-					Step        string `json:"step"`
+					baseParams
+					Step string `json:"step"`
 				}
 				if err := json.Unmarshal(args, &p); err != nil {
 					return "", err
 				}
 
-				startTime, err := time.Parse(time.RFC3339, p.StartTime)
+				startTime, endTime, err := p.parseTimeRange()
 				if err != nil {
-					return "", fmt.Errorf("invalid start_time: %w", err)
-				}
-				endTime, err := time.Parse(time.RFC3339, p.EndTime)
-				if err != nil {
-					return "", fmt.Errorf("invalid end_time: %w", err)
-				}
-
-				scope := obsgen.ComponentSearchScope{Namespace: p.Namespace}
-				if p.Project != "" {
-					scope.Project = &p.Project
-				}
-				if p.Component != "" {
-					scope.Component = &p.Component
-				}
-				if p.Environment != "" {
-					scope.Environment = &p.Environment
+					return "", err
 				}
 
 				req := obsgen.MetricsQueryRequest{
 					StartTime:   startTime,
 					EndTime:     endTime,
-					SearchScope: scope,
+					SearchScope: p.buildScope(),
 					Metric:      obsgen.Resource,
 				}
 				if p.Step != "" {
@@ -182,7 +181,11 @@ func NewOPTools(baseURL string, httpClient *http.Client) ([]agent.Tool, error) {
 				if err != nil {
 					return "", err
 				}
-				return readResponse(resp)
+				raw, err := readResponse(resp)
+				if err != nil {
+					return "", err
+				}
+				return formatMetrics(raw), nil
 			},
 		},
 		{
@@ -204,43 +207,23 @@ func NewOPTools(baseURL string, httpClient *http.Client) ([]agent.Tool, error) {
 			},
 			Execute: func(ctx context.Context, args json.RawMessage) (string, error) {
 				var p struct {
-					Namespace   string `json:"namespace"`
-					Project     string `json:"project"`
-					Component   string `json:"component"`
-					Environment string `json:"environment"`
-					StartTime   string `json:"start_time"`
-					EndTime     string `json:"end_time"`
-					Limit       int    `json:"limit"`
-					SortOrder   string `json:"sort_order"`
+					baseParams
+					Limit     int    `json:"limit"`
+					SortOrder string `json:"sort_order"`
 				}
 				if err := json.Unmarshal(args, &p); err != nil {
 					return "", err
 				}
 
-				startTime, err := time.Parse(time.RFC3339, p.StartTime)
+				startTime, endTime, err := p.parseTimeRange()
 				if err != nil {
-					return "", fmt.Errorf("invalid start_time: %w", err)
-				}
-				endTime, err := time.Parse(time.RFC3339, p.EndTime)
-				if err != nil {
-					return "", fmt.Errorf("invalid end_time: %w", err)
-				}
-
-				scope := obsgen.ComponentSearchScope{Namespace: p.Namespace}
-				if p.Project != "" {
-					scope.Project = &p.Project
-				}
-				if p.Component != "" {
-					scope.Component = &p.Component
-				}
-				if p.Environment != "" {
-					scope.Environment = &p.Environment
+					return "", err
 				}
 
 				req := obsgen.TracesQueryRequest{
 					StartTime:   startTime,
 					EndTime:     endTime,
-					SearchScope: scope,
+					SearchScope: p.buildScope(),
 				}
 				if p.Limit > 0 {
 					req.Limit = &p.Limit
@@ -254,7 +237,11 @@ func NewOPTools(baseURL string, httpClient *http.Client) ([]agent.Tool, error) {
 				if err != nil {
 					return "", err
 				}
-				return readResponse(resp)
+				raw, err := readResponse(resp)
+				if err != nil {
+					return "", err
+				}
+				return formatTraces(raw), nil
 			},
 		},
 		{
@@ -277,44 +264,24 @@ func NewOPTools(baseURL string, httpClient *http.Client) ([]agent.Tool, error) {
 			},
 			Execute: func(ctx context.Context, args json.RawMessage) (string, error) {
 				var p struct {
-					TraceID     string `json:"trace_id"`
-					Namespace   string `json:"namespace"`
-					Project     string `json:"project"`
-					Component   string `json:"component"`
-					Environment string `json:"environment"`
-					StartTime   string `json:"start_time"`
-					EndTime     string `json:"end_time"`
-					Limit       int    `json:"limit"`
-					SortOrder   string `json:"sort_order"`
+					baseParams
+					TraceID   string `json:"trace_id"`
+					Limit     int    `json:"limit"`
+					SortOrder string `json:"sort_order"`
 				}
 				if err := json.Unmarshal(args, &p); err != nil {
 					return "", err
 				}
 
-				startTime, err := time.Parse(time.RFC3339, p.StartTime)
+				startTime, endTime, err := p.parseTimeRange()
 				if err != nil {
-					return "", fmt.Errorf("invalid start_time: %w", err)
-				}
-				endTime, err := time.Parse(time.RFC3339, p.EndTime)
-				if err != nil {
-					return "", fmt.Errorf("invalid end_time: %w", err)
-				}
-
-				scope := obsgen.ComponentSearchScope{Namespace: p.Namespace}
-				if p.Project != "" {
-					scope.Project = &p.Project
-				}
-				if p.Component != "" {
-					scope.Component = &p.Component
-				}
-				if p.Environment != "" {
-					scope.Environment = &p.Environment
+					return "", err
 				}
 
 				req := obsgen.TracesQueryRequest{
 					StartTime:   startTime,
 					EndTime:     endTime,
-					SearchScope: scope,
+					SearchScope: p.buildScope(),
 				}
 				if p.Limit > 0 {
 					req.Limit = &p.Limit
@@ -328,7 +295,11 @@ func NewOPTools(baseURL string, httpClient *http.Client) ([]agent.Tool, error) {
 				if err != nil {
 					return "", err
 				}
-				return readResponse(resp)
+				raw, err := readResponse(resp)
+				if err != nil {
+					return "", err
+				}
+				return formatTraceSpans(raw), nil
 			},
 		},
 	}, nil
