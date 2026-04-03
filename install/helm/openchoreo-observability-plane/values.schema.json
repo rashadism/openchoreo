@@ -1642,6 +1642,23 @@
           "title": "service",
           "type": "object"
         },
+        "internalService": {
+          "additionalProperties": false,
+          "description": "Internal Kubernetes service configuration (for analyze endpoint)",
+          "properties": {
+            "port": {
+              "default": 8081,
+              "description": "Internal service port",
+              "maximum": 65535,
+              "minimum": 1,
+              "title": "port",
+              "type": "integer"
+            }
+          },
+          "required": [],
+          "title": "internalService",
+          "type": "object"
+        },
         "sqliteStorageSize": {
           "default": "128Mi",
           "description": "PVC storage size for SQLite (only used when reportBackend is sqlite)",

@@ -197,19 +197,11 @@ func (h *Handler) Chat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Stream NDJSON events.
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		writeError(w, http.StatusInternalServerError, "streaming not supported")
-		return
-	}
+	rc := http.NewResponseController(w)
+	_ = rc.SetWriteDeadline(time.Now().Add(10 * time.Minute))
 
 	w.Header().Set("Content-Type", "application/x-ndjson")
 	w.Header().Set("Cache-Control", "no-cache")
-
-	if rc := http.NewResponseController(w); rc != nil {
-		_ = rc.SetWriteDeadline(time.Now().Add(10 * time.Minute))
-	}
-
 	w.WriteHeader(http.StatusOK)
 
 	// Extract user's bearer token from JWT middleware for API auth.
@@ -223,7 +215,7 @@ func (h *Handler) Chat(w http.ResponseWriter, r *http.Request) {
 		if err := enc.Encode(ev); err != nil {
 			break
 		}
-		flusher.Flush()
+		_ = rc.Flush()
 	}
 }
 

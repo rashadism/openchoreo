@@ -1395,6 +1395,20 @@ rca:
 
   # @schema
   # type: object
+  # description: Internal Kubernetes service configuration (for analyze endpoint)
+  # @schema
+  internalService:
+    # @schema
+    # type: integer
+    # description: Internal service port
+    # minimum: 1
+    # maximum: 65535
+    # default: 8081
+    # @schema
+    port: 8081
+
+  # @schema
+  # type: object
   # description: Resource requests and limits
   # @schema
   resources:
