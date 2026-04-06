@@ -310,6 +310,9 @@ func (f *fakeAlertEntryStore) QueryAlertEntries(_ context.Context, params alerte
 	f.lastQueryParams = params
 	return f.entries, f.total, nil
 }
+func (f *fakeAlertEntryStore) HasRecentAlert(context.Context, string, string, time.Time) (bool, error) {
+	return false, nil
+}
 func (f *fakeAlertEntryStore) Close() error { return nil }
 
 type fakeIncidentEntryStore struct {

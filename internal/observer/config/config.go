@@ -118,6 +118,9 @@ type AlertingConfig struct {
 	AlertStoreBackend string `koanf:"alert.store.backend"`
 	// AlertStoreDSN is the SQL connection string for alert entry storage.
 	AlertStoreDSN string `koanf:"alert.store.dsn"`
+	// AlertSuppressionWindow is the duration within which duplicate alerts
+	// for the same alert rule are suppressed. Set to 0 to disable suppression.
+	AlertSuppressionWindow time.Duration `koanf:"alert.suppression.window"`
 }
 
 // UIDResolverConfig holds configuration for the resource UID resolver
@@ -205,6 +208,7 @@ func Load() (*Config, error) {
 		"OBSERVABILITY_NAMESPACE":               "alerting.observability.namespace",
 		"ALERT_STORE_BACKEND":                   "alerting.alert.store.backend",
 		"ALERT_STORE_DSN":                       "alerting.alert.store.dsn",
+		"ALERT_SUPPRESSION_WINDOW":              "alerting.alert.suppression.window",
 		"LOG_LEVEL":                             "loglevel",
 		"PORT":                                  "server.port",           // Common alias
 		"INTERNAL_PORT":                         "server.internal.port",  // Common alias
@@ -352,11 +356,12 @@ func getDefaults() map[string]interface{} {
 			"max.log.lines.per.file":  600000,
 		},
 		"alerting": map[string]interface{}{
-			"rca.service.url":         "http://ai-rca-agent:8080",
-			"ai.rca.enabled":          false,
-			"observability.namespace": "openchoreo-observability-plane",
-			"alert.store.backend":     "sqlite",
-			"alert.store.dsn":         "file:/data/alerts.db?_journal=WAL",
+			"rca.service.url":          "http://ai-rca-agent:8080",
+			"ai.rca.enabled":           false,
+			"observability.namespace":  "openchoreo-observability-plane",
+			"alert.store.backend":      "sqlite",
+			"alert.store.dsn":          "file:/data/alerts.db?_journal=WAL",
+			"alert.suppression.window": "1h",
 		},
 		"adapters": map[string]interface{}{
 			"logs.adapter.enabled":    false,

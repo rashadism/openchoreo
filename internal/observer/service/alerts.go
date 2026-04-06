@@ -187,10 +187,6 @@ func (s *AlertService) DeleteAlertRule(ctx context.Context, ruleName, sourceType
 // It fetches the ObservabilityAlertRule CR, enriches alert details, stores the alert entry,
 // sends a notification, and optionally triggers AI RCA analysis.
 func (s *AlertService) HandleAlertWebhook(ctx context.Context, req gen.AlertWebhookRequest) (*gen.AlertWebhookResponse, error) {
-	if s.k8sClient == nil {
-		return nil, fmt.Errorf("kubernetes client not configured")
-	}
-
 	// Validate required fields
 	ruleName := stringPtrVal(req.RuleName)
 	ruleNamespace := stringPtrVal(req.RuleNamespace)
@@ -199,6 +195,34 @@ func (s *AlertService) HandleAlertWebhook(ctx context.Context, req gen.AlertWebh
 	}
 	if ruleNamespace == "" {
 		return nil, fmt.Errorf("ruleNamespace is required")
+	}
+
+	if s.alertEntryStore == nil {
+		return nil, fmt.Errorf("alert entry store is not initialized")
+	}
+
+	// Check for duplicate alert within the suppression window.
+	// This is done before fetching the CR to avoid unnecessary k8s API calls for suppressed alerts.
+	if s.config.Alerting.AlertSuppressionWindow > 0 {
+		since := time.Now().UTC().Add(-s.config.Alerting.AlertSuppressionWindow)
+		isDuplicate, err := s.alertEntryStore.HasRecentAlert(ctx, ruleName, ruleNamespace, since)
+		if err != nil {
+			s.logger.Warn("Failed to check alert suppression", "error", err, "ruleName", ruleName)
+		} else if isDuplicate {
+			s.logger.Info("Alert suppressed (duplicate within suppression window)",
+				"ruleName", ruleName, "ruleNamespace", ruleNamespace,
+				"suppressionWindow", s.config.Alerting.AlertSuppressionWindow)
+			suppressedStatus := gen.Success
+			msg := "alert suppressed: duplicate within suppression window"
+			return &gen.AlertWebhookResponse{
+				Status:  &suppressedStatus,
+				Message: &msg,
+			}, nil
+		}
+	}
+
+	if s.k8sClient == nil {
+		return nil, fmt.Errorf("kubernetes client not configured")
 	}
 
 	// Derive alertValue and timestamp from the request
@@ -253,10 +277,6 @@ func (s *AlertService) HandleAlertWebhook(ctx context.Context, req gen.AlertWebh
 		if alertRule.Spec.Actions.Incident.TriggerAiRca != nil {
 			alertDetails.TriggerAiRca = *alertRule.Spec.Actions.Incident.TriggerAiRca
 		}
-	}
-
-	if s.alertEntryStore == nil {
-		return nil, fmt.Errorf("alert entry store is not initialized")
 	}
 
 	if alertDetails.AlertTimestamp == "" {
