@@ -424,6 +424,12 @@ observer:
   # @schema
   alertStoreBackend: sqlite
 
+  # @schema
+  # type: string
+  # description: Duration within which duplicate alerts for the same alert rule are suppressed. Set to "0" to disable.
+  # default: 1h
+  # @schema
+  alertSuppressionWindow: 1h
 
   # @schema
   # type: string

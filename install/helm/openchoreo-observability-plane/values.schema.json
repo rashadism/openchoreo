@@ -989,6 +989,12 @@
           "title": "alertStoreSqliteSize",
           "type": "string"
         },
+        "alertSuppressionWindow": {
+          "default": "1h",
+          "description": "Duration within which duplicate alerts for the same alert rule are suppressed. Set to \"0\" to disable.",
+          "title": "alertSuppressionWindow",
+          "type": "string"
+        },
         "authzTlsInsecureSkipVerify": {
           "default": false,
           "description": "Skip TLS certificate verification when calling the control plane authz service (use for self-signed certs)",
