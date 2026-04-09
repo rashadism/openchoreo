@@ -13,9 +13,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/openchoreo/openchoreo/internal/occ/cmd/config"
-	"github.com/openchoreo/openchoreo/internal/occ/cmd/workload/mocks"
-	th "github.com/openchoreo/openchoreo/internal/occ/testhelpers"
-	"github.com/openchoreo/openchoreo/pkg/cli/flags"
+	"github.com/openchoreo/openchoreo/internal/occ/flags"
+	"github.com/openchoreo/openchoreo/internal/occ/resources/client/mocks"
+	"github.com/openchoreo/openchoreo/internal/occ/testutil"
 )
 
 // --- helpers ---
@@ -25,7 +25,7 @@ func setupRepoWithComponent(t *testing.T) string {
 	t.Helper()
 	repoDir := t.TempDir()
 
-	th.WriteYAML(t, repoDir, "projects/myproj/components/my-svc/component.yaml", `
+	testutil.WriteYAML(t, repoDir, "projects/myproj/components/my-svc/component.yaml", `
 apiVersion: openchoreo.dev/v1alpha1
 kind: Component
 metadata:
@@ -39,7 +39,7 @@ spec:
     kind: ComponentType
 `)
 
-	th.WriteYAML(t, repoDir, "platform/component-types/service.yaml", `
+	testutil.WriteYAML(t, repoDir, "platform/component-types/service.yaml", `
 apiVersion: openchoreo.dev/v1alpha1
 kind: ComponentType
 metadata:
@@ -73,7 +73,7 @@ func setupRepoWithWorkload(t *testing.T) string {
 	t.Helper()
 	repoDir := setupRepoWithComponent(t)
 
-	th.WriteYAML(t, repoDir, "projects/myproj/components/my-svc/workload.yaml", `
+	testutil.WriteYAML(t, repoDir, "projects/myproj/components/my-svc/workload.yaml", `
 apiVersion: openchoreo.dev/v1alpha1
 kind: Workload
 metadata:
@@ -95,7 +95,7 @@ func setupRepoWithTwoComponents(t *testing.T) string {
 	t.Helper()
 	repoDir := setupRepoWithWorkload(t)
 
-	th.WriteYAML(t, repoDir, "projects/myproj/components/my-worker/component.yaml", `
+	testutil.WriteYAML(t, repoDir, "projects/myproj/components/my-worker/component.yaml", `
 apiVersion: openchoreo.dev/v1alpha1
 kind: Component
 metadata:
@@ -115,17 +115,17 @@ spec:
 // --- Create: file-system mode: new workload (no existing workload) ---
 
 func TestCreate_FileSystem_NewWorkload_DryRun(t *testing.T) {
-	home := th.SetupTestHome(t)
-	th.WriteOCConfig(t, home, &config.StoredConfig{
+	home := testutil.SetupTestHome(t)
+	testutil.WriteOCConfig(t, home, &config.StoredConfig{
 		CurrentContext: "my-ctx",
 		Contexts:       []config.Context{{Name: "my-ctx", Namespace: "test-ns"}},
 	})
 
 	repoDir := setupRepoWithComponent(t)
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	w := New(mc)
 
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		err := w.Create(CreateParams{
 			Mode:          flags.ModeFileSystem,
 			RootDir:       repoDir,
@@ -138,21 +138,21 @@ func TestCreate_FileSystem_NewWorkload_DryRun(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	th.AssertYAMLEquals(t, expectedBasicWorkloadYAML, th.ExtractYAML(out))
+	testutil.AssertYAMLEquals(t, expectedBasicWorkloadYAML, testutil.ExtractYAML(out))
 }
 
 func TestCreate_FileSystem_NewWorkload_Write(t *testing.T) {
-	home := th.SetupTestHome(t)
-	th.WriteOCConfig(t, home, &config.StoredConfig{
+	home := testutil.SetupTestHome(t)
+	testutil.WriteOCConfig(t, home, &config.StoredConfig{
 		CurrentContext: "my-ctx",
 		Contexts:       []config.Context{{Name: "my-ctx", Namespace: "test-ns"}},
 	})
 
 	repoDir := setupRepoWithComponent(t)
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	w := New(mc)
 
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		err := w.Create(CreateParams{
 			Mode:          flags.ModeFileSystem,
 			RootDir:       repoDir,
@@ -184,17 +184,17 @@ func TestCreate_FileSystem_NewWorkload_Write(t *testing.T) {
 // --- Create: file-system mode: existing workload (image update) ---
 
 func TestCreate_FileSystem_ExistingWorkload_ImageUpdate_DryRun(t *testing.T) {
-	home := th.SetupTestHome(t)
-	th.WriteOCConfig(t, home, &config.StoredConfig{
+	home := testutil.SetupTestHome(t)
+	testutil.WriteOCConfig(t, home, &config.StoredConfig{
 		CurrentContext: "my-ctx",
 		Contexts:       []config.Context{{Name: "my-ctx", Namespace: "test-ns"}},
 	})
 
 	repoDir := setupRepoWithWorkload(t)
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	w := New(mc)
 
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		err := w.Create(CreateParams{
 			Mode:          flags.ModeFileSystem,
 			RootDir:       repoDir,
@@ -219,17 +219,17 @@ func TestCreate_FileSystem_ExistingWorkload_ImageUpdate_DryRun(t *testing.T) {
 }
 
 func TestCreate_FileSystem_ExistingWorkload_ImageUpdate_Write(t *testing.T) {
-	home := th.SetupTestHome(t)
-	th.WriteOCConfig(t, home, &config.StoredConfig{
+	home := testutil.SetupTestHome(t)
+	testutil.WriteOCConfig(t, home, &config.StoredConfig{
 		CurrentContext: "my-ctx",
 		Contexts:       []config.Context{{Name: "my-ctx", Namespace: "test-ns"}},
 	})
 
 	repoDir := setupRepoWithWorkload(t)
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	w := New(mc)
 
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		err := w.Create(CreateParams{
 			Mode:          flags.ModeFileSystem,
 			RootDir:       repoDir,
@@ -252,8 +252,8 @@ func TestCreate_FileSystem_ExistingWorkload_ImageUpdate_Write(t *testing.T) {
 // --- Create: file-system mode: custom output path ---
 
 func TestCreate_FileSystem_CustomOutputPath(t *testing.T) {
-	home := th.SetupTestHome(t)
-	th.WriteOCConfig(t, home, &config.StoredConfig{
+	home := testutil.SetupTestHome(t)
+	testutil.WriteOCConfig(t, home, &config.StoredConfig{
 		CurrentContext: "my-ctx",
 		Contexts:       []config.Context{{Name: "my-ctx", Namespace: "test-ns"}},
 	})
@@ -263,10 +263,10 @@ func TestCreate_FileSystem_CustomOutputPath(t *testing.T) {
 	require.NoError(t, os.MkdirAll(outDir, 0755))
 	outFile := filepath.Join(outDir, "my-workload.yaml")
 
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	w := New(mc)
 
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		err := w.Create(CreateParams{
 			Mode:          flags.ModeFileSystem,
 			RootDir:       repoDir,
@@ -290,17 +290,17 @@ func TestCreate_FileSystem_CustomOutputPath(t *testing.T) {
 // --- Create: file-system mode: new workload for second component (no existing workload) ---
 
 func TestCreate_FileSystem_SecondComponent_NewWorkload(t *testing.T) {
-	home := th.SetupTestHome(t)
-	th.WriteOCConfig(t, home, &config.StoredConfig{
+	home := testutil.SetupTestHome(t)
+	testutil.WriteOCConfig(t, home, &config.StoredConfig{
 		CurrentContext: "my-ctx",
 		Contexts:       []config.Context{{Name: "my-ctx", Namespace: "test-ns"}},
 	})
 
 	repoDir := setupRepoWithTwoComponents(t)
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	w := New(mc)
 
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		err := w.Create(CreateParams{
 			Mode:          flags.ModeFileSystem,
 			RootDir:       repoDir,
@@ -332,16 +332,16 @@ spec:
   container:
     image: registry/my-worker:v1
 `
-	th.AssertYAMLEquals(t, expectedYAML, string(data))
+	testutil.AssertYAMLEquals(t, expectedYAML, string(data))
 }
 
 // --- Create: API server mode ---
 
 func TestCreate_APIServer_Stdout(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	w := New(mc)
 
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		err := w.Create(CreateParams{
 			Mode:          flags.ModeAPIServer,
 			NamespaceName: "test-ns",
@@ -352,15 +352,15 @@ func TestCreate_APIServer_Stdout(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	th.AssertYAMLEquals(t, expectedBasicWorkloadYAML, out)
+	testutil.AssertYAMLEquals(t, expectedBasicWorkloadYAML, out)
 }
 
 func TestCreate_APIServer_DefaultMode(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	w := New(mc)
 
 	// Empty Mode defaults to api-server
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		err := w.Create(CreateParams{
 			NamespaceName: "test-ns",
 			ProjectName:   "myproj",
@@ -370,16 +370,16 @@ func TestCreate_APIServer_DefaultMode(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	th.AssertYAMLEquals(t, expectedBasicWorkloadYAML, out)
+	testutil.AssertYAMLEquals(t, expectedBasicWorkloadYAML, out)
 }
 
 func TestCreate_APIServer_OutputFile(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	w := New(mc)
 
 	outFile := filepath.Join(t.TempDir(), "workload.yaml")
 
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		err := w.Create(CreateParams{
 			Mode:          flags.ModeAPIServer,
 			NamespaceName: "test-ns",
@@ -399,7 +399,7 @@ func TestCreate_APIServer_OutputFile(t *testing.T) {
 }
 
 func TestCreate_APIServer_WithDescriptor(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	w := New(mc)
 
 	// Write a workload descriptor file
@@ -410,7 +410,7 @@ func TestCreate_APIServer_WithDescriptor(t *testing.T) {
 `
 	require.NoError(t, os.WriteFile(descriptorFile, []byte(descriptor), 0600))
 
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		err := w.Create(CreateParams{
 			Mode:          flags.ModeAPIServer,
 			NamespaceName: "test-ns",
@@ -422,13 +422,13 @@ func TestCreate_APIServer_WithDescriptor(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	th.AssertYAMLEquals(t, expectedBasicWorkloadYAML, out)
+	testutil.AssertYAMLEquals(t, expectedBasicWorkloadYAML, out)
 }
 
 // --- Create: validation errors ---
 
 func TestCreate_FileSystem_MissingImage(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	w := New(mc)
 	err := w.Create(CreateParams{
 		Mode:          flags.ModeFileSystem,
@@ -440,7 +440,7 @@ func TestCreate_FileSystem_MissingImage(t *testing.T) {
 }
 
 func TestCreate_FileSystem_MissingNamespace(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	w := New(mc)
 	err := w.Create(CreateParams{
 		Mode:          flags.ModeFileSystem,
@@ -452,7 +452,7 @@ func TestCreate_FileSystem_MissingNamespace(t *testing.T) {
 }
 
 func TestCreate_FileSystem_MissingProject(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	w := New(mc)
 	err := w.Create(CreateParams{
 		Mode:          flags.ModeFileSystem,
@@ -464,7 +464,7 @@ func TestCreate_FileSystem_MissingProject(t *testing.T) {
 }
 
 func TestCreate_FileSystem_MissingComponent(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	w := New(mc)
 	err := w.Create(CreateParams{
 		Mode:          flags.ModeFileSystem,

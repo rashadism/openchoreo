@@ -4,16 +4,13 @@
 package config
 
 import (
-	"bytes"
-	"io"
-	"os"
 	"testing"
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/openchoreo/openchoreo/pkg/cli/flags"
+	"github.com/openchoreo/openchoreo/internal/occ/testutil"
 )
 
 func TestMaskToken(t *testing.T) {
@@ -301,23 +298,6 @@ func TestValidateCredentialsNameUniqueness(t *testing.T) {
 // These tests exercise the Config methods that read/write via the on-disk
 // YAML config, using setupTestHome to isolate each test.
 
-// captureStdout runs fn while capturing os.Stdout output.
-func captureStdout(t *testing.T, fn func()) string {
-	t.Helper()
-	old := os.Stdout
-	r, w, err := os.Pipe()
-	require.NoError(t, err)
-	os.Stdout = w
-
-	fn()
-
-	w.Close()
-	os.Stdout = old
-	var buf bytes.Buffer
-	_, _ = io.Copy(&buf, r)
-	return buf.String()
-}
-
 // seedConfig is a helper that writes a pre-populated StoredConfig to the test home.
 func seedConfig(t *testing.T, cfg *StoredConfig) {
 	t.Helper()
@@ -331,7 +311,7 @@ func TestListContexts(t *testing.T) {
 		setupTestHome(t)
 		seedConfig(t, &StoredConfig{})
 
-		out := captureStdout(t, func() {
+		out := testutil.CaptureStdout(t, func() {
 			require.NoError(t, c.ListContexts())
 		})
 		assert.Contains(t, out, "No contexts stored.")
@@ -347,7 +327,7 @@ func TestListContexts(t *testing.T) {
 			},
 		})
 
-		out := captureStdout(t, func() {
+		out := testutil.CaptureStdout(t, func() {
 			require.NoError(t, c.ListContexts())
 		})
 		assert.Contains(t, out, "NAME")
@@ -369,7 +349,7 @@ func TestListContexts(t *testing.T) {
 			},
 		})
 
-		out := captureStdout(t, func() {
+		out := testutil.CaptureStdout(t, func() {
 			require.NoError(t, c.ListContexts())
 		})
 		assert.Contains(t, out, "*")
@@ -383,7 +363,7 @@ func TestListControlPlanes(t *testing.T) {
 		setupTestHome(t)
 		seedConfig(t, &StoredConfig{})
 
-		out := captureStdout(t, func() {
+		out := testutil.CaptureStdout(t, func() {
 			require.NoError(t, c.ListControlPlanes())
 		})
 		assert.Contains(t, out, "No control planes stored.")
@@ -398,7 +378,7 @@ func TestListControlPlanes(t *testing.T) {
 			},
 		})
 
-		out := captureStdout(t, func() {
+		out := testutil.CaptureStdout(t, func() {
 			require.NoError(t, c.ListControlPlanes())
 		})
 		assert.Contains(t, out, "NAME")
@@ -417,7 +397,7 @@ func TestListCredentials(t *testing.T) {
 		setupTestHome(t)
 		seedConfig(t, &StoredConfig{})
 
-		out := captureStdout(t, func() {
+		out := testutil.CaptureStdout(t, func() {
 			require.NoError(t, c.ListCredentials())
 		})
 		assert.Contains(t, out, "No credentials stored.")
@@ -432,7 +412,7 @@ func TestListCredentials(t *testing.T) {
 			},
 		})
 
-		out := captureStdout(t, func() {
+		out := testutil.CaptureStdout(t, func() {
 			require.NoError(t, c.ListCredentials())
 		})
 		assert.Contains(t, out, "NAME")
@@ -452,7 +432,7 @@ func TestListCredentials(t *testing.T) {
 			},
 		})
 
-		out := captureStdout(t, func() {
+		out := testutil.CaptureStdout(t, func() {
 			require.NoError(t, c.ListCredentials())
 		})
 		assert.Contains(t, out, "-")
@@ -466,7 +446,7 @@ func TestAddContext(t *testing.T) {
 	t.Run("creates context with new CP and credential", func(t *testing.T) {
 		setupTestHome(t)
 
-		out := captureStdout(t, func() {
+		out := testutil.CaptureStdout(t, func() {
 			err := c.AddContext(AddContextParams{
 				Name:         "ctx1",
 				ControlPlane: "cp1",
@@ -497,7 +477,7 @@ func TestAddContext(t *testing.T) {
 			Credentials:   []Credential{{Name: "cred1"}},
 		})
 
-		out := captureStdout(t, func() {
+		out := testutil.CaptureStdout(t, func() {
 			err := c.AddContext(AddContextParams{
 				Name: "ctx1", ControlPlane: "cp1", Credentials: "cred1",
 			})
@@ -543,7 +523,7 @@ func TestDeleteContext(t *testing.T) {
 			Credentials:   []Credential{{Name: "cred1"}},
 		})
 
-		out := captureStdout(t, func() {
+		out := testutil.CaptureStdout(t, func() {
 			err := c.DeleteContext(DeleteContextParams{Name: "ctx2"})
 			require.NoError(t, err)
 		})
@@ -588,7 +568,7 @@ func TestUpdateContext(t *testing.T) {
 			Credentials:   []Credential{{Name: "cred1"}},
 		})
 
-		out := captureStdout(t, func() {
+		out := testutil.CaptureStdout(t, func() {
 			err := c.UpdateContext(UpdateContextParams{
 				Name: "ctx1", Namespace: "new-ns", Project: "new-proj",
 			})
@@ -654,7 +634,7 @@ func TestUseContext(t *testing.T) {
 			},
 		})
 
-		out := captureStdout(t, func() {
+		out := testutil.CaptureStdout(t, func() {
 			err := c.UseContext(UseContextParams{Name: "ctx2"})
 			require.NoError(t, err)
 		})
@@ -684,7 +664,7 @@ func TestAddControlPlane(t *testing.T) {
 		setupTestHome(t)
 		seedConfig(t, &StoredConfig{})
 
-		out := captureStdout(t, func() {
+		out := testutil.CaptureStdout(t, func() {
 			err := c.AddControlPlane(AddControlPlaneParams{
 				Name: "cp1", URL: "http://localhost:8080",
 			})
@@ -729,7 +709,7 @@ func TestUpdateControlPlane(t *testing.T) {
 			ControlPlanes: []ControlPlane{{Name: "cp1", URL: "http://old"}},
 		})
 
-		out := captureStdout(t, func() {
+		out := testutil.CaptureStdout(t, func() {
 			err := c.UpdateControlPlane(UpdateControlPlaneParams{
 				Name: "cp1", URL: "http://new",
 			})
@@ -764,7 +744,7 @@ func TestDeleteControlPlane(t *testing.T) {
 			},
 		})
 
-		out := captureStdout(t, func() {
+		out := testutil.CaptureStdout(t, func() {
 			err := c.DeleteControlPlane(DeleteControlPlaneParams{Name: "cp2"})
 			require.NoError(t, err)
 		})
@@ -804,7 +784,7 @@ func TestAddCredentials(t *testing.T) {
 		setupTestHome(t)
 		seedConfig(t, &StoredConfig{})
 
-		out := captureStdout(t, func() {
+		out := testutil.CaptureStdout(t, func() {
 			err := c.AddCredentials(AddCredentialsParams{Name: "cred1"})
 			require.NoError(t, err)
 		})
@@ -837,7 +817,7 @@ func TestDeleteCredentials(t *testing.T) {
 			Credentials: []Credential{{Name: "cred1"}, {Name: "cred2"}},
 		})
 
-		out := captureStdout(t, func() {
+		out := testutil.CaptureStdout(t, func() {
 			err := c.DeleteCredentials(DeleteCredentialsParams{Name: "cred2"})
 			require.NoError(t, err)
 		})
@@ -1019,9 +999,9 @@ func TestEnsureContext(t *testing.T) {
 func TestApplyContextDefaults(t *testing.T) {
 	newCmd := func() *cobra.Command {
 		cmd := &cobra.Command{Use: "test"}
-		cmd.Flags().String(flags.Namespace.Name, "", "")
-		cmd.Flags().String(flags.Project.Name, "", "")
-		cmd.Flags().String(flags.Component.Name, "", "")
+		cmd.Flags().String("namespace", "", "")
+		cmd.Flags().String("project", "", "")
+		cmd.Flags().String("component", "", "")
 		return cmd
 	}
 
@@ -1063,9 +1043,9 @@ func TestApplyContextDefaults(t *testing.T) {
 		})
 		cmd := newCmd()
 		require.NoError(t, ApplyContextDefaults(cmd))
-		assert.Equal(t, "ns1", cmd.Flags().Lookup(flags.Namespace.Name).Value.String())
-		assert.Equal(t, "proj1", cmd.Flags().Lookup(flags.Project.Name).Value.String())
-		assert.Equal(t, "comp1", cmd.Flags().Lookup(flags.Component.Name).Value.String())
+		assert.Equal(t, "ns1", cmd.Flags().Lookup("namespace").Value.String())
+		assert.Equal(t, "proj1", cmd.Flags().Lookup("project").Value.String())
+		assert.Equal(t, "comp1", cmd.Flags().Lookup("component").Value.String())
 	})
 
 	t.Run("does not override explicitly set flags", func(t *testing.T) {
@@ -1075,10 +1055,10 @@ func TestApplyContextDefaults(t *testing.T) {
 			Contexts:       []Context{{Name: "ctx1", Namespace: "from-config", Project: "from-config"}},
 		})
 		cmd := newCmd()
-		require.NoError(t, cmd.Flags().Set(flags.Namespace.Name, "explicit"))
+		require.NoError(t, cmd.Flags().Set("namespace", "explicit"))
 		require.NoError(t, ApplyContextDefaults(cmd))
-		assert.Equal(t, "explicit", cmd.Flags().Lookup(flags.Namespace.Name).Value.String())
-		assert.Equal(t, "from-config", cmd.Flags().Lookup(flags.Project.Name).Value.String())
+		assert.Equal(t, "explicit", cmd.Flags().Lookup("namespace").Value.String())
+		assert.Equal(t, "from-config", cmd.Flags().Lookup("project").Value.String())
 	})
 }
 

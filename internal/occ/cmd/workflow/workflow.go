@@ -17,41 +17,24 @@ import (
 	"github.com/openchoreo/openchoreo/internal/occ/cmd/pagination"
 	"github.com/openchoreo/openchoreo/internal/occ/cmd/setoverride"
 	"github.com/openchoreo/openchoreo/internal/occ/cmd/utils"
-	"github.com/openchoreo/openchoreo/internal/occ/validation"
+	"github.com/openchoreo/openchoreo/internal/occ/cmdutil"
+	"github.com/openchoreo/openchoreo/internal/occ/resources/client"
 	"github.com/openchoreo/openchoreo/internal/openchoreo-api/api/gen"
 )
 
-// Client defines the client methods used by Workflow operations.
-type Client interface {
-	ListWorkflows(ctx context.Context, namespaceName string, params *gen.ListWorkflowsParams) (*gen.WorkflowList, error)
-	GetWorkflow(ctx context.Context, namespaceName, workflowName string) (*gen.Workflow, error)
-	DeleteWorkflow(ctx context.Context, namespaceName, workflowName string) error
-	CreateWorkflowRun(ctx context.Context, namespaceName string, req gen.WorkflowRun) (*gen.WorkflowRun, error)
-
-	// Logs / ResolveLatestRun (satisfies workflowrun.Client)
-	ListWorkflowRuns(ctx context.Context, namespaceName string, params *gen.ListWorkflowRunsParams) (*gen.WorkflowRunList, error)
-	GetWorkflowRun(ctx context.Context, namespaceName, workflowRunName string) (*gen.WorkflowRun, error)
-	GetWorkflowRunStatus(ctx context.Context, namespaceName, runName string) (*gen.WorkflowRunStatusResponse, error)
-	GetWorkflowRunLogs(ctx context.Context, namespaceName, runName string, params *gen.GetWorkflowRunLogsParams) ([]gen.WorkflowRunLogEntry, error)
-	GetWorkflowPlane(ctx context.Context, namespaceName, workflowPlaneName string) (*gen.WorkflowPlane, error)
-	GetClusterWorkflowPlane(ctx context.Context, clusterWorkflowPlaneName string) (*gen.ClusterWorkflowPlane, error)
-	GetObservabilityPlane(ctx context.Context, namespaceName, observabilityPlaneName string) (*gen.ObservabilityPlane, error)
-	GetClusterObservabilityPlane(ctx context.Context, clusterObservabilityPlaneName string) (*gen.ClusterObservabilityPlane, error)
-}
-
 // Workflow implements workflow operations
 type Workflow struct {
-	client Client
+	client client.Interface
 }
 
 // New creates a new workflow implementation
-func New(client Client) *Workflow {
-	return &Workflow{client: client}
+func New(c client.Interface) *Workflow {
+	return &Workflow{client: c}
 }
 
 // List lists all workflows in a namespace.
 func (w *Workflow) List(params ListParams) error {
-	if err := validation.ValidateParams(validation.CmdList, validation.ResourceWorkflow, params); err != nil {
+	if err := cmdutil.RequireFields("list", "workflow", map[string]string{"namespace": params.Namespace}); err != nil {
 		return err
 	}
 
@@ -113,7 +96,7 @@ func (w *Workflow) Get(params GetParams) error {
 
 // Delete deletes a single workflow
 func (w *Workflow) Delete(params DeleteParams) error {
-	if err := validation.ValidateParams(validation.CmdDelete, validation.ResourceWorkflow, params); err != nil {
+	if err := cmdutil.RequireFields("delete", "workflow", map[string]string{"namespace": params.Namespace, "name": params.WorkflowName}); err != nil {
 		return err
 	}
 

@@ -13,19 +13,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	openchoreov1alpha1 "github.com/openchoreo/openchoreo/api/v1alpha1"
-	"github.com/openchoreo/openchoreo/internal/occ/testhelpers"
-	"github.com/openchoreo/openchoreo/pkg/cli/types/api"
+	"github.com/openchoreo/openchoreo/internal/occ/testutil"
 )
 
 func TestValidateConversionParams(t *testing.T) {
 	tests := []struct {
 		name    string
-		params  api.CreateWorkloadParams
+		params  CreateWorkloadParams
 		wantErr string
 	}{
 		{
 			name: "valid params",
-			params: api.CreateWorkloadParams{
+			params: CreateWorkloadParams{
 				NamespaceName: "ns",
 				ProjectName:   "proj",
 				ComponentName: "comp",
@@ -34,7 +33,7 @@ func TestValidateConversionParams(t *testing.T) {
 		},
 		{
 			name: "missing namespace",
-			params: api.CreateWorkloadParams{
+			params: CreateWorkloadParams{
 				ProjectName:   "proj",
 				ComponentName: "comp",
 				ImageURL:      "image:latest",
@@ -43,7 +42,7 @@ func TestValidateConversionParams(t *testing.T) {
 		},
 		{
 			name: "missing project",
-			params: api.CreateWorkloadParams{
+			params: CreateWorkloadParams{
 				NamespaceName: "ns",
 				ComponentName: "comp",
 				ImageURL:      "image:latest",
@@ -52,7 +51,7 @@ func TestValidateConversionParams(t *testing.T) {
 		},
 		{
 			name: "missing component",
-			params: api.CreateWorkloadParams{
+			params: CreateWorkloadParams{
 				NamespaceName: "ns",
 				ProjectName:   "proj",
 				ImageURL:      "image:latest",
@@ -61,7 +60,7 @@ func TestValidateConversionParams(t *testing.T) {
 		},
 		{
 			name: "missing image URL",
-			params: api.CreateWorkloadParams{
+			params: CreateWorkloadParams{
 				NamespaceName: "ns",
 				ProjectName:   "proj",
 				ComponentName: "comp",
@@ -81,12 +80,11 @@ func TestValidateConversionParams(t *testing.T) {
 		})
 	}
 }
-
 func TestCreateBaseWorkload(t *testing.T) {
 	tests := []struct {
 		name         string
 		workloadName string
-		params       api.CreateWorkloadParams
+		params       CreateWorkloadParams
 		wantName     string
 		wantNS       string
 		wantProject  string
@@ -96,7 +94,7 @@ func TestCreateBaseWorkload(t *testing.T) {
 		{
 			name:         "creates workload with all fields",
 			workloadName: "my-workload",
-			params: api.CreateWorkloadParams{
+			params: CreateWorkloadParams{
 				NamespaceName: "test-ns",
 				ProjectName:   "test-project",
 				ComponentName: "test-component",
@@ -111,7 +109,7 @@ func TestCreateBaseWorkload(t *testing.T) {
 		{
 			name:         "creates workload with minimal fields",
 			workloadName: "minimal",
-			params: api.CreateWorkloadParams{
+			params: CreateWorkloadParams{
 				NamespaceName: "ns",
 				ProjectName:   "proj",
 				ComponentName: "comp",
@@ -140,7 +138,6 @@ func TestCreateBaseWorkload(t *testing.T) {
 		})
 	}
 }
-
 func TestAddDependenciesFromDescriptor(t *testing.T) {
 	baseWorkload := func() *openchoreov1alpha1.Workload {
 		return &openchoreov1alpha1.Workload{
@@ -149,7 +146,6 @@ func TestAddDependenciesFromDescriptor(t *testing.T) {
 			},
 		}
 	}
-
 	tests := []struct {
 		name           string
 		descriptor     *WorkloadDescriptor
@@ -299,7 +295,6 @@ func TestAddDependenciesFromDescriptor(t *testing.T) {
 		})
 	}
 }
-
 func TestReadWorkloadDescriptorDependencies(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -368,7 +363,6 @@ connections:
 		})
 	}
 }
-
 func TestAddEndpointsFromDescriptorVisibilityValidation(t *testing.T) {
 	baseWorkload := func() *openchoreov1alpha1.Workload {
 		return &openchoreov1alpha1.Workload{
@@ -377,7 +371,6 @@ func TestAddEndpointsFromDescriptorVisibilityValidation(t *testing.T) {
 			},
 		}
 	}
-
 	tests := []struct {
 		name    string
 		desc    *WorkloadDescriptor
@@ -414,7 +407,6 @@ func TestAddEndpointsFromDescriptorVisibilityValidation(t *testing.T) {
 		})
 	}
 }
-
 func TestConvertEnvVarSource(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -462,16 +454,15 @@ func TestConvertEnvVarSource(t *testing.T) {
 		})
 	}
 }
-
 func TestCreateBasicWorkload(t *testing.T) {
 	tests := []struct {
 		name    string
-		params  api.CreateWorkloadParams
+		params  CreateWorkloadParams
 		wantErr string
 	}{
 		{
 			name: "creates workload from params",
-			params: api.CreateWorkloadParams{
+			params: CreateWorkloadParams{
 				NamespaceName: "test-ns",
 				ProjectName:   "test-project",
 				ComponentName: "test-component",
@@ -480,7 +471,7 @@ func TestCreateBasicWorkload(t *testing.T) {
 		},
 		{
 			name: "fails on missing image",
-			params: api.CreateWorkloadParams{
+			params: CreateWorkloadParams{
 				NamespaceName: "ns",
 				ProjectName:   "proj",
 				ComponentName: "comp",
@@ -506,7 +497,6 @@ func TestCreateBasicWorkload(t *testing.T) {
 		})
 	}
 }
-
 func TestReadWorkloadDescriptor(t *testing.T) {
 	t.Run("reads valid descriptor from file", func(t *testing.T) {
 		dir := t.TempDir()
@@ -518,50 +508,42 @@ endpoints:
     port: 8080
     type: REST
 `
-		testhelpers.WriteYAML(t, dir, "workload.yaml", content)
-
+		testutil.WriteYAML(t, dir, "workload.yaml", content)
 		desc, err := readWorkloadDescriptor(filepath.Join(dir, "workload.yaml"))
 		require.NoError(t, err)
 		assert.Equal(t, "my-service", desc.Metadata.Name)
 		assert.Len(t, desc.Endpoints, 1)
 	})
-
 	t.Run("returns error for missing file", func(t *testing.T) {
 		_, err := readWorkloadDescriptor("/nonexistent/workload.yaml")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to open file")
 	})
 }
-
 func TestReadSchemaFile(t *testing.T) {
 	t.Run("reads schema content", func(t *testing.T) {
 		dir := t.TempDir()
-		testhelpers.WriteYAML(t, dir, "schema.json", `{"openapi":"3.0.0"}`)
-
+		testutil.WriteYAML(t, dir, "schema.json", `{"openapi":"3.0.0"}`)
 		content, err := readSchemaFile(filepath.Join(dir, "schema.json"))
 		require.NoError(t, err)
 		assert.Equal(t, `{"openapi":"3.0.0"}`, content)
 	})
-
 	t.Run("returns error for missing file", func(t *testing.T) {
 		_, err := readSchemaFile("/nonexistent/schema.json")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to read schema file")
 	})
 }
-
 func TestAddEndpointsFromDescriptorWithSchemaFile(t *testing.T) {
 	dir := t.TempDir()
 	descriptorPath := filepath.Join(dir, "workload.yaml")
-
 	// Write a schema file in the same directory
 	schemaContent := `openapi: "3.0.0"
 info:
   title: Test API
   version: "1.0"
 `
-	testhelpers.WriteYAML(t, dir, "openapi.yaml", schemaContent)
-
+	testutil.WriteYAML(t, dir, "openapi.yaml", schemaContent)
 	w := &openchoreov1alpha1.Workload{
 		Spec: openchoreov1alpha1.WorkloadSpec{
 			WorkloadTemplateSpec: openchoreov1alpha1.WorkloadTemplateSpec{},
@@ -578,7 +560,6 @@ info:
 			},
 		},
 	}
-
 	err := addEndpointsFromDescriptor(w, desc, descriptorPath)
 	require.NoError(t, err)
 	require.Contains(t, w.Spec.Endpoints, "api")
@@ -587,11 +568,9 @@ info:
 	assert.Equal(t, "REST", ep.Schema.Type)
 	assert.Equal(t, schemaContent, ep.Schema.Content)
 }
-
 func TestAddEndpointsFromDescriptorSchemaFileMissing(t *testing.T) {
 	dir := t.TempDir()
 	descriptorPath := filepath.Join(dir, "workload.yaml")
-
 	w := &openchoreov1alpha1.Workload{
 		Spec: openchoreov1alpha1.WorkloadSpec{
 			WorkloadTemplateSpec: openchoreov1alpha1.WorkloadTemplateSpec{},
@@ -608,18 +587,15 @@ func TestAddEndpointsFromDescriptorSchemaFileMissing(t *testing.T) {
 			},
 		},
 	}
-
 	err := addEndpointsFromDescriptor(w, desc, descriptorPath)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to read schema file")
 }
-
 func TestAddConfigurationsFromDescriptor(t *testing.T) {
 	dir := t.TempDir()
 	descriptorPath := filepath.Join(dir, "workload.yaml")
 	configContent := "server.port=8080\nserver.host=0.0.0.0\n"
-	testhelpers.WriteYAML(t, dir, "app.properties", configContent)
-
+	testutil.WriteYAML(t, dir, "app.properties", configContent)
 	tests := []struct {
 		name       string
 		descriptor *WorkloadDescriptor
@@ -794,14 +770,11 @@ func TestAddConfigurationsFromDescriptor(t *testing.T) {
 		})
 	}
 }
-
 func TestConvertWorkloadDescriptorToWorkloadCR(t *testing.T) {
 	dir := t.TempDir()
 	descriptorPath := filepath.Join(dir, "workload.yaml")
-
 	// Write a schema file
-	testhelpers.WriteYAML(t, dir, "openapi.yaml", `openapi: "3.0.0"`)
-
+	testutil.WriteYAML(t, dir, "openapi.yaml", `openapi: "3.0.0"`)
 	descriptorContent := `apiVersion: openchoreo.dev/v1alpha1
 metadata:
   name: my-service
@@ -829,23 +802,19 @@ configurations:
       mountPath: /etc/app/cfg.yaml
       value: "key: val"
 `
-	testhelpers.WriteYAML(t, dir, "workload.yaml", descriptorContent)
-
-	params := api.CreateWorkloadParams{
+	testutil.WriteYAML(t, dir, "workload.yaml", descriptorContent)
+	params := CreateWorkloadParams{
 		NamespaceName: "test-ns",
 		ProjectName:   "test-project",
 		ComponentName: "test-comp",
 		ImageURL:      "gcr.io/img:v1",
 	}
-
 	t.Run("full conversion", func(t *testing.T) {
 		w, err := ConvertWorkloadDescriptorToWorkloadCR(descriptorPath, params)
 		require.NoError(t, err)
 		require.NotNil(t, w)
-
 		yamlBytes, err := ConvertWorkloadCRToYAML(w)
 		require.NoError(t, err)
-
 		wantYAML := `apiVersion: openchoreo.dev/v1alpha1
 kind: Workload
 metadata:
@@ -882,21 +851,18 @@ spec:
         envBindings:
           address: DB_URL
 `
-		testhelpers.AssertYAMLEquals(t, wantYAML, string(yamlBytes))
+		testutil.AssertYAMLEquals(t, wantYAML, string(yamlBytes))
 	})
-
 	t.Run("invalid params", func(t *testing.T) {
-		_, err := ConvertWorkloadDescriptorToWorkloadCR(descriptorPath, api.CreateWorkloadParams{})
+		_, err := ConvertWorkloadDescriptorToWorkloadCR(descriptorPath, CreateWorkloadParams{})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "namespace name is required")
 	})
-
 	t.Run("missing descriptor file", func(t *testing.T) {
 		_, err := ConvertWorkloadDescriptorToWorkloadCR("/nonexistent/workload.yaml", params)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to read workload descriptor")
 	})
-
 	t.Run("descriptor with invalid endpoint visibility propagates error", func(t *testing.T) {
 		badDir := t.TempDir()
 		badContent := `apiVersion: openchoreo.dev/v1alpha1
@@ -909,12 +875,11 @@ endpoints:
     visibility:
       - bogus
 `
-		testhelpers.WriteYAML(t, badDir, "workload.yaml", badContent)
+		testutil.WriteYAML(t, badDir, "workload.yaml", badContent)
 		_, err := ConvertWorkloadDescriptorToWorkloadCR(filepath.Join(badDir, "workload.yaml"), params)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), `invalid endpoint visibility "bogus" for endpoint "ep"`)
 	})
-
 	t.Run("descriptor with invalid dependency propagates error", func(t *testing.T) {
 		badDir := t.TempDir()
 		badContent := `apiVersion: openchoreo.dev/v1alpha1
@@ -927,12 +892,11 @@ dependencies:
       envBindings:
         address: URL
 `
-		testhelpers.WriteYAML(t, badDir, "workload.yaml", badContent)
+		testutil.WriteYAML(t, badDir, "workload.yaml", badContent)
 		_, err := ConvertWorkloadDescriptorToWorkloadCR(filepath.Join(badDir, "workload.yaml"), params)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "component is required")
 	})
-
 	t.Run("descriptor with missing config file propagates error", func(t *testing.T) {
 		badDir := t.TempDir()
 		badContent := `apiVersion: openchoreo.dev/v1alpha1
@@ -945,13 +909,12 @@ configurations:
       valueFrom:
         path: does-not-exist.conf
 `
-		testhelpers.WriteYAML(t, badDir, "workload.yaml", badContent)
+		testutil.WriteYAML(t, badDir, "workload.yaml", badContent)
 		_, err := ConvertWorkloadDescriptorToWorkloadCR(filepath.Join(badDir, "workload.yaml"), params)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to read file")
 	})
 }
-
 func TestConvertWorkloadCRToYAML(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -1043,7 +1006,7 @@ spec:
 		t.Run(tt.name, func(t *testing.T) {
 			yamlBytes, err := ConvertWorkloadCRToYAML(tt.workload)
 			require.NoError(t, err)
-			testhelpers.AssertYAMLEquals(t, tt.wantYAML, string(yamlBytes))
+			testutil.AssertYAMLEquals(t, tt.wantYAML, string(yamlBytes))
 		})
 	}
 }

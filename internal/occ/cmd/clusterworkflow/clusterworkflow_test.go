@@ -4,10 +4,7 @@
 package clusterworkflow
 
 import (
-	"bytes"
 	"fmt"
-	"io"
-	"os"
 	"testing"
 	"time"
 
@@ -15,46 +12,20 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/openchoreo/openchoreo/internal/occ/cmd/clusterworkflow/mocks"
+	"github.com/openchoreo/openchoreo/internal/occ/resources/client/mocks"
+	"github.com/openchoreo/openchoreo/internal/occ/testutil"
 	"github.com/openchoreo/openchoreo/internal/openchoreo-api/api/gen"
 )
 
-// captureStdout captures stdout output from a function call.
-func captureStdout(t *testing.T, fn func()) string {
-	t.Helper()
-
-	r, w, err := os.Pipe()
-	require.NoError(t, err)
-
-	origStdout := os.Stdout
-	os.Stdout = w
-	defer func() {
-		os.Stdout = origStdout
-		w.Close()
-		r.Close()
-	}()
-
-	fn()
-
-	os.Stdout = origStdout
-	w.Close()
-
-	var buf bytes.Buffer
-	_, err = io.Copy(&buf, r)
-	require.NoError(t, err)
-
-	return buf.String()
-}
-
 func TestPrint_Nil(t *testing.T) {
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		require.NoError(t, printList(nil))
 	})
 	assert.Contains(t, out, "No cluster workflows found")
 }
 
 func TestPrint_Empty(t *testing.T) {
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		require.NoError(t, printList([]gen.ClusterWorkflow{}))
 	})
 	assert.Contains(t, out, "No cluster workflows found")
@@ -76,7 +47,7 @@ func TestPrint_WithItems(t *testing.T) {
 		},
 	}
 
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		require.NoError(t, printList(items))
 	})
 
@@ -96,7 +67,7 @@ func TestPrint_NilTimestamp(t *testing.T) {
 		},
 	}
 
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		require.NoError(t, printList(items))
 	})
 
@@ -106,7 +77,7 @@ func TestPrint_NilTimestamp(t *testing.T) {
 // --- List tests ---
 
 func TestList_APIError(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().ListClusterWorkflows(mock.Anything, mock.Anything).Return(nil, fmt.Errorf("server error"))
 
 	cw := New(mc)
@@ -114,14 +85,14 @@ func TestList_APIError(t *testing.T) {
 }
 
 func TestList_Success(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().ListClusterWorkflows(mock.Anything, mock.Anything).Return(&gen.ClusterWorkflowList{
 		Items:      []gen.ClusterWorkflow{{Metadata: gen.ObjectMeta{Name: "build-go"}}},
 		Pagination: gen.Pagination{},
 	}, nil)
 
 	cw := New(mc)
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		require.NoError(t, cw.List())
 	})
 	assert.Contains(t, out, "build-go")
@@ -129,7 +100,7 @@ func TestList_Success(t *testing.T) {
 
 func TestList_MultipleItems(t *testing.T) {
 	now := time.Now()
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().ListClusterWorkflows(mock.Anything, mock.Anything).Return(&gen.ClusterWorkflowList{
 		Items: []gen.ClusterWorkflow{
 			{Metadata: gen.ObjectMeta{Name: "build-go", CreationTimestamp: &now}},
@@ -139,7 +110,7 @@ func TestList_MultipleItems(t *testing.T) {
 	}, nil)
 
 	cw := New(mc)
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		require.NoError(t, cw.List())
 	})
 	assert.Contains(t, out, "build-go")
@@ -147,14 +118,14 @@ func TestList_MultipleItems(t *testing.T) {
 }
 
 func TestList_Empty(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().ListClusterWorkflows(mock.Anything, mock.Anything).Return(&gen.ClusterWorkflowList{
 		Items:      []gen.ClusterWorkflow{},
 		Pagination: gen.Pagination{},
 	}, nil)
 
 	cw := New(mc)
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		require.NoError(t, cw.List())
 	})
 	assert.Contains(t, out, "No cluster workflows found")
@@ -163,7 +134,7 @@ func TestList_Empty(t *testing.T) {
 // --- Get tests ---
 
 func TestGet_APIError(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().GetClusterWorkflow(mock.Anything, "missing").Return(nil, fmt.Errorf("not found: missing"))
 
 	cw := New(mc)
@@ -171,13 +142,13 @@ func TestGet_APIError(t *testing.T) {
 }
 
 func TestGet_Success(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().GetClusterWorkflow(mock.Anything, "build-go").Return(&gen.ClusterWorkflow{
 		Metadata: gen.ObjectMeta{Name: "build-go"},
 	}, nil)
 
 	cw := New(mc)
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		require.NoError(t, cw.Get(GetParams{ClusterWorkflowName: "build-go"}))
 	})
 	assert.Contains(t, out, "name: build-go")
@@ -186,7 +157,7 @@ func TestGet_Success(t *testing.T) {
 // --- Delete tests ---
 
 func TestDelete_APIError(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().DeleteClusterWorkflow(mock.Anything, "build-go").Return(fmt.Errorf("forbidden"))
 
 	cw := New(mc)
@@ -194,11 +165,11 @@ func TestDelete_APIError(t *testing.T) {
 }
 
 func TestDelete_Success(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().DeleteClusterWorkflow(mock.Anything, "build-go").Return(nil)
 
 	cw := New(mc)
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		require.NoError(t, cw.Delete(DeleteParams{ClusterWorkflowName: "build-go"}))
 	})
 	assert.Contains(t, out, "ClusterWorkflow 'build-go' deleted")
@@ -242,21 +213,21 @@ func TestLogs_ValidationError(t *testing.T) {
 
 func TestLogs_WithRunName_LiveLogs(t *testing.T) {
 	now := time.Now()
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().GetWorkflowRunStatus(mock.Anything, "ns", "run-1").Return(
 		&gen.WorkflowRunStatusResponse{HasLiveObservability: true}, nil)
 	mc.EXPECT().GetWorkflowRunLogs(mock.Anything, "ns", "run-1", mock.Anything).Return(
 		[]gen.WorkflowRunLogEntry{{Timestamp: &now, Log: "deploy step"}}, nil)
 
 	cw := New(mc)
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		require.NoError(t, cw.Logs(LogsParams{Namespace: "ns", WorkflowName: "my-cwf", RunName: "run-1"}))
 	})
 	assert.Contains(t, out, "deploy step")
 }
 
 func TestLogs_WithRunName_StatusError(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().GetWorkflowRunStatus(mock.Anything, "ns", "run-1").Return(nil, fmt.Errorf("unavailable"))
 
 	cw := New(mc)
@@ -268,21 +239,21 @@ func TestLogs_WithRunName_StatusError(t *testing.T) {
 
 func TestStartRun_Success(t *testing.T) {
 	ns := "ns"
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().CreateWorkflowRun(mock.Anything, "ns", mock.Anything).Return(&gen.WorkflowRun{
 		Metadata: gen.ObjectMeta{Name: "run-1", Namespace: &ns},
 		Spec:     &gen.WorkflowRunSpec{Workflow: gen.WorkflowRunConfig{Name: "my-cwf"}},
 	}, nil)
 
 	cw := New(mc)
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		require.NoError(t, cw.StartRun(StartRunParams{Namespace: "ns", WorkflowName: "my-cwf"}))
 	})
 	assert.Contains(t, out, "Successfully started workflow run: run-1")
 }
 
 func TestStartRun_APIError(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().CreateWorkflowRun(mock.Anything, "ns", mock.Anything).Return(nil, fmt.Errorf("forbidden"))
 
 	cw := New(mc)
@@ -294,7 +265,7 @@ func TestStartRun_APIError(t *testing.T) {
 
 func TestLogs_WithoutRunName_ResolvesLatest(t *testing.T) {
 	now := time.Now()
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().ListWorkflowRuns(mock.Anything, "ns", mock.Anything).Return(&gen.WorkflowRunList{
 		Items:      []gen.WorkflowRun{{Metadata: gen.ObjectMeta{Name: "latest-run", CreationTimestamp: &now}}},
 		Pagination: gen.Pagination{},
@@ -305,14 +276,14 @@ func TestLogs_WithoutRunName_ResolvesLatest(t *testing.T) {
 		[]gen.WorkflowRunLogEntry{{Timestamp: &now, Log: "resolved log"}}, nil)
 
 	cw := New(mc)
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		require.NoError(t, cw.Logs(LogsParams{Namespace: "ns", WorkflowName: "my-cwf"}))
 	})
 	assert.Contains(t, out, "resolved log")
 }
 
 func TestLogs_WithoutRunName_NoRuns(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().ListWorkflowRuns(mock.Anything, "ns", mock.Anything).Return(&gen.WorkflowRunList{
 		Items:      []gen.WorkflowRun{},
 		Pagination: gen.Pagination{},
@@ -327,7 +298,7 @@ func TestLogs_WithoutRunName_NoRuns(t *testing.T) {
 
 func TestList_Pagination(t *testing.T) {
 	cursor := "page2"
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().ListClusterWorkflows(mock.Anything, mock.MatchedBy(func(p *gen.ListClusterWorkflowsParams) bool {
 		return p.Cursor == nil
 	})).Return(&gen.ClusterWorkflowList{
@@ -342,7 +313,7 @@ func TestList_Pagination(t *testing.T) {
 	}, nil).Once()
 
 	cw := New(mc)
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		require.NoError(t, cw.List())
 	})
 	assert.Contains(t, out, "wf-1")

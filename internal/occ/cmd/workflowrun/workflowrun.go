@@ -13,7 +13,8 @@ import (
 
 	"github.com/openchoreo/openchoreo/internal/occ/cmd/pagination"
 	"github.com/openchoreo/openchoreo/internal/occ/cmd/utils"
-	"github.com/openchoreo/openchoreo/internal/occ/validation"
+	"github.com/openchoreo/openchoreo/internal/occ/cmdutil"
+	"github.com/openchoreo/openchoreo/internal/occ/resources/client"
 	"github.com/openchoreo/openchoreo/internal/openchoreo-api/api/gen"
 )
 
@@ -24,34 +25,19 @@ const (
 	conditionStatusTrue = "True"
 )
 
-// Client defines the client methods used by WorkflowRun operations.
-type Client interface {
-	ListWorkflowRuns(ctx context.Context, namespaceName string, params *gen.ListWorkflowRunsParams) (*gen.WorkflowRunList, error)
-	GetWorkflowRun(ctx context.Context, namespaceName, workflowRunName string) (*gen.WorkflowRun, error)
-
-	// Logs
-	GetWorkflowRunStatus(ctx context.Context, namespaceName, runName string) (*gen.WorkflowRunStatusResponse, error)
-	GetWorkflowRunLogs(ctx context.Context, namespaceName, runName string, params *gen.GetWorkflowRunLogsParams) ([]gen.WorkflowRunLogEntry, error)
-	GetWorkflow(ctx context.Context, namespaceName, workflowName string) (*gen.Workflow, error)
-	GetWorkflowPlane(ctx context.Context, namespaceName, workflowPlaneName string) (*gen.WorkflowPlane, error)
-	GetClusterWorkflowPlane(ctx context.Context, clusterWorkflowPlaneName string) (*gen.ClusterWorkflowPlane, error)
-	GetObservabilityPlane(ctx context.Context, namespaceName, observabilityPlaneName string) (*gen.ObservabilityPlane, error)
-	GetClusterObservabilityPlane(ctx context.Context, clusterObservabilityPlaneName string) (*gen.ClusterObservabilityPlane, error)
-}
-
 // WorkflowRun implements workflow run operations
 type WorkflowRun struct {
-	client Client
+	client client.Interface
 }
 
 // New creates a new workflow run implementation
-func New(client Client) *WorkflowRun {
-	return &WorkflowRun{client: client}
+func New(c client.Interface) *WorkflowRun {
+	return &WorkflowRun{client: c}
 }
 
 // List lists workflow runs in a namespace (includes component workflow runs).
 func (w *WorkflowRun) List(params ListParams) error {
-	if err := validation.ValidateParams(validation.CmdList, validation.ResourceWorkflowRun, params); err != nil {
+	if err := cmdutil.RequireFields("list", "workflowrun", map[string]string{"namespace": params.Namespace}); err != nil {
 		return err
 	}
 
@@ -121,7 +107,7 @@ func getComponentLabel(run gen.WorkflowRun) string {
 
 // Get retrieves a single workflow run and outputs it as YAML
 func (w *WorkflowRun) Get(params GetParams) error {
-	if err := validation.ValidateParams(validation.CmdGet, validation.ResourceWorkflowRun, params); err != nil {
+	if err := cmdutil.RequireFields("get", "workflowrun", map[string]string{"namespace": params.Namespace}); err != nil {
 		return err
 	}
 

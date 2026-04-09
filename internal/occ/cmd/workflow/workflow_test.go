@@ -4,10 +4,7 @@
 package workflow
 
 import (
-	"bytes"
 	"fmt"
-	"io"
-	"os"
 	"testing"
 	"time"
 
@@ -16,7 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/openchoreo/openchoreo/internal/labels"
-	"github.com/openchoreo/openchoreo/internal/occ/cmd/workflow/mocks"
+	"github.com/openchoreo/openchoreo/internal/occ/resources/client/mocks"
+	"github.com/openchoreo/openchoreo/internal/occ/testutil"
 	"github.com/openchoreo/openchoreo/internal/openchoreo-api/api/gen"
 )
 
@@ -126,36 +124,10 @@ func TestApplySetOverrides(t *testing.T) {
 	})
 }
 
-func captureStdout(t *testing.T, fn func()) string {
-	t.Helper()
-
-	r, w, err := os.Pipe()
-	require.NoError(t, err)
-
-	origStdout := os.Stdout
-	os.Stdout = w
-	defer func() {
-		os.Stdout = origStdout
-		w.Close()
-		r.Close()
-	}()
-
-	fn()
-
-	os.Stdout = origStdout
-	w.Close()
-
-	var buf bytes.Buffer
-	_, err = io.Copy(&buf, r)
-	require.NoError(t, err)
-
-	return buf.String()
-}
-
 // --- List tests ---
 
 func TestList_APIError(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().ListWorkflows(mock.Anything, "ns", mock.Anything).Return(nil, fmt.Errorf("server error"))
 
 	wf := New(mc)
@@ -163,14 +135,14 @@ func TestList_APIError(t *testing.T) {
 }
 
 func TestList_Success(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().ListWorkflows(mock.Anything, "ns", mock.Anything).Return(&gen.WorkflowList{
 		Items:      []gen.Workflow{{Metadata: gen.ObjectMeta{Name: "my-workflow"}}},
 		Pagination: gen.Pagination{},
 	}, nil)
 
 	wf := New(mc)
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		require.NoError(t, wf.List(ListParams{Namespace: "ns"}))
 	})
 
@@ -179,7 +151,7 @@ func TestList_Success(t *testing.T) {
 
 func TestList_MultipleItems(t *testing.T) {
 	now := time.Now()
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().ListWorkflows(mock.Anything, "ns", mock.Anything).Return(&gen.WorkflowList{
 		Items: []gen.Workflow{
 			{Metadata: gen.ObjectMeta{Name: "wf-build", CreationTimestamp: &now}},
@@ -189,7 +161,7 @@ func TestList_MultipleItems(t *testing.T) {
 	}, nil)
 
 	wf := New(mc)
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		require.NoError(t, wf.List(ListParams{Namespace: "ns"}))
 	})
 
@@ -198,14 +170,14 @@ func TestList_MultipleItems(t *testing.T) {
 }
 
 func TestList_Empty(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().ListWorkflows(mock.Anything, "ns", mock.Anything).Return(&gen.WorkflowList{
 		Items:      []gen.Workflow{},
 		Pagination: gen.Pagination{},
 	}, nil)
 
 	wf := New(mc)
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		require.NoError(t, wf.List(ListParams{Namespace: "ns"}))
 	})
 
@@ -215,7 +187,7 @@ func TestList_Empty(t *testing.T) {
 // --- Get tests ---
 
 func TestGet_APIError(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().GetWorkflow(mock.Anything, "ns", "missing").Return(nil, fmt.Errorf("not found: missing"))
 
 	wf := New(mc)
@@ -223,13 +195,13 @@ func TestGet_APIError(t *testing.T) {
 }
 
 func TestGet_Success(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().GetWorkflow(mock.Anything, "ns", "my-workflow").Return(&gen.Workflow{
 		Metadata: gen.ObjectMeta{Name: "my-workflow"},
 	}, nil)
 
 	wf := New(mc)
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		require.NoError(t, wf.Get(GetParams{Namespace: "ns", WorkflowName: "my-workflow"}))
 	})
 
@@ -239,7 +211,7 @@ func TestGet_Success(t *testing.T) {
 // --- Delete tests ---
 
 func TestDelete_APIError(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().DeleteWorkflow(mock.Anything, "ns", "my-workflow").Return(fmt.Errorf("forbidden: my-workflow"))
 
 	wf := New(mc)
@@ -247,11 +219,11 @@ func TestDelete_APIError(t *testing.T) {
 }
 
 func TestDelete_Success(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().DeleteWorkflow(mock.Anything, "ns", "my-workflow").Return(nil)
 
 	wf := New(mc)
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		require.NoError(t, wf.Delete(DeleteParams{Namespace: "ns", WorkflowName: "my-workflow"}))
 	})
 
@@ -261,7 +233,7 @@ func TestDelete_Success(t *testing.T) {
 // --- StartRun tests ---
 
 func TestStartRun_APIError(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().CreateWorkflowRun(mock.Anything, "ns", mock.Anything).Return(nil, fmt.Errorf("server error"))
 
 	wf := New(mc)
@@ -274,14 +246,14 @@ func TestStartRun_APIError(t *testing.T) {
 
 func TestStartRun_Success(t *testing.T) {
 	ns := "ns"
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().CreateWorkflowRun(mock.Anything, "ns", mock.Anything).Return(&gen.WorkflowRun{
 		Metadata: gen.ObjectMeta{Name: "run-1", Namespace: &ns},
 		Spec:     &gen.WorkflowRunSpec{Workflow: gen.WorkflowRunConfig{Name: "my-wf"}},
 	}, nil)
 
 	wf := New(mc)
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		require.NoError(t, wf.StartRun(StartRunParams{
 			Namespace:    "ns",
 			WorkflowName: "my-wf",
@@ -349,21 +321,21 @@ func TestLogs_ValidationError(t *testing.T) {
 
 func TestLogs_WithRunName_LiveLogs(t *testing.T) {
 	now := time.Now()
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().GetWorkflowRunStatus(mock.Anything, "ns", "run-1").Return(
 		&gen.WorkflowRunStatusResponse{HasLiveObservability: true}, nil)
 	mc.EXPECT().GetWorkflowRunLogs(mock.Anything, "ns", "run-1", mock.Anything).Return(
 		[]gen.WorkflowRunLogEntry{{Timestamp: &now, Log: "build step"}}, nil)
 
 	wf := New(mc)
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		require.NoError(t, wf.Logs(LogsParams{Namespace: "ns", WorkflowName: "my-wf", RunName: "run-1"}))
 	})
 	assert.Contains(t, out, "build step")
 }
 
 func TestLogs_WithRunName_StatusError(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().GetWorkflowRunStatus(mock.Anything, "ns", "run-1").Return(nil, fmt.Errorf("unavailable"))
 
 	wf := New(mc)
@@ -376,7 +348,7 @@ func TestLogs_WithRunName_StatusError(t *testing.T) {
 func TestResolveLatestRun_Success(t *testing.T) {
 	now := time.Now()
 	older := now.Add(-time.Hour)
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().ListWorkflowRuns(mock.Anything, "ns", mock.Anything).Return(&gen.WorkflowRunList{
 		Items: []gen.WorkflowRun{
 			{Metadata: gen.ObjectMeta{Name: "run-old", CreationTimestamp: &older}},
@@ -392,7 +364,7 @@ func TestResolveLatestRun_Success(t *testing.T) {
 }
 
 func TestResolveLatestRun_NoRuns(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().ListWorkflowRuns(mock.Anything, "ns", mock.Anything).Return(&gen.WorkflowRunList{
 		Items:      []gen.WorkflowRun{},
 		Pagination: gen.Pagination{},
@@ -404,7 +376,7 @@ func TestResolveLatestRun_NoRuns(t *testing.T) {
 }
 
 func TestResolveLatestRun_APIError(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().ListWorkflowRuns(mock.Anything, "ns", mock.Anything).Return(nil, fmt.Errorf("server error"))
 
 	wf := New(mc)
@@ -416,7 +388,7 @@ func TestResolveLatestRun_APIError(t *testing.T) {
 
 func TestLogs_WithoutRunName_ResolvesLatest(t *testing.T) {
 	now := time.Now()
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().ListWorkflowRuns(mock.Anything, "ns", mock.Anything).Return(&gen.WorkflowRunList{
 		Items:      []gen.WorkflowRun{{Metadata: gen.ObjectMeta{Name: "latest-run", CreationTimestamp: &now}}},
 		Pagination: gen.Pagination{},
@@ -427,14 +399,14 @@ func TestLogs_WithoutRunName_ResolvesLatest(t *testing.T) {
 		[]gen.WorkflowRunLogEntry{{Timestamp: &now, Log: "auto-resolved log"}}, nil)
 
 	wf := New(mc)
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		require.NoError(t, wf.Logs(LogsParams{Namespace: "ns", WorkflowName: "my-wf"}))
 	})
 	assert.Contains(t, out, "auto-resolved log")
 }
 
 func TestLogs_WithoutRunName_NoRuns(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().ListWorkflowRuns(mock.Anything, "ns", mock.Anything).Return(&gen.WorkflowRunList{
 		Items:      []gen.WorkflowRun{},
 		Pagination: gen.Pagination{},
@@ -451,7 +423,7 @@ func TestResolveLatestRun_Pagination(t *testing.T) {
 	cursor := "page2"
 	now := time.Now()
 	later := now.Add(time.Minute)
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().ListWorkflowRuns(mock.Anything, "ns", mock.MatchedBy(func(p *gen.ListWorkflowRunsParams) bool {
 		return p.Cursor == nil
 	})).Return(&gen.WorkflowRunList{
@@ -475,7 +447,7 @@ func TestResolveLatestRun_Pagination(t *testing.T) {
 
 func TestList_Pagination(t *testing.T) {
 	cursor := "page2"
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().ListWorkflows(mock.Anything, "ns", mock.MatchedBy(func(p *gen.ListWorkflowsParams) bool {
 		return p.Cursor == nil
 	})).Return(&gen.WorkflowList{
@@ -490,7 +462,7 @@ func TestList_Pagination(t *testing.T) {
 	}, nil).Once()
 
 	wf := New(mc)
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		require.NoError(t, wf.List(ListParams{Namespace: "ns"}))
 	})
 	assert.Contains(t, out, "wf-1")
@@ -508,7 +480,7 @@ func TestListParams_GetNamespace(t *testing.T) {
 
 func TestStartRun_WithParametersAndLabels(t *testing.T) {
 	ns := "ns"
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().CreateWorkflowRun(mock.Anything, "ns", mock.MatchedBy(func(r gen.WorkflowRun) bool {
 		return r.Spec != nil && r.Spec.Workflow.Parameters != nil && r.Metadata.Labels != nil
 	})).Return(&gen.WorkflowRun{
@@ -517,7 +489,7 @@ func TestStartRun_WithParametersAndLabels(t *testing.T) {
 	}, nil)
 
 	wf := New(mc)
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		require.NoError(t, wf.StartRun(StartRunParams{
 			Namespace:    "ns",
 			WorkflowName: "my-wf",
@@ -540,7 +512,7 @@ func TestDelete_ValidationError(t *testing.T) {
 
 func TestResolveLatestRun_WithFilter(t *testing.T) {
 	now := time.Now()
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().ListWorkflowRuns(mock.Anything, "ns", mock.Anything).Return(&gen.WorkflowRunList{
 		Items: []gen.WorkflowRun{
 			{Metadata: gen.ObjectMeta{Name: "keep", CreationTimestamp: &now}},

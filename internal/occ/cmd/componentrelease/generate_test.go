@@ -12,16 +12,16 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/openchoreo/openchoreo/internal/occ/cmd/componentrelease/mocks"
 	"github.com/openchoreo/openchoreo/internal/occ/cmd/config"
-	th "github.com/openchoreo/openchoreo/internal/occ/testhelpers"
-	"github.com/openchoreo/openchoreo/pkg/cli/flags"
+	"github.com/openchoreo/openchoreo/internal/occ/flags"
+	"github.com/openchoreo/openchoreo/internal/occ/resources/client/mocks"
+	"github.com/openchoreo/openchoreo/internal/occ/testutil"
 )
 
 // --- Generate: mode validation (no filesystem needed) ---
 
 func TestGenerate_DefaultModeRejectsAPIServer(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	cr := New(mc)
 	// Empty Mode defaults to "api-server" → rejected
 	err := cr.Generate(GenerateParams{})
@@ -31,7 +31,7 @@ func TestGenerate_DefaultModeRejectsAPIServer(t *testing.T) {
 }
 
 func TestGenerate_ExplicitAPIServerModeRejected(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	cr := New(mc)
 	err := cr.Generate(GenerateParams{Mode: flags.ModeAPIServer})
 	require.Error(t, err)
@@ -39,7 +39,7 @@ func TestGenerate_ExplicitAPIServerModeRejected(t *testing.T) {
 }
 
 func TestGenerate_InvalidModeRejected(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	cr := New(mc)
 	err := cr.Generate(GenerateParams{Mode: "invalid-mode"})
 	require.Error(t, err)
@@ -50,8 +50,8 @@ func TestGenerate_InvalidModeRejected(t *testing.T) {
 // --- Generate: config loading ---
 
 func TestGenerate_NoConfigFile_NoCurrentContext(t *testing.T) {
-	th.SetupTestHome(t)
-	mc := mocks.NewMockClient(t)
+	testutil.SetupTestHome(t)
+	mc := mocks.NewMockInterface(t)
 	cr := New(mc)
 	// file-system mode, but no config file → LoadStoredConfig returns empty → "no current context set"
 	err := cr.Generate(GenerateParams{Mode: flags.ModeFileSystem})
@@ -62,13 +62,13 @@ func TestGenerate_NoConfigFile_NoCurrentContext(t *testing.T) {
 // --- Generate: context resolution ---
 
 func TestGenerate_EmptyCurrentContext(t *testing.T) {
-	home := th.SetupTestHome(t)
-	th.WriteOCConfig(t, home, &config.StoredConfig{
+	home := testutil.SetupTestHome(t)
+	testutil.WriteOCConfig(t, home, &config.StoredConfig{
 		CurrentContext: "",
 		Contexts:       []config.Context{},
 	})
 
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	cr := New(mc)
 	err := cr.Generate(GenerateParams{Mode: flags.ModeFileSystem})
 	require.Error(t, err)
@@ -76,15 +76,15 @@ func TestGenerate_EmptyCurrentContext(t *testing.T) {
 }
 
 func TestGenerate_CurrentContextNotFound(t *testing.T) {
-	home := th.SetupTestHome(t)
-	th.WriteOCConfig(t, home, &config.StoredConfig{
+	home := testutil.SetupTestHome(t)
+	testutil.WriteOCConfig(t, home, &config.StoredConfig{
 		CurrentContext: "missing-ctx",
 		Contexts: []config.Context{
 			{Name: "other-ctx", Namespace: "ns"},
 		},
 	})
 
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	cr := New(mc)
 	err := cr.Generate(GenerateParams{Mode: flags.ModeFileSystem})
 	require.Error(t, err)
@@ -94,8 +94,8 @@ func TestGenerate_CurrentContextNotFound(t *testing.T) {
 // --- Generate: namespace validation ---
 
 func TestGenerate_EmptyNamespaceInContext(t *testing.T) {
-	home := th.SetupTestHome(t)
-	th.WriteOCConfig(t, home, &config.StoredConfig{
+	home := testutil.SetupTestHome(t)
+	testutil.WriteOCConfig(t, home, &config.StoredConfig{
 		CurrentContext: "my-ctx",
 		Contexts: []config.Context{
 			{Name: "my-ctx", Namespace: ""},
@@ -106,7 +106,7 @@ func TestGenerate_EmptyNamespaceInContext(t *testing.T) {
 	repoDir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(repoDir, "dummy.yaml"), []byte("apiVersion: v1\nkind: Namespace\nmetadata:\n  name: x\n"), 0600))
 
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	cr := New(mc)
 	err := cr.Generate(GenerateParams{
 		Mode:    flags.ModeFileSystem,
@@ -119,8 +119,8 @@ func TestGenerate_EmptyNamespaceInContext(t *testing.T) {
 // --- Generate: component requires project ---
 
 func TestGenerate_ComponentRequiresProject(t *testing.T) {
-	home := th.SetupTestHome(t)
-	th.WriteOCConfig(t, home, &config.StoredConfig{
+	home := testutil.SetupTestHome(t)
+	testutil.WriteOCConfig(t, home, &config.StoredConfig{
 		CurrentContext: "my-ctx",
 		Contexts: []config.Context{
 			{Name: "my-ctx", Namespace: "test-ns"},
@@ -130,7 +130,7 @@ func TestGenerate_ComponentRequiresProject(t *testing.T) {
 	repoDir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(repoDir, "dummy.yaml"), []byte("apiVersion: v1\nkind: Namespace\nmetadata:\n  name: x\n"), 0600))
 
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	cr := New(mc)
 	err := cr.Generate(GenerateParams{
 		Mode:          flags.ModeFileSystem,
@@ -145,7 +145,7 @@ func TestGenerate_ComponentRequiresProject(t *testing.T) {
 // --- Generate: loadReleaseConfig ---
 
 func TestLoadReleaseConfig_NotFound_NotRequired(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	cr := New(mc)
 	cfg, err := cr.loadReleaseConfig(t.TempDir(), false)
 	require.NoError(t, err)
@@ -153,7 +153,7 @@ func TestLoadReleaseConfig_NotFound_NotRequired(t *testing.T) {
 }
 
 func TestLoadReleaseConfig_NotFound_Required(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	cr := New(mc)
 	dir := t.TempDir()
 	_, err := cr.loadReleaseConfig(dir, true)
@@ -163,7 +163,7 @@ func TestLoadReleaseConfig_NotFound_Required(t *testing.T) {
 }
 
 func TestLoadReleaseConfig_ValidFile(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	cr := New(mc)
 	dir := t.TempDir()
 	content := `apiVersion: openchoreo.dev/v1alpha1
@@ -176,7 +176,7 @@ kind: ReleaseConfig
 }
 
 func TestLoadReleaseConfig_InvalidYAML(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	cr := New(mc)
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "release-config.yaml"), []byte("{{invalid"), 0600))
@@ -188,10 +188,10 @@ func TestLoadReleaseConfig_InvalidYAML(t *testing.T) {
 // --- Generate: printYAML ---
 
 func TestPrintYAML_Success(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	cr := New(mc)
 	data := map[string]string{"name": "test"}
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		require.NoError(t, cr.printYAML(data))
 	})
 	assert.Contains(t, out, "name: test")
@@ -200,8 +200,8 @@ func TestPrintYAML_Success(t *testing.T) {
 // --- Generate: no-op when no scope specified ---
 
 func TestGenerate_NoScope_ReturnsNil(t *testing.T) {
-	home := th.SetupTestHome(t)
-	th.WriteOCConfig(t, home, &config.StoredConfig{
+	home := testutil.SetupTestHome(t)
+	testutil.WriteOCConfig(t, home, &config.StoredConfig{
 		CurrentContext: "my-ctx",
 		Contexts: []config.Context{
 			{Name: "my-ctx", Namespace: "test-ns"},
@@ -211,7 +211,7 @@ func TestGenerate_NoScope_ReturnsNil(t *testing.T) {
 	repoDir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(repoDir, "dummy.yaml"), []byte("apiVersion: v1\nkind: Namespace\nmetadata:\n  name: x\n"), 0600))
 
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	cr := New(mc)
 	// No All, no ComponentName, no ProjectName → falls through to return nil
 	err := cr.Generate(GenerateParams{
@@ -232,7 +232,7 @@ func setupRepoWithComponent(t *testing.T) string {
 	t.Helper()
 	repoDir := t.TempDir()
 
-	th.WriteYAML(t, repoDir, "projects/myproj/components/my-svc/component.yaml", `
+	testutil.WriteYAML(t, repoDir, "projects/myproj/components/my-svc/component.yaml", `
 apiVersion: openchoreo.dev/v1alpha1
 kind: Component
 metadata:
@@ -246,7 +246,7 @@ spec:
     kind: ComponentType
 `)
 
-	th.WriteYAML(t, repoDir, "platform/component-types/service.yaml", `
+	testutil.WriteYAML(t, repoDir, "platform/component-types/service.yaml", `
 apiVersion: openchoreo.dev/v1alpha1
 kind: ComponentType
 metadata:
@@ -264,7 +264,7 @@ spec:
   schema: {}
 `)
 
-	th.WriteYAML(t, repoDir, "projects/myproj/components/my-svc/workload.yaml", `
+	testutil.WriteYAML(t, repoDir, "projects/myproj/components/my-svc/workload.yaml", `
 apiVersion: openchoreo.dev/v1alpha1
 kind: Workload
 metadata:
@@ -286,7 +286,7 @@ func setupRepoWithTwoComponents(t *testing.T) string {
 	t.Helper()
 	repoDir := setupRepoWithComponent(t)
 
-	th.WriteYAML(t, repoDir, "projects/myproj/components/my-worker/component.yaml", `
+	testutil.WriteYAML(t, repoDir, "projects/myproj/components/my-worker/component.yaml", `
 apiVersion: openchoreo.dev/v1alpha1
 kind: Component
 metadata:
@@ -300,7 +300,7 @@ spec:
     kind: ComponentType
 `)
 
-	th.WriteYAML(t, repoDir, "projects/myproj/components/my-worker/workload.yaml", `
+	testutil.WriteYAML(t, repoDir, "projects/myproj/components/my-worker/workload.yaml", `
 apiVersion: openchoreo.dev/v1alpha1
 kind: Workload
 metadata:
@@ -320,17 +320,17 @@ spec:
 // --- generateForComponent: dry-run ---
 
 func TestGenerate_SingleComponent_DryRun(t *testing.T) {
-	home := th.SetupTestHome(t)
-	th.WriteOCConfig(t, home, &config.StoredConfig{
+	home := testutil.SetupTestHome(t)
+	testutil.WriteOCConfig(t, home, &config.StoredConfig{
 		CurrentContext: "my-ctx",
 		Contexts:       []config.Context{{Name: "my-ctx", Namespace: "test-ns"}},
 	})
 
 	repoDir := setupRepoWithComponent(t)
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	cr := New(mc)
 
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		err := cr.Generate(GenerateParams{
 			Mode:          flags.ModeFileSystem,
 			RootDir:       repoDir,
@@ -368,23 +368,23 @@ spec:
     container:
       image: registry/my-svc:v1
 `
-	th.AssertYAMLEquals(t, expectedYAML, th.ExtractYAML(out))
+	testutil.AssertYAMLEquals(t, expectedYAML, testutil.ExtractYAML(out))
 }
 
 // --- generateForComponent: write to disk ---
 
 func TestGenerate_SingleComponent_Write(t *testing.T) {
-	home := th.SetupTestHome(t)
-	th.WriteOCConfig(t, home, &config.StoredConfig{
+	home := testutil.SetupTestHome(t)
+	testutil.WriteOCConfig(t, home, &config.StoredConfig{
 		CurrentContext: "my-ctx",
 		Contexts:       []config.Context{{Name: "my-ctx", Namespace: "test-ns"}},
 	})
 
 	repoDir := setupRepoWithComponent(t)
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	cr := New(mc)
 
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		err := cr.Generate(GenerateParams{
 			Mode:          flags.ModeFileSystem,
 			RootDir:       repoDir,
@@ -414,8 +414,8 @@ func TestGenerate_SingleComponent_Write(t *testing.T) {
 // --- generateForComponent: write with custom output path ---
 
 func TestGenerate_SingleComponent_CustomOutputPath(t *testing.T) {
-	home := th.SetupTestHome(t)
-	th.WriteOCConfig(t, home, &config.StoredConfig{
+	home := testutil.SetupTestHome(t)
+	testutil.WriteOCConfig(t, home, &config.StoredConfig{
 		CurrentContext: "my-ctx",
 		Contexts:       []config.Context{{Name: "my-ctx", Namespace: "test-ns"}},
 	})
@@ -423,10 +423,10 @@ func TestGenerate_SingleComponent_CustomOutputPath(t *testing.T) {
 	repoDir := setupRepoWithComponent(t)
 	outDir := filepath.Join(t.TempDir(), "custom-out")
 
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	cr := New(mc)
 
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		err := cr.Generate(GenerateParams{
 			Mode:          flags.ModeFileSystem,
 			RootDir:       repoDir,
@@ -444,17 +444,17 @@ func TestGenerate_SingleComponent_CustomOutputPath(t *testing.T) {
 // --- generateForProject: dry-run ---
 
 func TestGenerate_Project_DryRun(t *testing.T) {
-	home := th.SetupTestHome(t)
-	th.WriteOCConfig(t, home, &config.StoredConfig{
+	home := testutil.SetupTestHome(t)
+	testutil.WriteOCConfig(t, home, &config.StoredConfig{
 		CurrentContext: "my-ctx",
 		Contexts:       []config.Context{{Name: "my-ctx", Namespace: "test-ns"}},
 	})
 
 	repoDir := setupRepoWithTwoComponents(t)
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	cr := New(mc)
 
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		err := cr.Generate(GenerateParams{
 			Mode:        flags.ModeFileSystem,
 			RootDir:     repoDir,
@@ -473,17 +473,17 @@ func TestGenerate_Project_DryRun(t *testing.T) {
 // --- generateForProject: write ---
 
 func TestGenerate_Project_Write(t *testing.T) {
-	home := th.SetupTestHome(t)
-	th.WriteOCConfig(t, home, &config.StoredConfig{
+	home := testutil.SetupTestHome(t)
+	testutil.WriteOCConfig(t, home, &config.StoredConfig{
 		CurrentContext: "my-ctx",
 		Contexts:       []config.Context{{Name: "my-ctx", Namespace: "test-ns"}},
 	})
 
 	repoDir := setupRepoWithTwoComponents(t)
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	cr := New(mc)
 
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		err := cr.Generate(GenerateParams{
 			Mode:        flags.ModeFileSystem,
 			RootDir:     repoDir,
@@ -512,17 +512,17 @@ func TestGenerate_Project_Write(t *testing.T) {
 // --- generateAll: dry-run ---
 
 func TestGenerate_All_DryRun(t *testing.T) {
-	home := th.SetupTestHome(t)
-	th.WriteOCConfig(t, home, &config.StoredConfig{
+	home := testutil.SetupTestHome(t)
+	testutil.WriteOCConfig(t, home, &config.StoredConfig{
 		CurrentContext: "my-ctx",
 		Contexts:       []config.Context{{Name: "my-ctx", Namespace: "test-ns"}},
 	})
 
 	repoDir := setupRepoWithTwoComponents(t)
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	cr := New(mc)
 
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		err := cr.Generate(GenerateParams{
 			Mode:    flags.ModeFileSystem,
 			RootDir: repoDir,
@@ -540,17 +540,17 @@ func TestGenerate_All_DryRun(t *testing.T) {
 // --- generateAll: write ---
 
 func TestGenerate_All_Write(t *testing.T) {
-	home := th.SetupTestHome(t)
-	th.WriteOCConfig(t, home, &config.StoredConfig{
+	home := testutil.SetupTestHome(t)
+	testutil.WriteOCConfig(t, home, &config.StoredConfig{
 		CurrentContext: "my-ctx",
 		Contexts:       []config.Context{{Name: "my-ctx", Namespace: "test-ns"}},
 	})
 
 	repoDir := setupRepoWithTwoComponents(t)
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	cr := New(mc)
 
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		err := cr.Generate(GenerateParams{
 			Mode:    flags.ModeFileSystem,
 			RootDir: repoDir,
@@ -579,8 +579,8 @@ func TestGenerate_All_Write(t *testing.T) {
 // --- generateForComponent: duplicate release name ---
 
 func TestGenerate_SingleComponent_DuplicateReleaseName(t *testing.T) {
-	home := th.SetupTestHome(t)
-	th.WriteOCConfig(t, home, &config.StoredConfig{
+	home := testutil.SetupTestHome(t)
+	testutil.WriteOCConfig(t, home, &config.StoredConfig{
 		CurrentContext: "my-ctx",
 		Contexts:       []config.Context{{Name: "my-ctx", Namespace: "test-ns"}},
 	})
@@ -588,10 +588,10 @@ func TestGenerate_SingleComponent_DuplicateReleaseName(t *testing.T) {
 	repoDir := setupRepoWithComponent(t)
 
 	// First: generate a release with a custom name
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	cr := New(mc)
 
-	captureStdout(t, func() {
+	testutil.CaptureStdout(t, func() {
 		err := cr.Generate(GenerateParams{
 			Mode:          flags.ModeFileSystem,
 			RootDir:       repoDir,

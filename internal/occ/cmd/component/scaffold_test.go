@@ -15,7 +15,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/openchoreo/openchoreo/internal/occ/cmd/component/mocks"
+	"github.com/openchoreo/openchoreo/internal/occ/resources/client/mocks"
+	"github.com/openchoreo/openchoreo/internal/occ/testutil"
 )
 
 // Shared schemas used across scaffold tests.
@@ -144,11 +145,11 @@ const wantScaffoldAllCluster = scaffoldHeader +
 // --- Scaffold: happy path printed to stdout ---
 
 func TestScaffold_Success_Stdout(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().GetComponentTypeSchema(mock.Anything, "ns", "web-app").Return(&minimalCTSchema, nil)
 
 	cp := New(mc)
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		require.NoError(t, cp.Scaffold(ScaffoldParams{
 			ComponentName: "my-comp",
 			Namespace:     "ns",
@@ -164,13 +165,13 @@ func TestScaffold_Success_Stdout(t *testing.T) {
 // --- Scaffold: happy path written to OutputPath ---
 
 func TestScaffold_Success_OutputPath(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().GetComponentTypeSchema(mock.Anything, "ns", "web-app").Return(&minimalCTSchema, nil)
 
 	outFile := filepath.Join(t.TempDir(), "component.yaml")
 
 	cp := New(mc)
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		require.NoError(t, cp.Scaffold(ScaffoldParams{
 			ComponentName: "my-comp",
 			Namespace:     "ns",
@@ -191,12 +192,12 @@ func TestScaffold_Success_OutputPath(t *testing.T) {
 // --- Scaffold: with namespace-scoped Trait ---
 
 func TestScaffold_WithTrait(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().GetComponentTypeSchema(mock.Anything, "ns", "web-app").Return(&minimalCTSchema, nil)
 	mc.EXPECT().GetTraitSchema(mock.Anything, "ns", "ingress").Return(&minimalTraitSchema, nil)
 
 	cp := New(mc)
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		require.NoError(t, cp.Scaffold(ScaffoldParams{
 			ComponentName: "my-comp",
 			Namespace:     "ns",
@@ -213,12 +214,12 @@ func TestScaffold_WithTrait(t *testing.T) {
 // --- Scaffold: with ClusterTrait ---
 
 func TestScaffold_WithClusterTrait(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().GetComponentTypeSchema(mock.Anything, "ns", "web-app").Return(&minimalCTSchema, nil)
 	mc.EXPECT().GetClusterTraitSchema(mock.Anything, "ingress").Return(&minimalTraitSchema, nil)
 
 	cp := New(mc)
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		require.NoError(t, cp.Scaffold(ScaffoldParams{
 			ComponentName: "my-comp",
 			Namespace:     "ns",
@@ -235,12 +236,12 @@ func TestScaffold_WithClusterTrait(t *testing.T) {
 // --- Scaffold: with namespace-scoped Workflow ---
 
 func TestScaffold_WithWorkflow(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().GetComponentTypeSchema(mock.Anything, "ns", "web-app").Return(&minimalCTSchema, nil)
 	mc.EXPECT().GetWorkflowSchema(mock.Anything, "ns", "build-wf").Return(&minimalWFSchema, nil)
 
 	cp := New(mc)
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		require.NoError(t, cp.Scaffold(ScaffoldParams{
 			ComponentName: "my-comp",
 			Namespace:     "ns",
@@ -257,12 +258,12 @@ func TestScaffold_WithWorkflow(t *testing.T) {
 // --- Scaffold: with ClusterWorkflow ---
 
 func TestScaffold_WithClusterWorkflow(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().GetComponentTypeSchema(mock.Anything, "ns", "web-app").Return(&minimalCTSchema, nil)
 	mc.EXPECT().GetClusterWorkflowSchema(mock.Anything, "build-wf").Return(&minimalWFSchema, nil)
 
 	cp := New(mc)
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		require.NoError(t, cp.Scaffold(ScaffoldParams{
 			ComponentName:       "my-comp",
 			Namespace:           "ns",
@@ -279,11 +280,11 @@ func TestScaffold_WithClusterWorkflow(t *testing.T) {
 // --- Scaffold: with ClusterComponentType ---
 
 func TestScaffold_WithClusterComponentType(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().GetClusterComponentTypeSchema(mock.Anything, "web-app").Return(&minimalCTSchema, nil)
 
 	cp := New(mc)
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		require.NoError(t, cp.Scaffold(ScaffoldParams{
 			ComponentName:        "my-comp",
 			Namespace:            "ns",
@@ -299,13 +300,13 @@ func TestScaffold_WithClusterComponentType(t *testing.T) {
 // --- Scaffold: ClusterComponentType + ClusterTrait + ClusterWorkflow ---
 
 func TestScaffold_AllClusterScoped(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().GetClusterComponentTypeSchema(mock.Anything, "web-app").Return(&minimalCTSchema, nil)
 	mc.EXPECT().GetClusterTraitSchema(mock.Anything, "ingress").Return(&minimalTraitSchema, nil)
 	mc.EXPECT().GetClusterWorkflowSchema(mock.Anything, "build-wf").Return(&minimalWFSchema, nil)
 
 	cp := New(mc)
-	out := captureStdout(t, func() {
+	out := testutil.CaptureStdout(t, func() {
 		require.NoError(t, cp.Scaffold(ScaffoldParams{
 			ComponentName:        "my-comp",
 			Namespace:            "ns",
@@ -323,7 +324,7 @@ func TestScaffold_AllClusterScoped(t *testing.T) {
 // --- fetchScaffoldSchemas: trait schema error ---
 
 func TestFetchScaffoldSchemas_TraitSchemaError(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().GetComponentTypeSchema(mock.Anything, "ns", "web-app").Return(&minimalCTSchema, nil)
 	mc.EXPECT().GetTraitSchema(mock.Anything, "ns", "bad-trait").Return(nil, fmt.Errorf("trait not found"))
 
@@ -339,7 +340,7 @@ func TestFetchScaffoldSchemas_TraitSchemaError(t *testing.T) {
 // --- fetchScaffoldSchemas: workflow schema error ---
 
 func TestFetchScaffoldSchemas_WorkflowSchemaError(t *testing.T) {
-	mc := mocks.NewMockClient(t)
+	mc := mocks.NewMockInterface(t)
 	mc.EXPECT().GetComponentTypeSchema(mock.Anything, "ns", "web-app").Return(&minimalCTSchema, nil)
 	mc.EXPECT().GetWorkflowSchema(mock.Anything, "ns", "build-wf").Return(nil, fmt.Errorf("workflow schema not found"))
 
