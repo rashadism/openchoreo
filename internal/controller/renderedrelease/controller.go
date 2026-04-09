@@ -46,9 +46,8 @@ const (
 // Reconciler reconciles a RenderedRelease object
 type Reconciler struct {
 	client.Client
-	K8sClientMgr *kubernetesClient.KubeMultiClientManager
-	Scheme       *runtime.Scheme
-	GatewayURL   string
+	PlaneClientProvider kubernetesClient.PlaneClientProvider
+	Scheme              *runtime.Scheme
 }
 
 // TODO: Optimize to apply resource only if spec has changed
@@ -208,19 +207,12 @@ func (r *Reconciler) getDPClient(ctx context.Context, namespaceName string, envi
 		return nil, fmt.Errorf("failed to get environment %s: %w", environmentName, err)
 	}
 
-	// Use the resolution function to get the DataPlane or ClusterDataPlane (with default fallback)
-	dataPlaneResult, err := controller.GetDataPlaneOrClusterDataPlaneOfEnv(ctx, r.Client, env)
+	dataPlaneResult, err := controller.GetDataPlaneFromRef(ctx, r.Client, env.Namespace, env.Spec.DataPlaneRef)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve dataplane for environment %s: %w", environmentName, err)
 	}
 
-	// Get Kubernetes client - supports both agent mode (via HTTP proxy) and direct access mode
-	var dpClient client.Client
-	if dataPlaneResult.DataPlane != nil {
-		dpClient, err = kubernetesClient.GetK8sClientFromDataPlane(r.K8sClientMgr, dataPlaneResult.DataPlane, r.GatewayURL)
-	} else {
-		dpClient, err = kubernetesClient.GetK8sClientFromClusterDataPlane(r.K8sClientMgr, dataPlaneResult.ClusterDataPlane, r.GatewayURL)
-	}
+	dpClient, err := dataPlaneResult.GetK8sClient(r.PlaneClientProvider)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create dataplane client for %s: %w", dataPlaneResult.GetName(), err)
 	}
@@ -236,25 +228,17 @@ func (r *Reconciler) getOPClient(ctx context.Context, namespaceName string, envi
 		return nil, fmt.Errorf("failed to get environment %s: %w", environmentName, err)
 	}
 
-	// Use the resolution function to get the DataPlane or ClusterDataPlane (with default fallback)
-	dataPlaneResult, err := controller.GetDataPlaneOrClusterDataPlaneOfEnv(ctx, r.Client, env)
+	dataPlaneResult, err := controller.GetDataPlaneFromRef(ctx, r.Client, env.Namespace, env.Spec.DataPlaneRef)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve dataplane for environment %s: %w", environmentName, err)
 	}
 
-	// Resolve the ObservabilityPlane (or ClusterObservabilityPlane) from the data plane
 	obsResult, err := dataPlaneResult.GetObservabilityPlane(ctx, r.Client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve observability plane for dataplane %s: %w", dataPlaneResult.GetName(), err)
 	}
 
-	// Get Kubernetes client - supports agent mode (via HTTP proxy) through cluster gateway
-	var opClient client.Client
-	if obsResult.ObservabilityPlane != nil {
-		opClient, err = kubernetesClient.GetK8sClientFromObservabilityPlane(r.K8sClientMgr, obsResult.ObservabilityPlane, r.GatewayURL)
-	} else {
-		opClient, err = kubernetesClient.GetK8sClientFromClusterObservabilityPlane(r.K8sClientMgr, obsResult.ClusterObservabilityPlane, r.GatewayURL)
-	}
+	opClient, err := obsResult.GetK8sClient(r.PlaneClientProvider)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create observability plane client for %s: %w", obsResult.GetName(), err)
 	}
@@ -611,10 +595,6 @@ func addJitter(base time.Duration, maxJitter time.Duration) time.Duration {
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
-	if r.K8sClientMgr == nil {
-		r.K8sClientMgr = kubernetesClient.NewManager()
-	}
-
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&openchoreov1alpha1.RenderedRelease{}).
 		Named("renderedrelease").

@@ -34,9 +34,9 @@ type workflowRunServiceWithAuthz struct {
 var _ Service = (*workflowRunServiceWithAuthz)(nil)
 
 // NewServiceWithAuthz creates a workflow run service with authorization checks.
-func NewServiceWithAuthz(k8sClient client.Client, wpClientMgr *kubernetesClient.KubeMultiClientManager, gwClient *gatewayClient.Client, authzPDP authz.PDP, logger *slog.Logger) Service {
+func NewServiceWithAuthz(k8sClient client.Client, planeClientProvider kubernetesClient.WorkflowPlaneClientProvider, gwClient *gatewayClient.Client, authzPDP authz.PDP, logger *slog.Logger) Service {
 	return &workflowRunServiceWithAuthz{
-		internal: NewService(k8sClient, wpClientMgr, gwClient, logger),
+		internal: NewService(k8sClient, planeClientProvider, gwClient, logger),
 		authz:    services.NewAuthzChecker(authzPDP, logger),
 	}
 }
@@ -128,7 +128,7 @@ func (s *workflowRunServiceWithAuthz) DeleteWorkflowRun(ctx context.Context, nam
 	return s.internal.DeleteWorkflowRun(ctx, namespaceName, runName)
 }
 
-func (s *workflowRunServiceWithAuthz) GetWorkflowRunLogs(ctx context.Context, namespaceName, runName, taskName, gatewayURL string, sinceSeconds *int64) ([]models.WorkflowRunLogEntry, error) {
+func (s *workflowRunServiceWithAuthz) GetWorkflowRunLogs(ctx context.Context, namespaceName, runName, taskName string, sinceSeconds *int64) ([]models.WorkflowRunLogEntry, error) {
 	wr, err := s.internal.GetWorkflowRun(ctx, namespaceName, runName)
 	if err != nil {
 		return nil, err
@@ -141,10 +141,10 @@ func (s *workflowRunServiceWithAuthz) GetWorkflowRunLogs(ctx context.Context, na
 	}); err != nil {
 		return nil, err
 	}
-	return s.internal.GetWorkflowRunLogs(ctx, namespaceName, runName, taskName, gatewayURL, sinceSeconds)
+	return s.internal.GetWorkflowRunLogs(ctx, namespaceName, runName, taskName, sinceSeconds)
 }
 
-func (s *workflowRunServiceWithAuthz) GetWorkflowRunEvents(ctx context.Context, namespaceName, runName, taskName, gatewayURL string) ([]models.WorkflowRunEventEntry, error) {
+func (s *workflowRunServiceWithAuthz) GetWorkflowRunEvents(ctx context.Context, namespaceName, runName, taskName string) ([]models.WorkflowRunEventEntry, error) {
 	wr, err := s.internal.GetWorkflowRun(ctx, namespaceName, runName)
 	if err != nil {
 		return nil, err
@@ -157,10 +157,10 @@ func (s *workflowRunServiceWithAuthz) GetWorkflowRunEvents(ctx context.Context, 
 	}); err != nil {
 		return nil, err
 	}
-	return s.internal.GetWorkflowRunEvents(ctx, namespaceName, runName, taskName, gatewayURL)
+	return s.internal.GetWorkflowRunEvents(ctx, namespaceName, runName, taskName)
 }
 
-func (s *workflowRunServiceWithAuthz) GetWorkflowRunStatus(ctx context.Context, namespaceName, runName, gatewayURL string) (*models.WorkflowRunStatusResponse, error) {
+func (s *workflowRunServiceWithAuthz) GetWorkflowRunStatus(ctx context.Context, namespaceName, runName string) (*models.WorkflowRunStatusResponse, error) {
 	wr, err := s.internal.GetWorkflowRun(ctx, namespaceName, runName)
 	if err != nil {
 		return nil, err
@@ -173,7 +173,7 @@ func (s *workflowRunServiceWithAuthz) GetWorkflowRunStatus(ctx context.Context, 
 	}); err != nil {
 		return nil, err
 	}
-	return s.internal.GetWorkflowRunStatus(ctx, namespaceName, runName, gatewayURL)
+	return s.internal.GetWorkflowRunStatus(ctx, namespaceName, runName)
 }
 
 func (s *workflowRunServiceWithAuthz) TriggerWorkflow(ctx context.Context, namespaceName, projectName, componentName, commit string) (*models.WorkflowRunTriggerResponse, error) {
