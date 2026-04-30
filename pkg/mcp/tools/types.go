@@ -242,6 +242,11 @@ type BuildToolsetHandler interface {
 		opts ListOpts,
 	) (any, error)
 	GetWorkflowRun(ctx context.Context, namespaceName, runName string) (any, error)
+	GetWorkflowRunStatus(ctx context.Context, namespaceName, runName string) (any, error)
+	GetWorkflowRunLogs(
+		ctx context.Context, namespaceName, runName, taskName string, sinceSeconds *int64,
+	) (any, error)
+	GetWorkflowRunEvents(ctx context.Context, namespaceName, runName, taskName string) (any, error)
 	ListWorkflows(ctx context.Context, namespaceName string, opts ListOpts) (any, error)
 	GetWorkflowSchema(ctx context.Context, namespaceName, workflowName string) (any, error)
 	ListClusterWorkflows(ctx context.Context, opts ListOpts) (any, error)

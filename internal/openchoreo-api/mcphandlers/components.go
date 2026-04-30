@@ -516,6 +516,32 @@ func (h *MCPHandler) GetWorkflowRun(ctx context.Context, namespaceName, runName 
 	return workflowRunDetail(wr), nil
 }
 
+func (h *MCPHandler) GetWorkflowRunStatus(ctx context.Context, namespaceName, runName string) (any, error) {
+	status, err := h.services.WorkflowRunService.GetWorkflowRunStatus(ctx, namespaceName, runName)
+	if err != nil {
+		return nil, err
+	}
+	return status, nil
+}
+
+func (h *MCPHandler) GetWorkflowRunLogs(
+	ctx context.Context, namespaceName, runName, taskName string, sinceSeconds *int64,
+) (any, error) {
+	logs, err := h.services.WorkflowRunService.GetWorkflowRunLogs(ctx, namespaceName, runName, taskName, sinceSeconds)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{"logs": logs}, nil
+}
+
+func (h *MCPHandler) GetWorkflowRunEvents(ctx context.Context, namespaceName, runName, taskName string) (any, error) {
+	events, err := h.services.WorkflowRunService.GetWorkflowRunEvents(ctx, namespaceName, runName, taskName)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{"events": events}, nil
+}
+
 // ClusterComponentType operations
 
 func (h *MCPHandler) ListClusterComponentTypes(ctx context.Context, opts tools.ListOpts) (any, error) {
