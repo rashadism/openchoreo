@@ -19,6 +19,7 @@ const (
 	testGoServiceName    = "go-service"
 	testAutoscalerName   = "autoscaler"
 	testBuildWorkflow    = "build-workflow"
+	testWorkflowRunName  = "workflow-run-1"
 	testWebAppType       = "WebApplication"
 	testAutoscalingTrait = "autoscaling"
 )

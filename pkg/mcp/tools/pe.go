@@ -1020,6 +1020,82 @@ func (t *Toolsets) RegisterGetWorkflowRun(s *mcp.Server, perms map[string]ToolPe
 	})
 }
 
+func (t *Toolsets) RegisterGetWorkflowRunStatus(s *mcp.Server, perms map[string]ToolPermission) {
+	const name = "get_workflow_run_status"
+	perms[name] = ToolPermission{ToolName: name, Action: authzcore.ActionViewWorkflowRun}
+	mcp.AddTool(s, &mcp.Tool{
+		Name: name,
+		Description: "Get the overall status and per-step status of a specific workflow run. " +
+			"Returns the run-level phase and a breakdown of each task with its phase and start/finish timestamps. " +
+			"Useful for monitoring CI/CD pipeline progress without fetching full logs.",
+		InputSchema: createSchema(map[string]any{
+			"namespace_name": defaultStringProperty(),
+			"run_name":       stringProperty("Use list_workflow_runs to discover valid names"),
+		}, []string{"namespace_name", "run_name"}),
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
+		NamespaceName string `json:"namespace_name"`
+		RunName       string `json:"run_name"`
+	}) (*mcp.CallToolResult, any, error) {
+		result, err := t.BuildToolset.GetWorkflowRunStatus(ctx, args.NamespaceName, args.RunName)
+		return handleToolResult(result, err)
+	})
+}
+
+func (t *Toolsets) RegisterGetWorkflowRunLogs(s *mcp.Server, perms map[string]ToolPermission) {
+	const name = "get_workflow_run_logs"
+	perms[name] = ToolPermission{ToolName: name, Action: authzcore.ActionViewWorkflowRun}
+	mcp.AddTool(s, &mcp.Tool{
+		Name: name,
+		Description: "Get live logs for a specific workflow run from the workflow plane. " +
+			"Useful for debugging CI/CD pipeline failures and inspecting task output. " +
+			"Logs are fetched live; no archived logs are returned for completed runs. " +
+			"Optionally filter by task name and limit to recent activity via since_seconds.",
+		InputSchema: createSchema(map[string]any{
+			"namespace_name": defaultStringProperty(),
+			"run_name":       stringProperty("Use list_workflow_runs to discover valid names"),
+			"task":           stringProperty("Optional: filter logs by task name within the workflow run"),
+			"since_seconds": map[string]any{
+				"type":        "integer",
+				"description": "Optional: return logs newer than a relative duration in seconds",
+				"minimum":     0,
+			},
+		}, []string{"namespace_name", "run_name"}),
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
+		NamespaceName string `json:"namespace_name"`
+		RunName       string `json:"run_name"`
+		Task          string `json:"task"`
+		SinceSeconds  *int64 `json:"since_seconds"`
+	}) (*mcp.CallToolResult, any, error) {
+		result, err := t.BuildToolset.GetWorkflowRunLogs(
+			ctx, args.NamespaceName, args.RunName, args.Task, args.SinceSeconds)
+		return handleToolResult(result, err)
+	})
+}
+
+func (t *Toolsets) RegisterGetWorkflowRunEvents(s *mcp.Server, perms map[string]ToolPermission) {
+	const name = "get_workflow_run_events"
+	perms[name] = ToolPermission{ToolName: name, Action: authzcore.ActionViewWorkflowRun}
+	mcp.AddTool(s, &mcp.Tool{
+		Name: name,
+		Description: "Get Kubernetes events for a specific workflow run. " +
+			"Useful for diagnosing scheduling problems, pod startup failures, and other workflow run issues. " +
+			"Optionally filter by task name within the run.",
+		InputSchema: createSchema(map[string]any{
+			"namespace_name": defaultStringProperty(),
+			"run_name":       stringProperty("Use list_workflow_runs to discover valid names"),
+			"task":           stringProperty("Optional: filter events by task name within the workflow run"),
+		}, []string{"namespace_name", "run_name"}),
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
+		NamespaceName string `json:"namespace_name"`
+		RunName       string `json:"run_name"`
+		Task          string `json:"task"`
+	}) (*mcp.CallToolResult, any, error) {
+		result, err := t.BuildToolset.GetWorkflowRunEvents(
+			ctx, args.NamespaceName, args.RunName, args.Task)
+		return handleToolResult(result, err)
+	})
+}
+
 // ---------------------------------------------------------------------------
 // Build Toolset — Workflow read
 // ---------------------------------------------------------------------------

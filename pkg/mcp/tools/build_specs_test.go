@@ -7,7 +7,7 @@ import "testing"
 
 // buildToolSpecs returns test specs for build toolset
 func buildToolSpecs() []toolTestSpec {
-	specs := make([]toolTestSpec, 0, 9)
+	specs := make([]toolTestSpec, 0, 12)
 	specs = append(specs, buildWorkflowRunSpecs()...)
 	specs = append(specs, buildWorkflowSpecs()...)
 	specs = append(specs, buildClusterWorkflowSpecs()...)
@@ -81,12 +81,65 @@ func buildWorkflowRunSpecs() []toolTestSpec {
 			requiredParams:      []string{"namespace_name", "run_name"},
 			testArgs: map[string]any{
 				"namespace_name": testNamespaceName,
-				"run_name":       "workflow-run-1",
+				"run_name":       testWorkflowRunName,
 			},
 			expectedMethod: "GetWorkflowRun",
 			validateCall: func(t *testing.T, args []interface{}) {
-				if args[0] != testNamespaceName || args[1] != "workflow-run-1" {
-					t.Errorf("Expected (%s, workflow-run-1), got (%v, %v)", testNamespaceName, args[0], args[1])
+				if args[0] != testNamespaceName || args[1] != testWorkflowRunName {
+					t.Errorf("Expected (%s, %s), got (%v, %v)", testNamespaceName, testWorkflowRunName, args[0], args[1])
+				}
+			},
+		},
+		{
+			name:                "get_workflow_run_status",
+			toolset:             "build",
+			descriptionKeywords: []string{"workflow", "run", "status"},
+			descriptionMinLen:   10,
+			requiredParams:      []string{"namespace_name", "run_name"},
+			testArgs: map[string]any{
+				"namespace_name": testNamespaceName,
+				"run_name":       testWorkflowRunName,
+			},
+			expectedMethod: "GetWorkflowRunStatus",
+			validateCall: func(t *testing.T, args []interface{}) {
+				if args[0] != testNamespaceName || args[1] != testWorkflowRunName {
+					t.Errorf("Expected (%s, %s), got (%v, %v)", testNamespaceName, testWorkflowRunName, args[0], args[1])
+				}
+			},
+		},
+		{
+			name:                "get_workflow_run_logs",
+			toolset:             "build",
+			descriptionKeywords: []string{"workflow", "run", "logs"},
+			descriptionMinLen:   10,
+			requiredParams:      []string{"namespace_name", "run_name"},
+			optionalParams:      []string{"task", "since_seconds"},
+			testArgs: map[string]any{
+				"namespace_name": testNamespaceName,
+				"run_name":       testWorkflowRunName,
+			},
+			expectedMethod: "GetWorkflowRunLogs",
+			validateCall: func(t *testing.T, args []interface{}) {
+				if args[0] != testNamespaceName || args[1] != testWorkflowRunName {
+					t.Errorf("Expected (%s, %s), got (%v, %v)", testNamespaceName, testWorkflowRunName, args[0], args[1])
+				}
+			},
+		},
+		{
+			name:                "get_workflow_run_events",
+			toolset:             "build",
+			descriptionKeywords: []string{"workflow", "run", "events"},
+			descriptionMinLen:   10,
+			requiredParams:      []string{"namespace_name", "run_name"},
+			optionalParams:      []string{"task"},
+			testArgs: map[string]any{
+				"namespace_name": testNamespaceName,
+				"run_name":       testWorkflowRunName,
+			},
+			expectedMethod: "GetWorkflowRunEvents",
+			validateCall: func(t *testing.T, args []interface{}) {
+				if args[0] != testNamespaceName || args[1] != testWorkflowRunName {
+					t.Errorf("Expected (%s, %s), got (%v, %v)", testNamespaceName, testWorkflowRunName, args[0], args[1])
 				}
 			},
 		},

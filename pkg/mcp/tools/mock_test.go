@@ -267,6 +267,25 @@ func (m *MockCoreToolsetHandler) GetWorkflowRun(ctx context.Context, namespaceNa
 	return `{"name":"workflow-run-1"}`, nil
 }
 
+func (m *MockCoreToolsetHandler) GetWorkflowRunStatus(ctx context.Context, namespaceName, runName string) (any, error) {
+	m.recordCall("GetWorkflowRunStatus", namespaceName, runName)
+	return `{"status":"Running","steps":[]}`, nil
+}
+
+func (m *MockCoreToolsetHandler) GetWorkflowRunLogs(
+	ctx context.Context, namespaceName, runName, taskName string, sinceSeconds *int64,
+) (any, error) {
+	m.recordCall("GetWorkflowRunLogs", namespaceName, runName, taskName, sinceSeconds)
+	return `{"logs":[]}`, nil
+}
+
+func (m *MockCoreToolsetHandler) GetWorkflowRunEvents(
+	ctx context.Context, namespaceName, runName, taskName string,
+) (any, error) {
+	m.recordCall("GetWorkflowRunEvents", namespaceName, runName, taskName)
+	return `{"events":[]}`, nil
+}
+
 func (m *MockCoreToolsetHandler) ListClusterComponentTypes(ctx context.Context, opts ListOpts) (any, error) {
 	m.recordCall("ListClusterComponentTypes", opts)
 	return `[{"name":"go-service"}]`, nil
