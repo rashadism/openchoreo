@@ -450,8 +450,23 @@ type AuthzClusterScope struct {
 	Project *string `json:"project,omitempty"`
 }
 
+// AuthzCondition Action-scoped mapping condition attached to a role mapping inside a binding. It constrains only the actions listed in the "actions" property and does not enable or disable the entire mapping or binding; all other actions in the mapping remain unaffected by this condition.
+type AuthzCondition struct {
+	// Actions List of actions this condition applies to. Supports exact match (e.g. "releasebinding:create") and wildcards (e.g. "releasebinding:*").
+	Actions []string `json:"actions"`
+
+	// Expression CEL expression that must evaluate to true for the action to be permitted. Example: resource.environment in ["dev", "staging"]
+	Expression string `json:"expression"`
+}
+
 // AuthzContext Additional context for authorization
-type AuthzContext map[string]interface{}
+type AuthzContext struct {
+	// Resource Resource-level attributes for condition evaluation
+	Resource *struct {
+		// Environment Target deployment environment (e.g. "dev", "staging", "prod")
+		Environment *string `json:"environment,omitempty"`
+	} `json:"resource,omitempty"`
+}
 
 // AuthzEntitlementClaim Entitlement claim-value pair for subject identification
 type AuthzEntitlementClaim struct {
@@ -531,6 +546,9 @@ type AuthzRoleList struct {
 
 // AuthzRoleMapping Pairs a role reference with an optional scope
 type AuthzRoleMapping struct {
+	// Conditions Per-role-mapping conditions that restrict specific actions within this role mapping in the binding. Each condition only affects the actions listed in its "actions" property and does not enable or disable the mapping or binding as a whole.
+	Conditions *[]AuthzCondition `json:"conditions,omitempty"`
+
 	// RoleRef Reference to an AuthzRole or ClusterAuthzRole
 	RoleRef AuthzRoleRef `json:"roleRef"`
 
@@ -652,7 +670,9 @@ type ClusterAuthzRoleList struct {
 
 // ClusterAuthzRoleMapping Pairs a role reference with an optional scope for cluster-scoped bindings
 type ClusterAuthzRoleMapping struct {
-	RoleRef struct {
+	// Conditions Per-role-mapping conditions that restrict specific actions within this role mapping in the binding. Each condition only affects the actions listed in its "actions" property and does not enable or disable the mapping or binding as a whole.
+	Conditions *[]AuthzCondition `json:"conditions,omitempty"`
+	RoleRef    struct {
 		Kind ClusterAuthzRoleMappingRoleRefKind `json:"kind"`
 
 		// Name Name of the role
