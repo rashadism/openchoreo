@@ -6,6 +6,7 @@ package mcphandlers
 import (
 	clustercomponenttypesvc "github.com/openchoreo/openchoreo/internal/openchoreo-api/services/clustercomponenttype"
 	componentsvc "github.com/openchoreo/openchoreo/internal/openchoreo-api/services/component"
+	componentreleasesvc "github.com/openchoreo/openchoreo/internal/openchoreo-api/services/componentrelease"
 	componenttypesvc "github.com/openchoreo/openchoreo/internal/openchoreo-api/services/componenttype"
 	deploymentpipelinesvc "github.com/openchoreo/openchoreo/internal/openchoreo-api/services/deploymentpipeline"
 	environmentsvc "github.com/openchoreo/openchoreo/internal/openchoreo-api/services/environment"
@@ -13,6 +14,7 @@ import (
 	namespacesvc "github.com/openchoreo/openchoreo/internal/openchoreo-api/services/namespace"
 	projectsvc "github.com/openchoreo/openchoreo/internal/openchoreo-api/services/project"
 	releasebindingsvc "github.com/openchoreo/openchoreo/internal/openchoreo-api/services/releasebinding"
+	secretreferencesvc "github.com/openchoreo/openchoreo/internal/openchoreo-api/services/secretreference"
 	workflowrunsvc "github.com/openchoreo/openchoreo/internal/openchoreo-api/services/workflowrun"
 	workloadsvc "github.com/openchoreo/openchoreo/internal/openchoreo-api/services/workload"
 )
@@ -64,4 +66,12 @@ func withWorkflowRunService(s workflowrunsvc.Service) func(*handlerservices.Serv
 
 func withDeploymentPipelineService(s deploymentpipelinesvc.Service) func(*handlerservices.Services) {
 	return func(svc *handlerservices.Services) { svc.DeploymentPipelineService = s }
+}
+
+func withSecretReferenceService(s secretreferencesvc.Service) func(*handlerservices.Services) {
+	return func(svc *handlerservices.Services) { svc.SecretReferenceService = s }
+}
+
+func withComponentReleaseService(s componentreleasesvc.Service) func(*handlerservices.Services) {
+	return func(svc *handlerservices.Services) { svc.ComponentReleaseService = s }
 }

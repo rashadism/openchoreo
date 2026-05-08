@@ -16,10 +16,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	openchoreov1alpha1 "github.com/openchoreo/openchoreo/api/v1alpha1"
+	"github.com/openchoreo/openchoreo/internal/controller"
 	"github.com/openchoreo/openchoreo/internal/openchoreo-api/api/gen"
 	clustercomponenttypesvc "github.com/openchoreo/openchoreo/internal/openchoreo-api/services/clustercomponenttype"
 	clustercomponenttypemocks "github.com/openchoreo/openchoreo/internal/openchoreo-api/services/clustercomponenttype/mocks"
 	componentmocks "github.com/openchoreo/openchoreo/internal/openchoreo-api/services/component/mocks"
+	componentreleasemocks "github.com/openchoreo/openchoreo/internal/openchoreo-api/services/componentrelease/mocks"
 	componenttypesvc "github.com/openchoreo/openchoreo/internal/openchoreo-api/services/componenttype"
 	componenttypemocks "github.com/openchoreo/openchoreo/internal/openchoreo-api/services/componenttype/mocks"
 	releasebindingmocks "github.com/openchoreo/openchoreo/internal/openchoreo-api/services/releasebinding/mocks"
@@ -35,6 +37,8 @@ const (
 	testEnvironmentName = "dev"
 	testExistingVal     = "existing-val"
 	testNewVal          = "new-val"
+	testDisplayName     = "My Component"
+	testDescription     = "A test component"
 )
 
 // ---------------------------------------------------------------------------
@@ -127,8 +131,8 @@ func TestCreateComponent(t *testing.T) {
 
 	t.Run("happy path with display name and description", func(t *testing.T) {
 		compSvc := componentmocks.NewMockService(t)
-		displayName := "My Component"
-		description := "A test component"
+		displayName := testDisplayName
+		description := testDescription
 		compSvc.EXPECT().
 			CreateComponent(mock.Anything, testNS, mock.MatchedBy(func(c *openchoreov1alpha1.Component) bool {
 				return c.Annotations["openchoreo.dev/display-name"] == displayName &&
@@ -402,6 +406,148 @@ func TestPatchComponent(t *testing.T) {
 		_, err := h.PatchComponent(ctx, testNS, testComponent, &gen.PatchComponentRequest{})
 		require.Error(t, err)
 	})
+
+	t.Run("updates DisplayName and Description annotations", func(t *testing.T) {
+		compSvc := componentmocks.NewMockService(t)
+		compSvc.EXPECT().GetComponent(mock.Anything, testNS, testComponent).Return(freshComponent(), nil)
+		compSvc.EXPECT().
+			UpdateComponent(mock.Anything, testNS, mock.MatchedBy(func(c *openchoreov1alpha1.Component) bool {
+				return c.Annotations[controller.AnnotationKeyDisplayName] == testDisplayName &&
+					c.Annotations[controller.AnnotationKeyDescription] == testDescription
+			})).
+			Return(freshComponent(), nil)
+
+		dn, desc := testDisplayName, testDescription
+		h := newTestHandler(withComponentService(compSvc))
+		_, err := h.PatchComponent(ctx, testNS, testComponent, &gen.PatchComponentRequest{
+			DisplayName: &dn,
+			Description: &desc,
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("empty DisplayName is treated as no-change", func(t *testing.T) {
+		existing := freshComponent()
+		existing.Annotations = map[string]string{
+			controller.AnnotationKeyDisplayName: "Original Name",
+		}
+		compSvc := componentmocks.NewMockService(t)
+		compSvc.EXPECT().GetComponent(mock.Anything, testNS, testComponent).Return(existing, nil)
+		compSvc.EXPECT().
+			UpdateComponent(mock.Anything, testNS, mock.MatchedBy(func(c *openchoreov1alpha1.Component) bool {
+				return c.Annotations[controller.AnnotationKeyDisplayName] == "Original Name"
+			})).
+			Return(existing, nil)
+
+		empty := ""
+		h := newTestHandler(withComponentService(compSvc))
+		_, err := h.PatchComponent(ctx, testNS, testComponent, &gen.PatchComponentRequest{DisplayName: &empty})
+		require.NoError(t, err)
+	})
+
+	t.Run("replaces Traits with new list", func(t *testing.T) {
+		existing := freshComponent()
+		existing.Spec.Traits = []openchoreov1alpha1.ComponentTrait{
+			{Name: "old-trait", InstanceName: "old"},
+		}
+		compSvc := componentmocks.NewMockService(t)
+		compSvc.EXPECT().GetComponent(mock.Anything, testNS, testComponent).Return(existing, nil)
+
+		params := map[string]interface{}{"min": 1.0, "max": 5.0}
+		expectedRaw, _ := json.Marshal(params)
+		compSvc.EXPECT().
+			UpdateComponent(mock.Anything, testNS, mock.MatchedBy(func(c *openchoreov1alpha1.Component) bool {
+				if len(c.Spec.Traits) != 1 {
+					return false
+				}
+				tr := c.Spec.Traits[0]
+				return tr.Name == "autoscaler" &&
+					tr.InstanceName == "api-autoscaler" &&
+					tr.Kind == openchoreov1alpha1.TraitRefKind("ClusterTrait") &&
+					tr.Parameters != nil && string(tr.Parameters.Raw) == string(expectedRaw)
+			})).
+			Return(existing, nil)
+
+		clusterKind := gen.ComponentTraitInputKindClusterTrait
+		traits := []gen.ComponentTraitInput{
+			{
+				Name:         "autoscaler",
+				InstanceName: "api-autoscaler",
+				Kind:         &clusterKind,
+				Parameters:   &params,
+			},
+		}
+		h := newTestHandler(withComponentService(compSvc))
+		_, err := h.PatchComponent(ctx, testNS, testComponent, &gen.PatchComponentRequest{Traits: &traits})
+		require.NoError(t, err)
+	})
+
+	t.Run("empty Traits clears all traits", func(t *testing.T) {
+		existing := freshComponent()
+		existing.Spec.Traits = []openchoreov1alpha1.ComponentTrait{
+			{Name: "to-be-removed", InstanceName: "x"},
+		}
+		compSvc := componentmocks.NewMockService(t)
+		compSvc.EXPECT().GetComponent(mock.Anything, testNS, testComponent).Return(existing, nil)
+		compSvc.EXPECT().
+			UpdateComponent(mock.Anything, testNS, mock.MatchedBy(func(c *openchoreov1alpha1.Component) bool {
+				return c.Spec.Traits != nil && len(c.Spec.Traits) == 0
+			})).
+			Return(existing, nil)
+
+		empty := []gen.ComponentTraitInput{}
+		h := newTestHandler(withComponentService(compSvc))
+		_, err := h.PatchComponent(ctx, testNS, testComponent, &gen.PatchComponentRequest{Traits: &empty})
+		require.NoError(t, err)
+	})
+
+	t.Run("nil Traits leaves existing traits unchanged", func(t *testing.T) {
+		existing := freshComponent()
+		existing.Spec.Traits = []openchoreov1alpha1.ComponentTrait{
+			{Name: "keep-me", InstanceName: "k"},
+		}
+		compSvc := componentmocks.NewMockService(t)
+		compSvc.EXPECT().GetComponent(mock.Anything, testNS, testComponent).Return(existing, nil)
+		compSvc.EXPECT().
+			UpdateComponent(mock.Anything, testNS, mock.MatchedBy(func(c *openchoreov1alpha1.Component) bool {
+				return len(c.Spec.Traits) == 1 && c.Spec.Traits[0].Name == "keep-me"
+			})).
+			Return(existing, nil)
+
+		h := newTestHandler(withComponentService(compSvc))
+		_, err := h.PatchComponent(ctx, testNS, testComponent, &gen.PatchComponentRequest{})
+		require.NoError(t, err)
+	})
+
+	t.Run("replaces Workflow", func(t *testing.T) {
+		existing := freshComponent()
+		existing.Spec.Workflow = &openchoreov1alpha1.ComponentWorkflowConfig{Name: "old-builder"}
+		compSvc := componentmocks.NewMockService(t)
+		compSvc.EXPECT().GetComponent(mock.Anything, testNS, testComponent).Return(existing, nil)
+
+		params := map[string]interface{}{"branch": "main"}
+		expectedRaw, _ := json.Marshal(params)
+		compSvc.EXPECT().
+			UpdateComponent(mock.Anything, testNS, mock.MatchedBy(func(c *openchoreov1alpha1.Component) bool {
+				return c.Spec.Workflow != nil &&
+					c.Spec.Workflow.Name == "docker-build" &&
+					c.Spec.Workflow.Kind == openchoreov1alpha1.WorkflowRefKind("ClusterWorkflow") &&
+					c.Spec.Workflow.Parameters != nil &&
+					string(c.Spec.Workflow.Parameters.Raw) == string(expectedRaw)
+			})).
+			Return(existing, nil)
+
+		clusterKind := gen.ComponentWorkflowInputKindClusterWorkflow
+		h := newTestHandler(withComponentService(compSvc))
+		_, err := h.PatchComponent(ctx, testNS, testComponent, &gen.PatchComponentRequest{
+			Workflow: &gen.ComponentWorkflowInput{
+				Name:       "docker-build",
+				Kind:       &clusterKind,
+				Parameters: &params,
+			},
+		})
+		require.NoError(t, err)
+	})
 }
 
 // ---------------------------------------------------------------------------
@@ -491,6 +637,92 @@ func TestUpdateWorkload(t *testing.T) {
 		h := newTestHandler(withWorkloadService(wlSvc))
 		_, err := h.UpdateWorkload(ctx, testNS, "comp1-workload", map[string]interface{}{})
 		require.Error(t, err)
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Delete handlers (Component, Workload, ComponentRelease)
+// ---------------------------------------------------------------------------
+
+func TestDeleteComponent(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("delete returns action: deleted", func(t *testing.T) {
+		compSvc := componentmocks.NewMockService(t)
+		compSvc.EXPECT().DeleteComponent(mock.Anything, testNS, testComponent).Return(nil)
+
+		h := newTestHandler(withComponentService(compSvc))
+		result, err := h.DeleteComponent(ctx, testNS, testComponent)
+		require.NoError(t, err)
+		m, ok := result.(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "deleted", m["action"])
+		assert.Equal(t, testComponent, m["name"])
+		assert.Equal(t, testNS, m["namespace"])
+	})
+
+	t.Run("service delete error propagated", func(t *testing.T) {
+		expected := errors.New("not found")
+		compSvc := componentmocks.NewMockService(t)
+		compSvc.EXPECT().DeleteComponent(mock.Anything, testNS, testComponent).Return(expected)
+
+		h := newTestHandler(withComponentService(compSvc))
+		_, err := h.DeleteComponent(ctx, testNS, testComponent)
+		require.ErrorIs(t, err, expected)
+	})
+}
+
+func TestDeleteWorkload(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("delete returns action: deleted", func(t *testing.T) {
+		wlSvc := workloadmocks.NewMockService(t)
+		wlSvc.EXPECT().DeleteWorkload(mock.Anything, testNS, "comp1-workload").Return(nil)
+
+		h := newTestHandler(withWorkloadService(wlSvc))
+		result, err := h.DeleteWorkload(ctx, testNS, "comp1-workload")
+		require.NoError(t, err)
+		m, ok := result.(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "deleted", m["action"])
+		assert.Equal(t, "comp1-workload", m["name"])
+	})
+
+	t.Run("service delete error propagated", func(t *testing.T) {
+		expected := errors.New("not found")
+		wlSvc := workloadmocks.NewMockService(t)
+		wlSvc.EXPECT().DeleteWorkload(mock.Anything, testNS, "comp1-workload").Return(expected)
+
+		h := newTestHandler(withWorkloadService(wlSvc))
+		_, err := h.DeleteWorkload(ctx, testNS, "comp1-workload")
+		require.ErrorIs(t, err, expected)
+	})
+}
+
+func TestDeleteComponentRelease(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("delete returns action: deleted", func(t *testing.T) {
+		crSvc := componentreleasemocks.NewMockService(t)
+		crSvc.EXPECT().DeleteComponentRelease(mock.Anything, testNS, "release-1").Return(nil)
+
+		h := newTestHandler(withComponentReleaseService(crSvc))
+		result, err := h.DeleteComponentRelease(ctx, testNS, "release-1")
+		require.NoError(t, err)
+		m, ok := result.(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "deleted", m["action"])
+		assert.Equal(t, "release-1", m["name"])
+	})
+
+	t.Run("service delete error propagated", func(t *testing.T) {
+		expected := errors.New("not found")
+		crSvc := componentreleasemocks.NewMockService(t)
+		crSvc.EXPECT().DeleteComponentRelease(mock.Anything, testNS, "release-1").Return(expected)
+
+		h := newTestHandler(withComponentReleaseService(crSvc))
+		_, err := h.DeleteComponentRelease(ctx, testNS, "release-1")
+		require.ErrorIs(t, err, expected)
 	})
 }
 
@@ -635,49 +867,66 @@ func TestUpdateReleaseBinding(t *testing.T) {
 		_, err := h.UpdateReleaseBinding(ctx, testNS, "comp-dev", req)
 		require.Error(t, err)
 	})
-}
 
-// ---------------------------------------------------------------------------
-// UpdateReleaseBindingState
-// ---------------------------------------------------------------------------
-
-func TestUpdateReleaseBindingState(t *testing.T) {
-	ctx := context.Background()
-
-	existingRB := &openchoreov1alpha1.ReleaseBinding{
-		ObjectMeta: metav1.ObjectMeta{Name: "comp-dev"},
-		Spec:       openchoreov1alpha1.ReleaseBindingSpec{},
-	}
-
-	t.Run("sets state and includes it in response", func(t *testing.T) {
+	t.Run("sets release state when provided", func(t *testing.T) {
 		rbSvc := releasebindingmocks.NewMockService(t)
 		rbSvc.EXPECT().GetReleaseBinding(mock.Anything, testNS, "comp-dev").Return(existingRB, nil)
 		rbSvc.EXPECT().
 			UpdateReleaseBinding(mock.Anything, testNS, mock.MatchedBy(func(rb *openchoreov1alpha1.ReleaseBinding) bool {
-				return rb.Spec.State == openchoreov1alpha1.ReleaseState("active")
+				return rb.Spec.State == openchoreov1alpha1.ReleaseState("Undeploy")
 			})).
-			Return(&openchoreov1alpha1.ReleaseBinding{
-				Spec: openchoreov1alpha1.ReleaseBindingSpec{State: "active"},
-			}, nil)
+			Return(existingRB, nil)
 
 		h := newTestHandler(withReleaseBindingService(rbSvc))
-		state := gen.ReleaseBindingSpecState("active")
-		result, err := h.UpdateReleaseBindingState(ctx, testNS, "comp-dev", &state)
+		state := gen.ReleaseBindingSpecState("Undeploy")
+		req := &gen.ReleaseBindingSpec{Environment: testEnvironmentName, State: &state}
+		_, err := h.UpdateReleaseBinding(ctx, testNS, "comp-dev", req)
+		require.NoError(t, err)
+	})
+
+	t.Run("delete returns action: deleted", func(t *testing.T) {
+		rbSvc := releasebindingmocks.NewMockService(t)
+		rbSvc.EXPECT().DeleteReleaseBinding(mock.Anything, testNS, "comp-dev").Return(nil)
+
+		h := newTestHandler(withReleaseBindingService(rbSvc))
+		result, err := h.DeleteReleaseBinding(ctx, testNS, "comp-dev")
 		require.NoError(t, err)
 		m, ok := result.(map[string]any)
 		require.True(t, ok)
-		assert.Equal(t, "active", m["state"])
+		assert.Equal(t, "deleted", m["action"])
+		assert.Equal(t, "comp-dev", m["name"])
 	})
 
-	t.Run("nil state: no state change, still updates", func(t *testing.T) {
+	t.Run("delete error propagated", func(t *testing.T) {
+		expected := errors.New("conflict")
 		rbSvc := releasebindingmocks.NewMockService(t)
-		rbSvc.EXPECT().GetReleaseBinding(mock.Anything, testNS, "comp-dev").Return(existingRB, nil)
-		rbSvc.EXPECT().UpdateReleaseBinding(mock.Anything, testNS, mock.Anything).Return(existingRB, nil)
+		rbSvc.EXPECT().DeleteReleaseBinding(mock.Anything, testNS, "comp-dev").Return(expected)
 
 		h := newTestHandler(withReleaseBindingService(rbSvc))
-		result, err := h.UpdateReleaseBindingState(ctx, testNS, "comp-dev", nil)
+		_, err := h.DeleteReleaseBinding(ctx, testNS, "comp-dev")
+		require.ErrorIs(t, err, expected)
+	})
+
+	t.Run("nil state leaves existing state unchanged", func(t *testing.T) {
+		rbWithState := &openchoreov1alpha1.ReleaseBinding{
+			ObjectMeta: metav1.ObjectMeta{Name: "comp-dev"},
+			Spec: openchoreov1alpha1.ReleaseBindingSpec{
+				Environment: testEnvironmentName,
+				State:       openchoreov1alpha1.ReleaseState("Active"),
+			},
+		}
+		rbSvc := releasebindingmocks.NewMockService(t)
+		rbSvc.EXPECT().GetReleaseBinding(mock.Anything, testNS, "comp-dev").Return(rbWithState, nil)
+		rbSvc.EXPECT().
+			UpdateReleaseBinding(mock.Anything, testNS, mock.MatchedBy(func(rb *openchoreov1alpha1.ReleaseBinding) bool {
+				return rb.Spec.State == openchoreov1alpha1.ReleaseState("Active")
+			})).
+			Return(rbWithState, nil)
+
+		h := newTestHandler(withReleaseBindingService(rbSvc))
+		req := &gen.ReleaseBindingSpec{Environment: testEnvironmentName}
+		_, err := h.UpdateReleaseBinding(ctx, testNS, "comp-dev", req)
 		require.NoError(t, err)
-		assert.NotNil(t, result)
 	})
 }
 

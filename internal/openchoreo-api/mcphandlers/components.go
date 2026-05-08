@@ -255,6 +255,9 @@ func (h *MCPHandler) UpdateReleaseBinding(
 	if req.ReleaseName != nil && *req.ReleaseName != "" {
 		rb.Spec.ReleaseName = *req.ReleaseName
 	}
+	if req.State != nil {
+		rb.Spec.State = openchoreov1alpha1.ReleaseState(*req.State)
+	}
 	if req.Environment != "" && req.Environment != rb.Spec.Environment {
 		return nil, fmt.Errorf("release binding environment is immutable")
 	}
@@ -293,6 +296,50 @@ func (h *MCPHandler) UpdateReleaseBinding(
 		return nil, err
 	}
 	return mutationResult(updated, "patched"), nil
+}
+
+func (h *MCPHandler) DeleteReleaseBinding(ctx context.Context, namespaceName, bindingName string) (any, error) {
+	if err := h.services.ReleaseBindingService.DeleteReleaseBinding(ctx, namespaceName, bindingName); err != nil {
+		return nil, err
+	}
+	return map[string]any{
+		"name":      bindingName,
+		"namespace": namespaceName,
+		"action":    "deleted",
+	}, nil
+}
+
+func (h *MCPHandler) DeleteComponent(ctx context.Context, namespaceName, componentName string) (any, error) {
+	if err := h.services.ComponentService.DeleteComponent(ctx, namespaceName, componentName); err != nil {
+		return nil, err
+	}
+	return map[string]any{
+		"name":      componentName,
+		"namespace": namespaceName,
+		"action":    "deleted",
+	}, nil
+}
+
+func (h *MCPHandler) DeleteWorkload(ctx context.Context, namespaceName, workloadName string) (any, error) {
+	if err := h.services.WorkloadService.DeleteWorkload(ctx, namespaceName, workloadName); err != nil {
+		return nil, err
+	}
+	return map[string]any{
+		"name":      workloadName,
+		"namespace": namespaceName,
+		"action":    "deleted",
+	}, nil
+}
+
+func (h *MCPHandler) DeleteComponentRelease(ctx context.Context, namespaceName, componentReleaseName string) (any, error) {
+	if err := h.services.ComponentReleaseService.DeleteComponentRelease(ctx, namespaceName, componentReleaseName); err != nil {
+		return nil, err
+	}
+	return map[string]any{
+		"name":      componentReleaseName,
+		"namespace": namespaceName,
+		"action":    "deleted",
+	}, nil
 }
 
 func (h *MCPHandler) CreateWorkload(
@@ -385,6 +432,18 @@ func (h *MCPHandler) PatchComponent(
 		return nil, err
 	}
 
+	if req.DisplayName != nil && *req.DisplayName != "" {
+		if component.Annotations == nil {
+			component.Annotations = map[string]string{}
+		}
+		component.Annotations[controller.AnnotationKeyDisplayName] = *req.DisplayName
+	}
+	if req.Description != nil && *req.Description != "" {
+		if component.Annotations == nil {
+			component.Annotations = map[string]string{}
+		}
+		component.Annotations[controller.AnnotationKeyDescription] = *req.Description
+	}
 	if req.AutoDeploy != nil {
 		component.Spec.AutoDeploy = *req.AutoDeploy
 	}
@@ -395,33 +454,51 @@ func (h *MCPHandler) PatchComponent(
 		}
 		component.Spec.Parameters = &runtime.RawExtension{Raw: paramsBytes}
 	}
+	if req.Traits != nil {
+		traits := make([]openchoreov1alpha1.ComponentTrait, 0, len(*req.Traits))
+		for _, ti := range *req.Traits {
+			ct := openchoreov1alpha1.ComponentTrait{
+				Name:         ti.Name,
+				InstanceName: ti.InstanceName,
+			}
+			if ti.Kind != nil {
+				ct.Kind = openchoreov1alpha1.TraitRefKind(*ti.Kind)
+			}
+			if ti.Parameters != nil {
+				paramsBytes, err := json.Marshal(*ti.Parameters)
+				if err != nil {
+					return nil, err
+				}
+				ct.Parameters = &runtime.RawExtension{Raw: paramsBytes}
+			}
+			traits = append(traits, ct)
+		}
+		component.Spec.Traits = traits
+	}
+	if req.Workflow != nil {
+		var workflowParams *runtime.RawExtension
+		if req.Workflow.Parameters != nil {
+			paramsBytes, err := json.Marshal(*req.Workflow.Parameters)
+			if err != nil {
+				return nil, err
+			}
+			workflowParams = &runtime.RawExtension{Raw: paramsBytes}
+		}
+		workflowConfig := &openchoreov1alpha1.ComponentWorkflowConfig{
+			Name:       req.Workflow.Name,
+			Parameters: workflowParams,
+		}
+		if req.Workflow.Kind != nil {
+			workflowConfig.Kind = openchoreov1alpha1.WorkflowRefKind(*req.Workflow.Kind)
+		}
+		component.Spec.Workflow = workflowConfig
+	}
 
 	updated, err := h.services.ComponentService.UpdateComponent(ctx, namespaceName, component)
 	if err != nil {
 		return nil, err
 	}
 	return mutationResult(updated, "patched"), nil
-}
-
-func (h *MCPHandler) UpdateReleaseBindingState(
-	ctx context.Context, namespaceName, bindingName string, state *gen.ReleaseBindingSpecState,
-) (any, error) {
-	rb, err := h.services.ReleaseBindingService.GetReleaseBinding(ctx, namespaceName, bindingName)
-	if err != nil {
-		return nil, err
-	}
-
-	if state != nil {
-		rb.Spec.State = openchoreov1alpha1.ReleaseState(*state)
-	}
-
-	updated, err := h.services.ReleaseBindingService.UpdateReleaseBinding(ctx, namespaceName, rb)
-	if err != nil {
-		return nil, err
-	}
-	return mutationResult(updated, "updated", map[string]any{
-		"state": string(updated.Spec.State),
-	}), nil
 }
 
 func (h *MCPHandler) GetComponentReleaseSchema(

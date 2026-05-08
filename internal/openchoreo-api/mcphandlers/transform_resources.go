@@ -40,6 +40,9 @@ func componentSummary(c openchoreov1alpha1.Component) map[string]any {
 	m["projectName"] = c.Spec.Owner.ProjectName
 	m["componentType"] = c.Spec.ComponentType.Name
 	m["autoDeploy"] = c.Spec.AutoDeploy
+	if c.Spec.AutoBuild != nil {
+		m["autoBuild"] = *c.Spec.AutoBuild
+	}
 	setIfNotEmpty(m, "status", readyStatus(c.Status.Conditions))
 	if c.Status.LatestRelease != nil {
 		m["latestRelease"] = c.Status.LatestRelease.Name
@@ -119,77 +122,8 @@ func workloadSummary(w openchoreov1alpha1.Workload) map[string]any {
 
 func workloadDetail(w *openchoreov1alpha1.Workload) map[string]any {
 	m := extractCommonMeta(w)
-	m["projectName"] = w.Spec.Owner.ProjectName
-	m["componentName"] = w.Spec.Owner.ComponentName
-	m["container"] = containerToMap(&w.Spec.Container)
-	if len(w.Spec.Endpoints) > 0 {
-		eps := make(map[string]any, len(w.Spec.Endpoints))
-		for name, ep := range w.Spec.Endpoints {
-			e := map[string]any{
-				"type": string(ep.Type),
-				"port": ep.Port,
-			}
-			if ep.TargetPort != 0 {
-				e["targetPort"] = ep.TargetPort
-			}
-			if len(ep.Visibility) > 0 {
-				vis := make([]string, 0, len(ep.Visibility))
-				for _, v := range ep.Visibility {
-					vis = append(vis, string(v))
-				}
-				e["visibility"] = vis
-			}
-			setIfNotEmpty(e, "displayName", ep.DisplayName)
-			setIfNotEmpty(e, "basePath", ep.BasePath)
-			eps[name] = e
-		}
-		m["endpoints"] = eps
-	}
-	deps := w.Spec.GetDependencyEndpoints()
-	if len(deps) > 0 {
-		conns := make([]map[string]any, 0, len(deps))
-		for _, conn := range deps {
-			c := map[string]any{
-				"component":  conn.Component,
-				"name":       conn.Name,
-				"visibility": string(conn.Visibility),
-			}
-			if conn.Project != "" {
-				c["project"] = conn.Project
-			}
-			envBindings := make(map[string]any)
-			setIfNotEmpty(envBindings, "address", conn.EnvBindings.Address)
-			setIfNotEmpty(envBindings, "host", conn.EnvBindings.Host)
-			setIfNotEmpty(envBindings, "port", conn.EnvBindings.Port)
-			setIfNotEmpty(envBindings, "basePath", conn.EnvBindings.BasePath)
-			if len(envBindings) > 0 {
-				c["envBindings"] = envBindings
-			}
-			conns = append(conns, c)
-		}
-		m["dependencies"] = conns
-	}
-	return m
-}
-
-func containerToMap(c *openchoreov1alpha1.Container) map[string]any {
-	m := map[string]any{"image": c.Image}
-	if len(c.Command) > 0 {
-		m["command"] = c.Command
-	}
-	if len(c.Args) > 0 {
-		m["args"] = c.Args
-	}
-	if len(c.Env) > 0 {
-		envs := make([]map[string]any, 0, len(c.Env))
-		for i := range c.Env {
-			e := map[string]any{"key": c.Env[i].Key}
-			if c.Env[i].Value != "" {
-				e["value"] = c.Env[i].Value
-			}
-			envs = append(envs, e)
-		}
-		m["env"] = envs
+	if spec := specToMap(w.Spec); len(spec) > 0 {
+		m["spec"] = spec
 	}
 	return m
 }
@@ -227,41 +161,18 @@ func dataplaneSummary(dp openchoreov1alpha1.DataPlane) map[string]any {
 
 func dataplaneDetail(dp *openchoreov1alpha1.DataPlane) map[string]any {
 	m := extractCommonMeta(dp)
-	setIfNotEmpty(m, "planeID", dp.Spec.PlaneID)
-	if dp.Spec.ObservabilityPlaneRef != nil {
-		m["observabilityPlaneRef"] = map[string]any{
-			"kind": string(dp.Spec.ObservabilityPlaneRef.Kind),
-			"name": dp.Spec.ObservabilityPlaneRef.Name,
-		}
-	}
-	if dp.Spec.SecretStoreRef != nil {
-		m["secretStoreRef"] = dp.Spec.SecretStoreRef.Name
+	if spec := specToMap(dp.Spec); len(spec) > 0 {
+		m["spec"] = spec
 	}
 	if dp.Status.AgentConnection != nil {
-		m["agentConnection"] = agentConnectionToMap(dp.Status.AgentConnection)
+		if ac := specToMap(dp.Status.AgentConnection); len(ac) > 0 {
+			m["agentConnection"] = ac
+		}
 	}
 	setIfNotEmpty(m, "status", readyStatus(dp.Status.Conditions))
 	if conds := conditionsSummary(dp.Status.Conditions); conds != nil {
 		m["conditions"] = conds
 	}
-	return m
-}
-
-func agentConnectionToMap(ac *openchoreov1alpha1.AgentConnectionStatus) map[string]any {
-	m := map[string]any{
-		"connected":       ac.Connected,
-		"connectedAgents": ac.ConnectedAgents,
-	}
-	if ac.LastConnectedTime != nil {
-		m["lastConnectedTime"] = ac.LastConnectedTime.UTC().Format("2006-01-02T15:04:05Z")
-	}
-	if ac.LastDisconnectedTime != nil {
-		m["lastDisconnectedTime"] = ac.LastDisconnectedTime.UTC().Format("2006-01-02T15:04:05Z")
-	}
-	if ac.LastHeartbeatTime != nil {
-		m["lastHeartbeatTime"] = ac.LastHeartbeatTime.UTC().Format("2006-01-02T15:04:05Z")
-	}
-	setIfNotEmpty(m, "message", ac.Message)
 	return m
 }
 
@@ -524,15 +435,13 @@ func workflowPlaneSummary(wp openchoreov1alpha1.WorkflowPlane) map[string]any {
 
 func workflowPlaneDetail(wp *openchoreov1alpha1.WorkflowPlane) map[string]any {
 	m := extractCommonMeta(wp)
-	setIfNotEmpty(m, "planeID", wp.Spec.PlaneID)
-	if wp.Spec.ObservabilityPlaneRef != nil {
-		m["observabilityPlaneRef"] = map[string]any{
-			"kind": string(wp.Spec.ObservabilityPlaneRef.Kind),
-			"name": wp.Spec.ObservabilityPlaneRef.Name,
-		}
+	if spec := specToMap(wp.Spec); len(spec) > 0 {
+		m["spec"] = spec
 	}
 	if wp.Status.AgentConnection != nil {
-		m["agentConnection"] = agentConnectionToMap(wp.Status.AgentConnection)
+		if ac := specToMap(wp.Status.AgentConnection); len(ac) > 0 {
+			m["agentConnection"] = ac
+		}
 	}
 	setIfNotEmpty(m, "status", readyStatus(wp.Status.Conditions))
 	if conds := conditionsSummary(wp.Status.Conditions); conds != nil {
@@ -558,10 +467,13 @@ func observabilityPlaneSummary(op openchoreov1alpha1.ObservabilityPlane) map[str
 
 func observabilityPlaneDetail(op *openchoreov1alpha1.ObservabilityPlane) map[string]any {
 	m := extractCommonMeta(op)
-	setIfNotEmpty(m, "planeID", op.Spec.PlaneID)
-	setIfNotEmpty(m, "observerURL", op.Spec.ObserverURL)
+	if spec := specToMap(op.Spec); len(spec) > 0 {
+		m["spec"] = spec
+	}
 	if op.Status.AgentConnection != nil {
-		m["agentConnection"] = agentConnectionToMap(op.Status.AgentConnection)
+		if ac := specToMap(op.Status.AgentConnection); len(ac) > 0 {
+			m["agentConnection"] = ac
+		}
 	}
 	setIfNotEmpty(m, "status", readyStatus(op.Status.Conditions))
 	if conds := conditionsSummary(op.Status.Conditions); conds != nil {
@@ -574,9 +486,19 @@ func observabilityPlaneDetail(op *openchoreov1alpha1.ObservabilityPlane) map[str
 // SecretReference
 // ---------------------------------------------------------------------------
 
+// TODO: surface SecretReference status fields (Conditions, LastRefreshTime, SecretStores) once the
+// control-plane controller populates them. Until then, sync status surfaces on the rendered
+// ExternalSecret in the data plane and is queryable via get_resource_events.
+
 func secretReferenceSummary(sr openchoreov1alpha1.SecretReference) map[string]any {
-	m := extractCommonMeta(&sr)
-	setIfNotEmpty(m, "status", readyStatus(sr.Status.Conditions))
+	return extractCommonMeta(&sr)
+}
+
+func secretReferenceDetail(sr *openchoreov1alpha1.SecretReference) map[string]any {
+	m := extractCommonMeta(sr)
+	if spec := specToMap(sr.Spec); len(spec) > 0 {
+		m["spec"] = spec
+	}
 	return m
 }
 
@@ -596,18 +518,13 @@ func clusterDataPlaneSummary(cdp openchoreov1alpha1.ClusterDataPlane) map[string
 
 func clusterDataPlaneDetail(cdp *openchoreov1alpha1.ClusterDataPlane) map[string]any {
 	m := extractCommonMeta(cdp)
-	setIfNotEmpty(m, "planeID", cdp.Spec.PlaneID)
-	if cdp.Spec.ObservabilityPlaneRef != nil {
-		m["observabilityPlaneRef"] = map[string]any{
-			"kind": string(cdp.Spec.ObservabilityPlaneRef.Kind),
-			"name": cdp.Spec.ObservabilityPlaneRef.Name,
-		}
-	}
-	if cdp.Spec.SecretStoreRef != nil {
-		m["secretStoreRef"] = cdp.Spec.SecretStoreRef.Name
+	if spec := specToMap(cdp.Spec); len(spec) > 0 {
+		m["spec"] = spec
 	}
 	if cdp.Status.AgentConnection != nil {
-		m["agentConnection"] = agentConnectionToMap(cdp.Status.AgentConnection)
+		if ac := specToMap(cdp.Status.AgentConnection); len(ac) > 0 {
+			m["agentConnection"] = ac
+		}
 	}
 	setIfNotEmpty(m, "status", readyStatus(cdp.Status.Conditions))
 	if conds := conditionsSummary(cdp.Status.Conditions); conds != nil {
@@ -631,9 +548,13 @@ func clusterWorkflowPlaneSummary(cwp openchoreov1alpha1.ClusterWorkflowPlane) ma
 
 func clusterWorkflowPlaneDetail(cbp *openchoreov1alpha1.ClusterWorkflowPlane) map[string]any {
 	m := extractCommonMeta(cbp)
-	setIfNotEmpty(m, "planeID", cbp.Spec.PlaneID)
+	if spec := specToMap(cbp.Spec); len(spec) > 0 {
+		m["spec"] = spec
+	}
 	if cbp.Status.AgentConnection != nil {
-		m["agentConnection"] = agentConnectionToMap(cbp.Status.AgentConnection)
+		if ac := specToMap(cbp.Status.AgentConnection); len(ac) > 0 {
+			m["agentConnection"] = ac
+		}
 	}
 	setIfNotEmpty(m, "status", readyStatus(cbp.Status.Conditions))
 	if conds := conditionsSummary(cbp.Status.Conditions); conds != nil {
@@ -658,10 +579,13 @@ func clusterObservabilityPlaneSummary(cop openchoreov1alpha1.ClusterObservabilit
 
 func clusterObservabilityPlaneDetail(cop *openchoreov1alpha1.ClusterObservabilityPlane) map[string]any {
 	m := extractCommonMeta(cop)
-	setIfNotEmpty(m, "planeID", cop.Spec.PlaneID)
-	setIfNotEmpty(m, "observerURL", cop.Spec.ObserverURL)
+	if spec := specToMap(cop.Spec); len(spec) > 0 {
+		m["spec"] = spec
+	}
 	if cop.Status.AgentConnection != nil {
-		m["agentConnection"] = agentConnectionToMap(cop.Status.AgentConnection)
+		if ac := specToMap(cop.Status.AgentConnection); len(ac) > 0 {
+			m["agentConnection"] = ac
+		}
 	}
 	setIfNotEmpty(m, "status", readyStatus(cop.Status.Conditions))
 	if conds := conditionsSummary(cop.Status.Conditions); conds != nil {

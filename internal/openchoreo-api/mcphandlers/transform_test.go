@@ -482,62 +482,68 @@ func TestWorkloadDetail(t *testing.T) {
 	}
 
 	m := workloadDetail(w)
-	assert.Equal(t, "proj", m["projectName"])
-	assert.Equal(t, "comp", m["componentName"])
+	spec, ok := m["spec"].(map[string]any)
+	require.True(t, ok, "expected spec to be a map")
 
-	container, ok := m["container"].(map[string]any)
-	require.True(t, ok, "expected container to be a map")
+	owner, ok := spec["owner"].(map[string]any)
+	require.True(t, ok, "expected spec.owner to be a map")
+	assert.Equal(t, "proj", owner["projectName"])
+	assert.Equal(t, "comp", owner["componentName"])
+
+	container, ok := spec["container"].(map[string]any)
+	require.True(t, ok, "expected spec.container to be a map")
 	assert.Equal(t, "app:v1", container["image"])
 	assert.NotNil(t, container["command"])
 	assert.NotNil(t, container["args"])
 
-	envs, ok := container["env"].([]map[string]any)
-	require.True(t, ok, "expected container.env to be []map[string]any")
+	envs, ok := container["env"].([]any)
+	require.True(t, ok, "expected container.env to be []any")
 	require.Len(t, envs, 2)
-	assert.Equal(t, "DB_HOST", envs[0]["key"])
-	assert.Equal(t, "localhost", envs[0]["value"])
-	assert.NotContains(t, envs[1], "value")
+	env0, ok := envs[0].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "DB_HOST", env0["key"])
+	assert.Equal(t, "localhost", env0["value"])
+	env1, ok := envs[1].(map[string]any)
+	require.True(t, ok)
+	assert.NotContains(t, env1, "value")
 
-	eps, ok := m["endpoints"].(map[string]any)
-	require.True(t, ok, "expected endpoints to be map[string]any")
+	eps, ok := spec["endpoints"].(map[string]any)
+	require.True(t, ok, "expected spec.endpoints to be map[string]any")
 	apiEp, ok := eps["api"].(map[string]any)
 	require.True(t, ok, "expected api endpoint to be a map")
 	assert.Equal(t, "HTTP", apiEp["type"])
-	assert.Equal(t, int32(8080), apiEp["port"])
-	assert.Equal(t, int32(9090), apiEp["targetPort"])
+	assert.EqualValues(t, 8080, apiEp["port"])
+	assert.EqualValues(t, 9090, apiEp["targetPort"])
 	assert.Equal(t, "API", apiEp["displayName"])
 	assert.Equal(t, "/v1", apiEp["basePath"])
-	vis, ok := apiEp["visibility"].([]string)
-	require.True(t, ok, "expected visibility to be []string")
+	vis, ok := apiEp["visibility"].([]any)
+	require.True(t, ok, "expected visibility to be []any")
 	assert.Len(t, vis, 1)
 
-	deps, ok := m["dependencies"].([]map[string]any)
-	require.True(t, ok, "expected dependencies to be []map[string]any")
+	depsWrap, ok := spec["dependencies"].(map[string]any)
+	require.True(t, ok, "expected spec.dependencies to be a map")
+	deps, ok := depsWrap["endpoints"].([]any)
+	require.True(t, ok, "expected spec.dependencies.endpoints to be []any")
 	require.Len(t, deps, 2)
-	assert.Equal(t, "other-proj", deps[0]["project"])
-	assert.Equal(t, "db-service", deps[0]["component"])
+	dep0, ok := deps[0].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "other-proj", dep0["project"])
+	assert.Equal(t, "db-service", dep0["component"])
 
-	bindings, ok := deps[0]["envBindings"].(map[string]any)
+	bindings, ok := dep0["envBindings"].(map[string]any)
 	require.True(t, ok, "expected envBindings to be a map")
 	assert.Equal(t, "DB_ADDR", bindings["address"])
 	assert.Equal(t, "DB_HOST", bindings["host"])
 	assert.Equal(t, "DB_PORT", bindings["port"])
 	assert.Equal(t, "DB_PATH", bindings["basePath"])
 
-	assert.NotContains(t, deps[1], "project")
-	bindings2, ok := deps[1]["envBindings"].(map[string]any)
+	dep1, ok := deps[1].(map[string]any)
+	require.True(t, ok)
+	assert.NotContains(t, dep1, "project")
+	bindings2, ok := dep1["envBindings"].(map[string]any)
 	require.True(t, ok, "expected dep[1].envBindings to be a map")
 	assert.Equal(t, "CACHE_ADDR", bindings2["address"])
 	assert.NotContains(t, bindings2, "host")
-}
-
-func TestContainerToMap(t *testing.T) {
-	c := &openchoreov1alpha1.Container{Image: "minimal:v1"}
-	m := containerToMap(c)
-	assert.Equal(t, "minimal:v1", m["image"])
-	assert.NotContains(t, m, "command")
-	assert.NotContains(t, m, "args")
-	assert.NotContains(t, m, "env")
 }
 
 func TestEnvironmentSummary(t *testing.T) {
@@ -631,18 +637,22 @@ func TestDataplaneDetail(t *testing.T) {
 	}
 
 	m := dataplaneDetail(dp)
-	assert.Equal(t, "plane-1", m["planeID"])
+	spec, ok := m["spec"].(map[string]any)
+	require.True(t, ok, "expected spec to be a map")
+	assert.Equal(t, "plane-1", spec["planeID"])
 
-	obsRef, ok := m["observabilityPlaneRef"].(map[string]any)
-	require.True(t, ok, "expected observabilityPlaneRef to be a map")
+	obsRef, ok := spec["observabilityPlaneRef"].(map[string]any)
+	require.True(t, ok, "expected spec.observabilityPlaneRef to be a map")
 	assert.Equal(t, "obs-1", obsRef["name"])
 
-	assert.Equal(t, "my-store", m["secretStoreRef"])
+	secretStore, ok := spec["secretStoreRef"].(map[string]any)
+	require.True(t, ok, "expected spec.secretStoreRef to be a map")
+	assert.Equal(t, "my-store", secretStore["name"])
 
 	ac, ok := m["agentConnection"].(map[string]any)
 	require.True(t, ok, "expected agentConnection to be a map")
 	assert.Equal(t, true, ac["connected"])
-	assert.Equal(t, 2, ac["connectedAgents"])
+	assert.EqualValues(t, 2, ac["connectedAgents"])
 	assert.Equal(t, "2025-06-15T10:00:00Z", ac["lastConnectedTime"])
 	assert.Equal(t, "2025-06-15T09:00:00Z", ac["lastDisconnectedTime"])
 	assert.Equal(t, "2025-06-15T10:01:00Z", ac["lastHeartbeatTime"])
@@ -656,23 +666,8 @@ func TestDataplaneDetail_Minimal(t *testing.T) {
 	}
 	m := dataplaneDetail(dp)
 	assert.Equal(t, "dp-bare", m["name"])
-	assert.NotContains(t, m, "planeID")
-	assert.NotContains(t, m, "observabilityPlaneRef")
-	assert.NotContains(t, m, "secretStoreRef")
 	assert.NotContains(t, m, "agentConnection")
 	assert.NotContains(t, m, "conditions")
-}
-
-func TestAgentConnectionToMap_Minimal(t *testing.T) {
-	ac := &openchoreov1alpha1.AgentConnectionStatus{
-		Connected:       false,
-		ConnectedAgents: 0,
-	}
-	m := agentConnectionToMap(ac)
-	assert.Equal(t, false, m["connected"])
-	assert.NotContains(t, m, "lastConnectedTime")
-	assert.NotContains(t, m, "lastDisconnectedTime")
-	assert.NotContains(t, m, "lastHeartbeatTime")
 }
 
 func TestDeploymentPipelineSummary(t *testing.T) {
@@ -1155,10 +1150,12 @@ func TestWorkflowPlaneDetail(t *testing.T) {
 		},
 	}
 	m := workflowPlaneDetail(wp)
-	assert.Equal(t, "wf-plane-1", m["planeID"])
+	spec, ok := m["spec"].(map[string]any)
+	require.True(t, ok, "expected spec to be a map")
+	assert.Equal(t, "wf-plane-1", spec["planeID"])
 
-	obsRef, ok := m["observabilityPlaneRef"].(map[string]any)
-	require.True(t, ok, "expected observabilityPlaneRef to be a map")
+	obsRef, ok := spec["observabilityPlaneRef"].(map[string]any)
+	require.True(t, ok, "expected spec.observabilityPlaneRef to be a map")
 	assert.Equal(t, "obs-1", obsRef["name"])
 	ac, ok := m["agentConnection"].(map[string]any)
 	require.True(t, ok, "expected agentConnection to be map[string]any")
@@ -1172,8 +1169,6 @@ func TestWorkflowPlaneDetail_Minimal(t *testing.T) {
 	}
 	m := workflowPlaneDetail(wp)
 	assert.Equal(t, "wp-bare", m["name"])
-	assert.NotContains(t, m, "planeID")
-	assert.NotContains(t, m, "observabilityPlaneRef")
 	assert.NotContains(t, m, "agentConnection")
 	assert.NotContains(t, m, "conditions")
 }
@@ -1210,8 +1205,10 @@ func TestObservabilityPlaneDetail(t *testing.T) {
 		},
 	}
 	m := observabilityPlaneDetail(op)
-	assert.Equal(t, "obs-plane-1", m["planeID"])
-	assert.Equal(t, "https://observer.example.com", m["observerURL"])
+	spec, ok := m["spec"].(map[string]any)
+	require.True(t, ok, "expected spec to be a map")
+	assert.Equal(t, "obs-plane-1", spec["planeID"])
+	assert.Equal(t, "https://observer.example.com", spec["observerURL"])
 	ac, ok := m["agentConnection"].(map[string]any)
 	require.True(t, ok, "expected agentConnection to be map[string]any")
 	assert.Equal(t, true, ac["connected"])
@@ -1227,7 +1224,8 @@ func TestSecretReferenceSummary(t *testing.T) {
 	}
 	m := secretReferenceSummary(sr)
 	assert.Equal(t, "sr-1", m["name"])
-	assert.Equal(t, "Ready", m["status"])
+	// Status is intentionally omitted (see secretReferenceDetail TODO).
+	assert.NotContains(t, m, "status")
 }
 
 func TestClusterDataPlaneSummary(t *testing.T) {
@@ -1262,12 +1260,16 @@ func TestClusterDataPlaneDetail(t *testing.T) {
 		},
 	}
 	m := clusterDataPlaneDetail(cdp)
-	assert.Equal(t, "cdp-plane", m["planeID"])
+	spec, ok := m["spec"].(map[string]any)
+	require.True(t, ok, "expected spec to be a map")
+	assert.Equal(t, "cdp-plane", spec["planeID"])
 
-	obsRef, ok := m["observabilityPlaneRef"].(map[string]any)
-	require.True(t, ok, "expected observabilityPlaneRef to be a map")
+	obsRef, ok := spec["observabilityPlaneRef"].(map[string]any)
+	require.True(t, ok, "expected spec.observabilityPlaneRef to be a map")
 	assert.Equal(t, "cobs-1", obsRef["name"])
-	assert.Equal(t, "store", m["secretStoreRef"])
+	store, ok := spec["secretStoreRef"].(map[string]any)
+	require.True(t, ok, "expected spec.secretStoreRef to be a map")
+	assert.Equal(t, "store", store["name"])
 	ac, ok := m["agentConnection"].(map[string]any)
 	require.True(t, ok, "expected agentConnection to be map[string]any")
 	assert.Equal(t, true, ac["connected"])
@@ -1297,7 +1299,9 @@ func TestClusterWorkflowPlaneDetail(t *testing.T) {
 		},
 	}
 	m := clusterWorkflowPlaneDetail(cwp)
-	assert.Equal(t, "cwp-plane", m["planeID"])
+	spec, ok := m["spec"].(map[string]any)
+	require.True(t, ok, "expected spec to be a map")
+	assert.Equal(t, "cwp-plane", spec["planeID"])
 	ac, ok := m["agentConnection"].(map[string]any)
 	require.True(t, ok, "expected agentConnection to be map[string]any")
 	assert.Equal(t, true, ac["connected"])
@@ -1334,8 +1338,10 @@ func TestClusterObservabilityPlaneDetail(t *testing.T) {
 		},
 	}
 	m := clusterObservabilityPlaneDetail(cop)
-	assert.Equal(t, "cop-plane", m["planeID"])
-	assert.Equal(t, "https://obs.example.com", m["observerURL"])
+	spec, ok := m["spec"].(map[string]any)
+	require.True(t, ok, "expected spec to be a map")
+	assert.Equal(t, "cop-plane", spec["planeID"])
+	assert.Equal(t, "https://obs.example.com", spec["observerURL"])
 	ac, ok := m["agentConnection"].(map[string]any)
 	require.True(t, ok, "expected agentConnection to be map[string]any")
 	assert.Equal(t, true, ac["connected"])

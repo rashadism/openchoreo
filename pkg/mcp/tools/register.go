@@ -13,6 +13,10 @@ func (t *Toolsets) namespaceToolRegistrations() []RegisterFunc {
 		t.RegisterListNamespaces,
 		t.RegisterCreateNamespace,
 		t.RegisterListSecretReferences,
+		t.RegisterGetSecretReference,
+		t.RegisterCreateSecretReference,
+		t.RegisterUpdateSecretReference,
+		t.RegisterDeleteSecretReference,
 	}
 }
 
@@ -21,6 +25,7 @@ func (t *Toolsets) projectToolRegistrations() []RegisterFunc {
 	return []RegisterFunc{
 		t.RegisterListProjects,
 		t.RegisterCreateProject,
+		t.RegisterDeleteProject,
 	}
 }
 
@@ -31,10 +36,12 @@ func (t *Toolsets) componentToolRegistrations() []RegisterFunc {
 		t.RegisterListComponents,
 		t.RegisterGetComponent,
 		t.RegisterPatchComponent,
+		t.RegisterDeleteComponent,
 		t.RegisterListWorkloads,
 		t.RegisterGetWorkload,
 		t.RegisterCreateWorkload,
 		t.RegisterUpdateWorkload,
+		t.RegisterDeleteWorkload,
 		t.RegisterGetWorkloadSchema,
 		t.RegisterGetComponentSchema,
 		// Platform standards (read-only, namespace-scoped)
@@ -59,7 +66,8 @@ func (t *Toolsets) deploymentToolRegistrations() []RegisterFunc {
 		t.RegisterGetReleaseBinding,
 		t.RegisterCreateReleaseBinding,
 		t.RegisterUpdateReleaseBinding,
-		t.RegisterUpdateReleaseBindingState,
+		t.RegisterDeleteReleaseBinding,
+		t.RegisterDeleteComponentRelease,
 		t.RegisterListDeploymentPipelines,
 		t.RegisterGetDeploymentPipeline,
 		t.RegisterListEnvironments,
@@ -139,6 +147,9 @@ func (t *Toolsets) peToolRegistrations() []RegisterFunc {
 		t.RegisterGetComponentTypeCreationSchema,
 		t.RegisterGetClusterComponentTypeCreationSchema,
 		t.RegisterGetTraitCreationSchema,
+		t.RegisterGetClusterTraitCreationSchema,
+		t.RegisterGetWorkflowCreationSchema,
+		t.RegisterGetClusterWorkflowCreationSchema,
 
 		// Platform standards write (namespace-scoped)
 		t.RegisterCreateComponentType,

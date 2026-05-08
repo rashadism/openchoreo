@@ -132,7 +132,7 @@ func componentBasicSpecs() []toolTestSpec {
 			descriptionKeywords: []string{"patch", "component"},
 			descriptionMinLen:   10,
 			requiredParams:      []string{"namespace_name", "component_name"},
-			optionalParams:      []string{"auto_deploy", "parameters"},
+			optionalParams:      []string{"display_name", "description", "auto_deploy", "parameters", "traits", "workflow"},
 			testArgs: map[string]any{
 				"namespace_name": testNamespaceName,
 				"component_name": testComponentName,
@@ -142,6 +142,41 @@ func componentBasicSpecs() []toolTestSpec {
 				if args[0] != testNamespaceName || args[1] != testComponentName {
 					t.Errorf("Expected (%s, %s), got (%v, %v)",
 						testNamespaceName, testComponentName, args[0], args[1])
+				}
+			},
+		},
+		{
+			name:                "delete_component",
+			toolset:             "component",
+			descriptionKeywords: []string{"delete", "component"},
+			descriptionMinLen:   10,
+			requiredParams:      []string{"namespace_name", "component_name"},
+			testArgs: map[string]any{
+				"namespace_name": testNamespaceName,
+				"component_name": testComponentName,
+			},
+			expectedMethod: "DeleteComponent",
+			validateCall: func(t *testing.T, args []interface{}) {
+				if args[0] != testNamespaceName || args[1] != testComponentName {
+					t.Errorf("Expected (%s, %s), got (%v, %v)",
+						testNamespaceName, testComponentName, args[0], args[1])
+				}
+			},
+		},
+		{
+			name:                "delete_workload",
+			toolset:             "component",
+			descriptionKeywords: []string{"delete", "workload"},
+			descriptionMinLen:   10,
+			requiredParams:      []string{"namespace_name", "workload_name"},
+			testArgs: map[string]any{
+				"namespace_name": testNamespaceName,
+				"workload_name":  "workload1",
+			},
+			expectedMethod: "DeleteWorkload",
+			validateCall: func(t *testing.T, args []interface{}) {
+				if args[0] != testNamespaceName || args[1] != "workload1" {
+					t.Errorf("Expected (%s, workload1), got (%v, %v)", testNamespaceName, args[0], args[1])
 				}
 			},
 		},
