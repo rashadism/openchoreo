@@ -2242,6 +2242,19 @@ backstage:
 
   # @schema
   # type: object
+  # description: Catalog sync configuration — controls how often the OpenChoreo entity provider runs the periodic full sync as a safety net behind the event-driven path. Lower values converge faster after missed events but cost more CRUD calls; higher values are cheaper but slower to recover. The event-forwarder (when enabled via eventForwarder.enabled) handles real-time delta updates between syncs.
+  # @schema
+  catalogSync:
+    # @schema
+    # type: integer
+    # description: Frequency in seconds between periodic full syncs of the OpenChoreo catalog provider. With the event-forwarder enabled, this acts as a safety net for any events missed; with it disabled, this is the only sync mechanism and you may want a much smaller value (e.g. 60).
+    # default: 300
+    # minimum: 1
+    # @schema
+    frequency: 300
+
+  # @schema
+  # type: object
   # description: Feature flags for enabling/disabling OpenChoreo features in Backstage
   # @schema
   features:
@@ -3490,3 +3503,103 @@ gateway:
     #       description: Secret name containing the TLS certificate
     # @schema
     certificateRefs: []
+
+# @schema
+# type: object
+# description: Event-forwarder configuration — watches OpenChoreo Kubernetes resources via informers and forwards change-notification webhooks to subscribers (typically Backstage's events plugin) for near-real-time catalog updates.
+# @schema
+eventForwarder:
+  # @schema
+  # type: boolean
+  # description: Enable the event-forwarder component. Disabling it stops the event-forwarder pod from being deployed and signals Backstage to skip its event subscriptions, falling back to poll-only catalog sync.
+  # default: true
+  # @schema
+  enabled: true
+
+  # @schema
+  # type: string
+  # description: Name of the event-forwarder Deployment / ServiceAccount / ClusterRole resources
+  # default: event-forwarder
+  # @schema
+  name: event-forwarder
+
+  image:
+    repository: ghcr.io/openchoreo/event-forwarder
+    tag: ""
+    pullPolicy: IfNotPresent
+
+  config:
+    server:
+      port: 8080
+    webhooks:
+      # Webhook endpoints that receive resource change notifications.
+      # Default targets the in-cluster Backstage Service (same namespace,
+      # default service name "backstage" on port 7007). Override for
+      # external consumers, a renamed Backstage Service, or to fan out
+      # to multiple subscribers.
+      #
+      # Each endpoint may define its own optional `retry` block:
+      #   - url: https://example.com/hook
+      #     retry:
+      #       maxAttempts: 3
+      #       backoffMs: 500
+      # When omitted (the default for the Backstage entry below), the
+      # forwarder makes a single attempt per event and gives up on
+      # failure — Backstage's periodic full sync reconciles missed
+      # events. Add `retry` only for endpoints that have no equivalent
+      # reconciliation mechanism of their own.
+      # @schema
+      # type: array
+      # items:
+      #   type: object
+      #   additionalProperties: false
+      #   required: [url]
+      #   properties:
+      #     url:
+      #       type: string
+      #       format: uri
+      #       minLength: 1
+      #     retry:
+      #       type: object
+      #       additionalProperties: false
+      #       required: [maxAttempts, backoffMs]
+      #       properties:
+      #         maxAttempts:
+      #           type: integer
+      #           minimum: 1
+      #         backoffMs:
+      #           type: integer
+      #           minimum: 0
+      # @schema
+      endpoints:
+        - url: http://backstage:7007/api/events/http/openchoreo
+    logging:
+      level: info
+
+  serviceAccount:
+    create: true
+    name: ""
+    # @schema
+    # type: object
+    # description: Annotations to add to the service account
+    # additionalProperties:
+    #   type: string
+    # default: {}
+    # @schema
+    annotations: {}
+
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+
+  containerSecurityContext:
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false

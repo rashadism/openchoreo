@@ -31,6 +31,7 @@ DOCKER_BUILD_IMAGES := \
 	init-observability-opensearch:$(PROJECT_DIR)/install/init/observability/opensearch/Dockerfile:$(PROJECT_DIR) \
 	openchoreo-api:$(PROJECT_DIR)/cmd/openchoreo-api/Dockerfile:$(PROJECT_DIR) \
 	observer:$(PROJECT_DIR)/cmd/observer/Dockerfile:$(PROJECT_DIR) \
+	event-forwarder:$(PROJECT_DIR)/cmd/event-forwarder/Dockerfile:$(PROJECT_DIR) \
 	ai-rca-agent:$(PROJECT_DIR)/rca-agent/Dockerfile:$(PROJECT_DIR)/rca-agent \
 	finops-agent:$(PROJECT_DIR)/finops-agent/Dockerfile:$(PROJECT_DIR)/finops-agent \
 	openchoreo-cli:$(PROJECT_DIR)/cmd/occ/Dockerfile:$(PROJECT_DIR) \
@@ -76,6 +77,7 @@ docker.build.controller: go.build-multiarch.manager
 docker.build.quick-start: go.build-multiarch.occ
 docker.build.openchoreo-api: go.build-multiarch.openchoreo-api
 docker.build.observer: go.build-multiarch.observer
+docker.build.event-forwarder: go.build-multiarch.event-forwarder
 docker.build.ai-rca-agent:  # Python project - no Go build dependency
 docker.build.finops-agent:  # Python project - no Go build dependency
 docker.build.cluster-gateway: go.build-multiarch.cluster-gateway
