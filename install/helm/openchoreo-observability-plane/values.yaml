@@ -1702,22 +1702,17 @@ finOpsAgent:
 
   # @schema
   # type: string
-  # description: Name of an existing Secret injected via envFrom into the FinOps agent container. Required keys - FINOPS_LLM_API_KEY, OAUTH_CLIENT_SECRET. Optional keys - SQL_BACKEND_URI (when reportBackend is postgresql).
-  # default: finops-agent-secret
+  # description: Name of an existing Secret injected via envFrom into the FinOps agent container. Required keys - LLM_API_KEY, OAUTH_CLIENT_SECRET. Optional keys - SQL_BACKEND_URI (when reportBackend is postgresql).
+  # default: finops-agent
   # @schema
-  secretName: "finops-agent-secret"
+  secretName: "finops-agent"
 
   # @schema
-  # type: object
-  # description: LLM configuration for AI-powered cost analysis
+  # type: string
+  # description: LLM model name (e.g., gpt-5.2)
+  # default: ""
   # @schema
-  llm:
-    # @schema
-    # type: string
-    # description: LLM model name (e.g., gpt-5.2)
-    # default: ""
-    # @schema
-    modelName: ""
+  llmName: ""
 
   # @schema
   # description: Report storage backend type
