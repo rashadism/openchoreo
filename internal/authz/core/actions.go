@@ -42,10 +42,21 @@ const (
 	ActionUpdateComponent = "component:update"
 	ActionDeleteComponent = "component:delete"
 
+	// Resource actions
+	ActionCreateResource = "resource:create"
+	ActionViewResource   = "resource:view"
+	ActionUpdateResource = "resource:update"
+	ActionDeleteResource = "resource:delete"
+
 	// ComponentRelease actions
 	ActionCreateComponentRelease = "componentrelease:create"
 	ActionViewComponentRelease   = "componentrelease:view"
 	ActionDeleteComponentRelease = "componentrelease:delete"
+
+	// ResourceRelease actions
+	ActionCreateResourceRelease = "resourcerelease:create"
+	ActionViewResourceRelease   = "resourcerelease:view"
+	ActionDeleteResourceRelease = "resourcerelease:delete"
 
 	// ReleaseBinding actions
 	ActionCreateReleaseBinding = "releasebinding:create"
@@ -53,11 +64,23 @@ const (
 	ActionUpdateReleaseBinding = "releasebinding:update"
 	ActionDeleteReleaseBinding = "releasebinding:delete"
 
+	// ResourceReleaseBinding actions
+	ActionCreateResourceReleaseBinding = "resourcereleasebinding:create"
+	ActionViewResourceReleaseBinding   = "resourcereleasebinding:view"
+	ActionUpdateResourceReleaseBinding = "resourcereleasebinding:update"
+	ActionDeleteResourceReleaseBinding = "resourcereleasebinding:delete"
+
 	// ComponentType actions
 	ActionCreateComponentType = "componenttype:create"
 	ActionViewComponentType   = "componenttype:view"
 	ActionUpdateComponentType = "componenttype:update"
 	ActionDeleteComponentType = "componenttype:delete"
+
+	// ResourceType actions
+	ActionCreateResourceType = "resourcetype:create"
+	ActionViewResourceType   = "resourcetype:view"
+	ActionUpdateResourceType = "resourcetype:update"
+	ActionDeleteResourceType = "resourcetype:delete"
 
 	// Workflow actions
 	ActionCreateWorkflow = "workflow:create"
@@ -106,6 +129,12 @@ const (
 	ActionViewClusterComponentType   = "clustercomponenttype:view"
 	ActionUpdateClusterComponentType = "clustercomponenttype:update"
 	ActionDeleteClusterComponentType = "clustercomponenttype:delete"
+
+	// ClusterResourceType actions
+	ActionCreateClusterResourceType = "clusterresourcetype:create"
+	ActionViewClusterResourceType   = "clusterresourcetype:view"
+	ActionUpdateClusterResourceType = "clusterresourcetype:update"
+	ActionDeleteClusterResourceType = "clusterresourcetype:delete"
 
 	// ClusterTrait actions
 	ActionCreateClusterTrait = "clustertrait:create"
@@ -244,10 +273,21 @@ var systemActions = []Action{
 	{Name: ActionUpdateComponent, LowestScope: ScopeComponent, IsInternal: false},
 	{Name: ActionDeleteComponent, LowestScope: ScopeComponent, IsInternal: false},
 
+	// Resource
+	{Name: ActionCreateResource, LowestScope: ScopeProject, IsInternal: false},
+	{Name: ActionViewResource, LowestScope: ScopeProject, IsInternal: false},
+	{Name: ActionUpdateResource, LowestScope: ScopeProject, IsInternal: false},
+	{Name: ActionDeleteResource, LowestScope: ScopeProject, IsInternal: false},
+
 	// ComponentRelease
 	{Name: ActionViewComponentRelease, LowestScope: ScopeComponent, IsInternal: false},
 	{Name: ActionCreateComponentRelease, LowestScope: ScopeComponent, IsInternal: false},
 	{Name: ActionDeleteComponentRelease, LowestScope: ScopeComponent, IsInternal: false},
+
+	// ResourceRelease
+	{Name: ActionViewResourceRelease, LowestScope: ScopeProject, IsInternal: false},
+	{Name: ActionCreateResourceRelease, LowestScope: ScopeProject, IsInternal: false},
+	{Name: ActionDeleteResourceRelease, LowestScope: ScopeProject, IsInternal: false},
 
 	// ReleaseBinding
 	{Name: ActionViewReleaseBinding, LowestScope: ScopeComponent, IsInternal: false},
@@ -255,11 +295,23 @@ var systemActions = []Action{
 	{Name: ActionUpdateReleaseBinding, LowestScope: ScopeComponent, IsInternal: false},
 	{Name: ActionDeleteReleaseBinding, LowestScope: ScopeComponent, IsInternal: false},
 
+	// ResourceReleaseBinding
+	{Name: ActionViewResourceReleaseBinding, LowestScope: ScopeProject, IsInternal: false},
+	{Name: ActionCreateResourceReleaseBinding, LowestScope: ScopeProject, IsInternal: false},
+	{Name: ActionUpdateResourceReleaseBinding, LowestScope: ScopeProject, IsInternal: false},
+	{Name: ActionDeleteResourceReleaseBinding, LowestScope: ScopeProject, IsInternal: false},
+
 	// ComponentType
 	{Name: ActionViewComponentType, LowestScope: ScopeNamespace, IsInternal: false},
 	{Name: ActionCreateComponentType, LowestScope: ScopeNamespace, IsInternal: false},
 	{Name: ActionUpdateComponentType, LowestScope: ScopeNamespace, IsInternal: false},
 	{Name: ActionDeleteComponentType, LowestScope: ScopeNamespace, IsInternal: false},
+
+	// ResourceType
+	{Name: ActionViewResourceType, LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: ActionCreateResourceType, LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: ActionUpdateResourceType, LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: ActionDeleteResourceType, LowestScope: ScopeNamespace, IsInternal: false},
 
 	// Workflow
 	{Name: ActionViewWorkflow, LowestScope: ScopeNamespace, IsInternal: false},
@@ -308,6 +360,12 @@ var systemActions = []Action{
 	{Name: ActionCreateClusterComponentType, LowestScope: ScopeCluster, IsInternal: false},
 	{Name: ActionUpdateClusterComponentType, LowestScope: ScopeCluster, IsInternal: false},
 	{Name: ActionDeleteClusterComponentType, LowestScope: ScopeCluster, IsInternal: false},
+
+	// ClusterResourceType
+	{Name: ActionViewClusterResourceType, LowestScope: ScopeCluster, IsInternal: false},
+	{Name: ActionCreateClusterResourceType, LowestScope: ScopeCluster, IsInternal: false},
+	{Name: ActionUpdateClusterResourceType, LowestScope: ScopeCluster, IsInternal: false},
+	{Name: ActionDeleteClusterResourceType, LowestScope: ScopeCluster, IsInternal: false},
 
 	// ClusterTrait
 	{Name: ActionViewClusterTrait, LowestScope: ScopeCluster, IsInternal: false},
