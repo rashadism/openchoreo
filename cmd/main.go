@@ -65,6 +65,7 @@ import (
 	authzrolebindingwebhook "github.com/openchoreo/openchoreo/internal/webhook/authzrolebinding"
 	clusterauthzrolebindingwebhook "github.com/openchoreo/openchoreo/internal/webhook/clusterauthzrolebinding"
 	clustercomponenttypewebhook "github.com/openchoreo/openchoreo/internal/webhook/clustercomponenttype"
+	clusterresourcetypewebhook "github.com/openchoreo/openchoreo/internal/webhook/clusterresourcetype"
 	clustertraitwebhook "github.com/openchoreo/openchoreo/internal/webhook/clustertrait"
 	clusterworkflowwebhook "github.com/openchoreo/openchoreo/internal/webhook/clusterworkflow"
 	componentwebhook "github.com/openchoreo/openchoreo/internal/webhook/component"
@@ -72,6 +73,8 @@ import (
 	componenttypewebhook "github.com/openchoreo/openchoreo/internal/webhook/componenttype"
 	projectwebhook "github.com/openchoreo/openchoreo/internal/webhook/project"
 	releasebindingwebhook "github.com/openchoreo/openchoreo/internal/webhook/releasebinding"
+	resourcereleasewebhook "github.com/openchoreo/openchoreo/internal/webhook/resourcerelease"
+	resourcetypewebhook "github.com/openchoreo/openchoreo/internal/webhook/resourcetype"
 	traitwebhook "github.com/openchoreo/openchoreo/internal/webhook/trait"
 	workflowwebhook "github.com/openchoreo/openchoreo/internal/webhook/workflow"
 )
@@ -400,86 +403,32 @@ func main() {
 	// Setup webhooks with the controller manager
 	// -----------------------------------------------------------------------------
 
-	// nolint:goconst
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		if err = projectwebhook.SetupProjectWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "Project")
-			os.Exit(1)
+		webhookSetups := []struct {
+			name  string
+			setup func(ctrl.Manager) error
+		}{
+			{"Project", projectwebhook.SetupProjectWebhookWithManager},
+			{"ComponentType", componenttypewebhook.SetupComponentTypeWebhookWithManager},
+			{"ClusterComponentType", clustercomponenttypewebhook.SetupClusterComponentTypeWebhookWithManager},
+			{"Component", componentwebhook.SetupComponentWebhookWithManager},
+			{"Trait", traitwebhook.SetupTraitWebhookWithManager},
+			{"ClusterTrait", clustertraitwebhook.SetupClusterTraitWebhookWithManager},
+			{"ComponentRelease", componentreleasewebhook.SetupComponentReleaseWebhookWithManager},
+			{"ReleaseBinding", releasebindingwebhook.SetupReleaseBindingWebhookWithManager},
+			{"ResourceType", resourcetypewebhook.SetupResourceTypeWebhookWithManager},
+			{"ClusterResourceType", clusterresourcetypewebhook.SetupClusterResourceTypeWebhookWithManager},
+			{"ResourceRelease", resourcereleasewebhook.SetupResourceReleaseWebhookWithManager},
+			{"Workflow", workflowwebhook.SetupWorkflowWebhookWithManager},
+			{"ClusterWorkflow", clusterworkflowwebhook.SetupClusterWorkflowWebhookWithManager},
+			{"AuthzRoleBinding", authzrolebindingwebhook.SetupAuthzRoleBindingWebhookWithManager},
+			{"ClusterAuthzRoleBinding", clusterauthzrolebindingwebhook.SetupClusterAuthzRoleBindingWebhookWithManager},
 		}
-	}
-
-	// nolint:goconst
-	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		if err := componenttypewebhook.SetupComponentTypeWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "ComponentType")
-			os.Exit(1)
-		}
-	}
-	// nolint:goconst
-	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		if err := clustercomponenttypewebhook.SetupClusterComponentTypeWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "ClusterComponentType")
-			os.Exit(1)
-		}
-	}
-	// nolint:goconst
-	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		if err := componentwebhook.SetupComponentWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "Component")
-			os.Exit(1)
-		}
-	}
-	// nolint:goconst
-	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		if err := traitwebhook.SetupTraitWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "Trait")
-			os.Exit(1)
-		}
-	}
-	// nolint:goconst
-	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		if err := clustertraitwebhook.SetupClusterTraitWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "ClusterTrait")
-			os.Exit(1)
-		}
-	}
-	// nolint:goconst
-	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		if err := componentreleasewebhook.SetupComponentReleaseWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "ComponentRelease")
-			os.Exit(1)
-		}
-	}
-	// nolint:goconst
-	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		if err := releasebindingwebhook.SetupReleaseBindingWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "ReleaseBinding")
-			os.Exit(1)
-		}
-	}
-	// nolint:goconst
-	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		if err := workflowwebhook.SetupWorkflowWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "Workflow")
-			os.Exit(1)
-		}
-	}
-	// nolint:goconst
-	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		if err := clusterworkflowwebhook.SetupClusterWorkflowWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "ClusterWorkflow")
-			os.Exit(1)
-		}
-	}
-	// nolint:goconst
-	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		if err := authzrolebindingwebhook.SetupAuthzRoleBindingWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "AuthzRoleBinding")
-			os.Exit(1)
-		}
-		if err := clusterauthzrolebindingwebhook.SetupClusterAuthzRoleBindingWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "ClusterAuthzRoleBinding")
-			os.Exit(1)
+		for _, w := range webhookSetups {
+			if err := w.setup(mgr); err != nil {
+				setupLog.Error(err, "unable to create webhook", "webhook", w.name)
+				os.Exit(1)
+			}
 		}
 	}
 
