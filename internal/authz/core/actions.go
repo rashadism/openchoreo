@@ -241,7 +241,8 @@ const (
 	ActionUpdateRCAReport = "rcareport:update"
 
 	// FinOps Report actions
-	ActionViewFinOpsReport = "finopsreport:view"
+	ActionViewFinOpsReport   = "finopsreport:view"
+	ActionUpdateFinOpsReport = "finopsreport:update"
 )
 
 // Action represents a system action with metadata
@@ -475,6 +476,7 @@ var systemActions = []Action{
 
 	// FinOps Report
 	{Name: ActionViewFinOpsReport, LowestScope: ScopeProject, IsInternal: false},
+	{Name: ActionUpdateFinOpsReport, LowestScope: ScopeProject, IsInternal: false},
 }
 
 // AllActions returns all system-defined actions
