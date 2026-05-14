@@ -128,6 +128,13 @@ func (m *MockCoreToolsetHandler) CreateProject(
 	return `{"name":"new-project"}`, nil
 }
 
+func (m *MockCoreToolsetHandler) UpdateProject(
+	ctx context.Context, namespaceName, projectName string, req *gen.PatchProjectRequest,
+) (any, error) {
+	m.recordCall("UpdateProject", namespaceName, projectName, req)
+	return `{"name":"updated-project"}`, nil
+}
+
 // ComponentToolsetHandler methods
 
 func (m *MockCoreToolsetHandler) CreateComponent(

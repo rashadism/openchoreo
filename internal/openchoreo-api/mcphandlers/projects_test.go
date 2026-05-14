@@ -133,6 +133,111 @@ func TestCreateProject(t *testing.T) {
 	})
 }
 
+func TestUpdateProject(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("updates deployment pipeline while preserving existing metadata", func(t *testing.T) {
+		const (
+			projectName = "my-proj"
+			oldPipeline = "default"
+		)
+		newPipeline := "custom-pipeline"
+		newDisplayName := "Updated Project"
+		newDescription := "Updated project description"
+
+		projSvc := projectmocks.NewMockService(t)
+		existing := &openchoreov1alpha1.Project{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        projectName,
+				Namespace:   testNS,
+				Labels:      map[string]string{"team": "integrations"},
+				Annotations: map[string]string{"openchoreo.dev/display-name": "My Project", "custom": "keep"},
+			},
+			Spec: openchoreov1alpha1.ProjectSpec{
+				DeploymentPipelineRef: openchoreov1alpha1.DeploymentPipelineRef{
+					Kind: openchoreov1alpha1.DeploymentPipelineRefKindDeploymentPipeline,
+					Name: oldPipeline,
+				},
+			},
+		}
+		updated := existing.DeepCopy()
+		updated.Spec.DeploymentPipelineRef.Name = newPipeline
+
+		projSvc.EXPECT().
+			GetProject(mock.Anything, testNS, projectName).
+			Return(existing, nil)
+
+		var updateReq *openchoreov1alpha1.Project
+		projSvc.EXPECT().
+			UpdateProject(mock.Anything, testNS, mock.Anything).
+			Run(func(ctx context.Context, namespaceName string, project *openchoreov1alpha1.Project) {
+				updateReq = project
+			}).
+			Return(updated, nil)
+
+		h := newTestHandler(withProjectService(projSvc))
+		result, err := h.UpdateProject(ctx, testNS, projectName, &gen.PatchProjectRequest{
+			DeploymentPipeline: &newPipeline,
+			DisplayName:        &newDisplayName,
+			Description:        &newDescription,
+		})
+		require.NoError(t, err)
+
+		require.NotNil(t, updateReq)
+		assert.Equal(t, projectName, updateReq.Name)
+		assert.Equal(t, testNS, updateReq.Namespace)
+		assert.Equal(t, existing.Labels, updateReq.Labels)
+		assert.Equal(t, "keep", updateReq.Annotations["custom"])
+		assert.Equal(t, newDisplayName, updateReq.Annotations["openchoreo.dev/display-name"])
+		assert.Equal(t, newDescription, updateReq.Annotations["openchoreo.dev/description"])
+		assert.Equal(t, openchoreov1alpha1.DeploymentPipelineRefKindDeploymentPipeline, updateReq.Spec.DeploymentPipelineRef.Kind)
+		assert.Equal(t, newPipeline, updateReq.Spec.DeploymentPipelineRef.Name)
+
+		typed, ok := result.(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "updated", typed["action"])
+		assert.Equal(t, projectName, typed["name"])
+		assert.Equal(t, newPipeline, typed["deploymentPipelineRef"])
+	})
+
+	t.Run("wraps get error", func(t *testing.T) {
+		expected := errors.New("get failed")
+		projSvc := projectmocks.NewMockService(t)
+		projSvc.EXPECT().
+			GetProject(mock.Anything, testNS, "my-proj").
+			Return(nil, expected)
+
+		h := newTestHandler(withProjectService(projSvc))
+		_, err := h.UpdateProject(ctx, testNS, "my-proj", &gen.PatchProjectRequest{})
+		require.ErrorIs(t, err, expected)
+		assert.Contains(t, err.Error(), "UpdateProject: GetProject namespace=test-ns project=my-proj")
+	})
+
+	t.Run("wraps update error", func(t *testing.T) {
+		expected := errors.New("update failed")
+		project := &openchoreov1alpha1.Project{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "my-proj",
+				Namespace: testNS,
+			},
+		}
+
+		projSvc := projectmocks.NewMockService(t)
+		projSvc.EXPECT().
+			GetProject(mock.Anything, testNS, "my-proj").
+			Return(project, nil)
+		projSvc.EXPECT().
+			UpdateProject(mock.Anything, testNS, mock.Anything).
+			Return(nil, expected)
+
+		h := newTestHandler(withProjectService(projSvc))
+		_, err := h.UpdateProject(ctx, testNS, "my-proj", nil)
+		require.ErrorIs(t, err, expected)
+		assert.Contains(t, err.Error(),
+			"UpdateProject: UpdateProject namespace=test-ns project=my-proj deploymentPipeline=")
+	})
+}
+
 func TestDeleteProject(t *testing.T) {
 	ctx := context.Background()
 
