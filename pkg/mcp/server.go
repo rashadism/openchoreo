@@ -27,14 +27,25 @@ const (
 	// Defaults to true. The service layer enforces authz independently
 	// regardless of this flag.
 	QueryParamFilterByAuthz = "filterByAuthz"
+	// QueryParamIncludeDeprecatedTools controls whether tools/list includes the
+	// deprecated cluster-prefixed compatibility-alias tools (e.g.
+	// ?includeDeprecatedTools=false). Defaults to true in v1.1: the aliases are
+	// listed with a description-level deprecation banner and a structured _meta
+	// marker so existing clients see a migration signal before they disappear.
+	// Set this to false to preview the v1.2 surface, where the aliases are
+	// hidden from tools/list but remain callable; in v1.3 they are removed.
+	QueryParamIncludeDeprecatedTools = "includeDeprecatedTools"
 )
 
 // NewHTTPServer creates an MCP HTTP handler backed by a single shared server.
 //
 // All configured toolsets are registered up front. Per-session narrowing
 // happens via query parameters parsed from the initialize request:
-//   - ?toolsets=ns1,ns2     — only show tools from those toolsets in tools/list
-//   - ?filterByAuthz=false  — disable MCP-layer authz filtering for the session
+//   - ?toolsets=ns1,ns2              — only show tools from those toolsets in tools/list
+//   - ?filterByAuthz=false           — disable MCP-layer authz filtering for the session
+//   - ?includeDeprecatedTools=false  — hide the deprecated cluster-prefixed alias tools
+//     (they are listed by default in v1.1 with a deprecation banner, hidden in v1.2,
+//     and removed in v1.3)
 //
 // When pdp is non-nil the server installs a receiving middleware that filters
 // tools/list results and guards tools/call invocations based on the
@@ -69,8 +80,9 @@ func NewSTDIO(toolsets *tools.Toolsets) *mcp.Server {
 }
 
 // withSessionQueryParams returns an http.Handler that extracts the optional
-// MCP session-scoping query parameters (toolsets, filterByAuthz) from the
-// request URL and stores them on the request context. The MCP SDK propagates
+// MCP session-scoping query parameters (toolsets, filterByAuthz,
+// includeDeprecatedTools) from the request URL and stores them on the request
+// context. The MCP SDK propagates
 // the initialize request's context into the long-lived session, so the values
 // set here become the per-session scope used by the tool-filter middleware.
 //
@@ -92,6 +104,12 @@ func withSessionQueryParams(next http.Handler) http.Handler {
 		if raw := q.Get(QueryParamFilterByAuthz); raw != "" {
 			if v, err := strconv.ParseBool(raw); err == nil {
 				ctx = tools.WithFilterByAuthz(ctx, v)
+			}
+		}
+
+		if raw := q.Get(QueryParamIncludeDeprecatedTools); raw != "" {
+			if v, err := strconv.ParseBool(raw); err == nil {
+				ctx = tools.WithIncludeDeprecatedTools(ctx, v)
 			}
 		}
 
