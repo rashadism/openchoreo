@@ -32,6 +32,7 @@ import (
 	k8s "github.com/openchoreo/openchoreo/internal/openchoreo-api/clients"
 	"github.com/openchoreo/openchoreo/internal/openchoreo-api/config"
 	"github.com/openchoreo/openchoreo/internal/openchoreo-api/mcphandlers"
+	svcpkg "github.com/openchoreo/openchoreo/internal/openchoreo-api/services"
 	autobuildsvc "github.com/openchoreo/openchoreo/internal/openchoreo-api/services/autobuild"
 	"github.com/openchoreo/openchoreo/internal/openchoreo-api/services/handlerservices"
 	workflowrunsvc "github.com/openchoreo/openchoreo/internal/openchoreo-api/services/workflowrun"
@@ -228,8 +229,25 @@ func main() {
 		Middlewares: []gen.MiddlewareFunc{openapihandlers.WebhookRawBodyMiddleware, authMiddleware, loggerMiddleware},
 	})
 
+	// Exec WebSocket endpoint is registered on a top-level mux that wraps the
+	// OpenAPI handler. This keeps exec outside the OpenAPI middleware chain whose
+	// ResponseWriter wrappers break http.Hijacker (required for WebSocket upgrade).
+	// The JWT middleware is applied directly to the exec handler for authentication.
+	// Authorization is enforced inside the handler via AuthzChecker (component:exec).
+	var topHandler http.Handler = handler
+	if cfg.ClusterGateway.Enabled && gatewayURL != "" {
+		execAuthzChecker := svcpkg.NewAuthzChecker(runtime.pdp, logger.With("component", "exec-authz"))
+		execHandler := openapihandlers.NewExecHandler(k8sClient, gwClient, gatewayURL, execAuthzChecker, logger)
+		authedExecHandler := jwtMiddleware(execHandler)
+		topMux := http.NewServeMux()
+		topMux.Handle("/exec/", authedExecHandler)
+		topMux.Handle("/", handler)
+		topHandler = topMux
+		logger.Info("Exec endpoint registered", "path", "/exec/namespaces/{ns}/components/{name}")
+	}
+
 	// Create server from configuration
-	srv := server.New(cfg.Server.ToServerConfig(), handler, logger)
+	srv := server.New(cfg.Server.ToServerConfig(), topHandler, logger)
 
 	// Start server
 	if err := srv.Run(ctx); err != nil {
