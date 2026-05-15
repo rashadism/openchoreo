@@ -677,6 +677,7 @@ helm upgrade --install observability-tracing-opensearch \
   --set openSearch.enabled=false \
   --set openSearchCluster.enabled=false \
   --set openSearchSetup.enabled=false \
+  --set adapter.enabled=false \
   --set-json opentelemetry-collector.extraEnvs='[]' \
   --set opentelemetryCollectorCustomizations.http.observabilityPlaneUrl="http://host.k3d.internal:11080" \
   --set opentelemetryCollectorCustomizations.http.observabilityPlaneVirtualHost="opentelemetry.observability.openchoreo.localhost"
@@ -692,7 +693,7 @@ helm upgrade --install observability-metrics-prometheus \
   --kube-context k3d-openchoreo-op \
   --create-namespace \
   --namespace openchoreo-observability-plane \
-  --version 0.6.0 \
+  --version 0.6.1 \
   --set global.installationMode="multiClusterReceiver" \
   --set-json 'prometheusCustomizations.http.hostnames=["prometheus.observability.openchoreo.localhost", "host.k3d.internal"]'
 ```
@@ -705,7 +706,7 @@ helm upgrade --install observability-metrics-prometheus \
   --kube-context k3d-openchoreo-dp \
   --create-namespace \
   --namespace openchoreo-observability-plane \
-  --version 0.6.0 \
+  --version 0.6.1 \
   --set global.installationMode="multiClusterExporter" \
   --set prometheusCustomizations.http.observabilityPlaneUrl=http://host.k3d.internal:11080/api/v1/write \
   --set kube-prometheus-stack.prometheus.enabled=false \
@@ -798,6 +799,20 @@ kubectl --context k3d-openchoreo-dp logs -n openchoreo-data-plane -l app.kuberne
 kubectl --context k3d-openchoreo-wp logs -n openchoreo-workflow-plane -l app.kubernetes.io/component=cluster-agent --tail=5
 kubectl --context k3d-openchoreo-op logs -n openchoreo-observability-plane -l app.kubernetes.io/component=cluster-agent --tail=5
 ```
+
+## Troubleshooting
+
+### Observer returns no logs
+
+If Fluent Bit is shipping and `container-logs-*` is filling but Observer returns empty results, the index was likely created before `openSearchSetup` applied its template — so it has dynamic mappings that don't match what the adapter queries. Delete the index and let Fluent Bit recreate it:
+
+```bash
+kubectl --context k3d-openchoreo-op exec -n openchoreo-observability-plane opensearch-master-0 \
+  -- curl -ksu admin:ThisIsTheOpenSearchPassword1 \
+  -X DELETE 'https://localhost:9200/container-logs-*'
+```
+
+Only logs written after the deletion will appear (Fluent Bit's tail cursor persists at `/var/lib/fluent-bit/db/tail-container-logs.db`). Generate fresh traffic, or remove that DB and restart the DaemonSet to backfill.
 
 ## Image Preloading
 
