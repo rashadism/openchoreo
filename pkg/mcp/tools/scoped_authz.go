@@ -275,13 +275,13 @@ func (t *Toolsets) RegisterEvaluateAuthz(s *mcp.Server, perms map[string]ToolPer
 		Description: "Evaluate one or more authorization requests and return allow/deny decisions. " +
 			"Used to debug \"why am I getting 403?\" — pass the action and resource the caller tried to " +
 			"perform; each response carries `decision` (true = allowed) and an optional `reason` string. " +
-			"Each request must include action, resource.type, and subject_context (use the caller's own " +
-			"identity to ask \"can I do X?\").",
+			"Each request must include action and resource.type. subject_context is optional and " +
+			"defaults to the caller's own identity (the common \"can I do X?\" case).",
 		InputSchema: createSchema(map[string]any{
 			"requests": map[string]any{
 				"type": "array",
 				"description": "List of evaluation requests. Each: {action, " +
-					"resource: {type, id?, hierarchy?}, subject_context: " +
+					"resource: {type, id?, hierarchy?}, subject_context?: " +
 					"{type, entitlement_claim, entitlement_values[]}, context?}.",
 				"items":    map[string]any{"type": "object"},
 				"minItems": 1,
