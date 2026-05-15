@@ -2993,7 +2993,14 @@ paths:
     get:
       operationId: getSubjectProfile
       summary: Get subject profile
-      description: Returns the authorization profile for the authenticated subject.
+      description: |
+        Returns the authorization profile for the authenticated subject.
+
+        Scope query parameters follow the same hierarchy rules as the ResourceHierarchy schema:
+        - `project` is required when `component` or `resource` is set
+        - `component` and `resource` are mutually exclusive (siblings under `project`)
+
+        Omitting `component` and `resource` returns a project-scoped profile.
       tags: [Authorization]
       parameters:
         - name: namespace
@@ -3012,6 +3019,12 @@ paths:
           in: query
           required: false
           description: Component scope
+          schema:
+            type: string
+        - name: resource
+          in: query
+          required: false
+          description: Resource scope (sibling of component under project)
           schema:
             type: string
       responses:
@@ -10536,7 +10549,15 @@ components:
 
     ResourceHierarchy:
       type: object
-      description: Resource hierarchy scope
+      description: |
+        Resource hierarchy scope. Authoritative validation lives on the
+        AuthzRoleBinding / ClusterAuthzRoleBinding CRD CEL rules; this schema
+        documents the same invariants for clients:
+        - `project` is required when `component` or `resource` is set
+        - `component` and `resource` are mutually exclusive (siblings under `project`)
+
+        Hierarchies that violate these invariants are treated as no-match by
+        the authz engine rather than rejected on the wire.
       properties:
         namespace:
           type: string
@@ -10550,6 +10571,10 @@ components:
           type: string
           description: Component name
           example: api-service
+        resource:
+          type: string
+          description: Resource name (sibling of component under project)
+          example: analytics-shared-db
 
     AuthzContext:
       type: object
@@ -10676,12 +10701,13 @@ components:
           type: string
           description: >
             The lowest resource hierarchy level at which this action is evaluated.
-            One of cluster, namespace, project, or component.
+            One of cluster, namespace, project, component, or resource.
           enum:
             - cluster
             - namespace
             - project
             - component
+            - resource
           example: component
         conditions:
           type: array

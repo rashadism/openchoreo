@@ -21,6 +21,7 @@ const (
 	ActionInfoLowestScopeComponent ActionInfoLowestScope = "component"
 	ActionInfoLowestScopeNamespace ActionInfoLowestScope = "namespace"
 	ActionInfoLowestScopeProject   ActionInfoLowestScope = "project"
+	ActionInfoLowestScopeResource  ActionInfoLowestScope = "resource"
 )
 
 // Defines values for AuthzRoleBindingSpecEffect.
@@ -435,14 +436,14 @@ type ActionInfo struct {
 	// Conditions ABAC attributes available for CEL condition expressions on this action. Empty means no conditions are supported.
 	Conditions *[]ConditionAttribute `json:"conditions,omitempty"`
 
-	// LowestScope The lowest resource hierarchy level at which this action is evaluated. One of cluster, namespace, project, or component.
+	// LowestScope The lowest resource hierarchy level at which this action is evaluated. One of cluster, namespace, project, component, or resource.
 	LowestScope ActionInfoLowestScope `json:"lowestScope"`
 
 	// Name The action identifier (e.g. "component:create").
 	Name string `json:"name"`
 }
 
-// ActionInfoLowestScope The lowest resource hierarchy level at which this action is evaluated. One of cluster, namespace, project, or component.
+// ActionInfoLowestScope The lowest resource hierarchy level at which this action is evaluated. One of cluster, namespace, project, component, or resource.
 type ActionInfoLowestScope string
 
 // AgentConnectionStatus Status of cluster agent connections
@@ -2872,7 +2873,14 @@ type ResolvedResourceOutput struct {
 
 // Resource Resource for authorization evaluation
 type Resource struct {
-	// Hierarchy Resource hierarchy scope
+	// Hierarchy Resource hierarchy scope. Authoritative validation lives on the
+	// AuthzRoleBinding / ClusterAuthzRoleBinding CRD CEL rules; this schema
+	// documents the same invariants for clients:
+	// - `project` is required when `component` or `resource` is set
+	// - `component` and `resource` are mutually exclusive (siblings under `project`)
+	//
+	// Hierarchies that violate these invariants are treated as no-match by
+	// the authz engine rather than rejected on the wire.
 	Hierarchy ResourceHierarchy `json:"hierarchy"`
 
 	// Id Resource ID
@@ -2921,7 +2929,14 @@ type ResourceEventsResponse struct {
 	Events []ResourceEvent `json:"events"`
 }
 
-// ResourceHierarchy Resource hierarchy scope
+// ResourceHierarchy Resource hierarchy scope. Authoritative validation lives on the
+// AuthzRoleBinding / ClusterAuthzRoleBinding CRD CEL rules; this schema
+// documents the same invariants for clients:
+// - `project` is required when `component` or `resource` is set
+// - `component` and `resource` are mutually exclusive (siblings under `project`)
+//
+// Hierarchies that violate these invariants are treated as no-match by
+// the authz engine rather than rejected on the wire.
 type ResourceHierarchy struct {
 	// Component Component name
 	Component *string `json:"component,omitempty"`
@@ -2931,6 +2946,9 @@ type ResourceHierarchy struct {
 
 	// Project Project name
 	Project *string `json:"project,omitempty"`
+
+	// Resource Resource name (sibling of component under project)
+	Resource *string `json:"resource,omitempty"`
 }
 
 // ResourceInstance Resource.
@@ -4241,6 +4259,9 @@ type GetSubjectProfileParams struct {
 
 	// Component Component scope
 	Component *string `form:"component,omitempty" json:"component,omitempty"`
+
+	// Resource Resource scope (sibling of component under project)
+	Resource *string `form:"resource,omitempty" json:"resource,omitempty"`
 }
 
 // ListClusterRoleBindingsParams defines parameters for ListClusterRoleBindings.

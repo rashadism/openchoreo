@@ -35,20 +35,21 @@ func newAuthzSvc(pdp *testutil.CapturingPDP, internal Service) Service {
 	}
 }
 
-func projectHierarchy() authzcore.ResourceHierarchy {
+func projectHierarchy(resourceName string) authzcore.ResourceHierarchy {
 	return authzcore.ResourceHierarchy{
 		Namespace: authzNamespace,
 		Project:   authzProject,
+		Resource:  resourceName,
 	}
 }
 
-func newBindingFixture(name string) *openchoreov1alpha1.ResourceReleaseBinding {
+func newBindingFixture(name, ownerResourceName string) *openchoreov1alpha1.ResourceReleaseBinding {
 	return &openchoreov1alpha1.ResourceReleaseBinding{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: authzNamespace},
 		Spec: openchoreov1alpha1.ResourceReleaseBindingSpec{
 			Owner: openchoreov1alpha1.ResourceReleaseBindingOwner{
 				ProjectName:  authzProject,
-				ResourceName: "my-r",
+				ResourceName: ownerResourceName,
 			},
 			Environment: "dev",
 		},
@@ -56,7 +57,7 @@ func newBindingFixture(name string) *openchoreov1alpha1.ResourceReleaseBinding {
 }
 
 func TestCreateResourceReleaseBinding_AuthzCheck(t *testing.T) {
-	rb := newBindingFixture("my-rb")
+	rb := newBindingFixture("my-rb", "my-r")
 
 	t.Run("allowed", func(t *testing.T) {
 		pdp := testutil.AllowPDP()
@@ -67,7 +68,7 @@ func TestCreateResourceReleaseBinding_AuthzCheck(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, rb, result)
 		require.Len(t, pdp.Captured, 1)
-		testutil.RequireEvalRequest(t, pdp.Captured[0], "resourcereleasebinding:create", "resourcereleasebinding", "my-rb", projectHierarchy())
+		testutil.RequireEvalRequest(t, pdp.Captured[0], "resourcereleasebinding:create", "resourcereleasebinding", "my-rb", projectHierarchy("my-r"))
 		require.Equal(t, expectedEnvAttr, pdp.Captured[0].Context.Resource.Environment, "Create authz should attach binding's environment to ABAC context")
 	})
 
@@ -81,7 +82,7 @@ func TestCreateResourceReleaseBinding_AuthzCheck(t *testing.T) {
 }
 
 func TestUpdateResourceReleaseBinding_AuthzCheck(t *testing.T) {
-	rb := newBindingFixture("my-rb")
+	rb := newBindingFixture("my-rb", "my-r")
 
 	t.Run("allowed", func(t *testing.T) {
 		pdp := testutil.AllowPDP()
@@ -95,7 +96,7 @@ func TestUpdateResourceReleaseBinding_AuthzCheck(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, rb, result)
 		require.Len(t, pdp.Captured, 1)
-		testutil.RequireEvalRequest(t, pdp.Captured[0], "resourcereleasebinding:update", "resourcereleasebinding", "my-rb", projectHierarchy())
+		testutil.RequireEvalRequest(t, pdp.Captured[0], "resourcereleasebinding:update", "resourcereleasebinding", "my-rb", projectHierarchy("my-r"))
 		require.Equal(t, expectedEnvAttr, pdp.Captured[0].Context.Resource.Environment, "Update authz should attach binding's environment to ABAC context")
 	})
 
@@ -122,8 +123,8 @@ func TestUpdateResourceReleaseBinding_AuthzCheck(t *testing.T) {
 		// Existing binding belongs to project A; client sends body claiming project B.
 		// The authz check must use existing.Spec.Owner.ProjectName (project A), not
 		// the body's claim, so the project-scoped policy is honored.
-		existing := newBindingFixture("my-rb")
-		bodyClaiming := newBindingFixture("my-rb")
+		existing := newBindingFixture("my-rb", "my-r")
+		bodyClaiming := newBindingFixture("my-rb", "my-r")
 		bodyClaiming.Spec.Owner.ProjectName = "different-project"
 
 		pdp := testutil.AllowPDP()
@@ -139,12 +140,12 @@ func TestUpdateResourceReleaseBinding_AuthzCheck(t *testing.T) {
 		// accidentally read from the body again.
 		require.Equal(t, authzProject, pdp.Captured[0].Resource.Hierarchy.Project, "authz must use existing.Spec.Owner.ProjectName, not the body's claim")
 		require.NotEqual(t, "different-project", pdp.Captured[0].Resource.Hierarchy.Project, "body's project claim must not leak into authz hierarchy")
-		testutil.RequireEvalRequest(t, pdp.Captured[0], "resourcereleasebinding:update", "resourcereleasebinding", "my-rb", projectHierarchy())
+		testutil.RequireEvalRequest(t, pdp.Captured[0], "resourcereleasebinding:update", "resourcereleasebinding", "my-rb", projectHierarchy("my-r"))
 	})
 }
 
 func TestGetResourceReleaseBinding_AuthzCheck(t *testing.T) {
-	rb := newBindingFixture("my-rb")
+	rb := newBindingFixture("my-rb", "my-r")
 
 	t.Run("allowed", func(t *testing.T) {
 		pdp := testutil.AllowPDP()
@@ -155,7 +156,7 @@ func TestGetResourceReleaseBinding_AuthzCheck(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, rb, result)
 		require.Len(t, pdp.Captured, 1)
-		testutil.RequireEvalRequest(t, pdp.Captured[0], "resourcereleasebinding:view", "resourcereleasebinding", "my-rb", projectHierarchy())
+		testutil.RequireEvalRequest(t, pdp.Captured[0], "resourcereleasebinding:view", "resourcereleasebinding", "my-rb", projectHierarchy("my-r"))
 		require.Equal(t, expectedEnvAttr, pdp.Captured[0].Context.Resource.Environment, "Get authz should attach binding's environment to ABAC context")
 	})
 
@@ -180,7 +181,7 @@ func TestGetResourceReleaseBinding_AuthzCheck(t *testing.T) {
 }
 
 func TestDeleteResourceReleaseBinding_AuthzCheck(t *testing.T) {
-	rb := newBindingFixture("my-rb")
+	rb := newBindingFixture("my-rb", "my-r")
 
 	t.Run("allowed", func(t *testing.T) {
 		pdp := testutil.AllowPDP()
@@ -191,7 +192,7 @@ func TestDeleteResourceReleaseBinding_AuthzCheck(t *testing.T) {
 		err := svc.DeleteResourceReleaseBinding(testutil.AuthzContext(), authzNamespace, "my-rb")
 		require.NoError(t, err)
 		require.Len(t, pdp.Captured, 1)
-		testutil.RequireEvalRequest(t, pdp.Captured[0], "resourcereleasebinding:delete", "resourcereleasebinding", "my-rb", projectHierarchy())
+		testutil.RequireEvalRequest(t, pdp.Captured[0], "resourcereleasebinding:delete", "resourcereleasebinding", "my-rb", projectHierarchy("my-r"))
 		require.Equal(t, expectedEnvAttr, pdp.Captured[0].Context.Resource.Environment, "Delete authz should attach binding's environment to ABAC context")
 	})
 
@@ -216,9 +217,11 @@ func TestDeleteResourceReleaseBinding_AuthzCheck(t *testing.T) {
 }
 
 func TestListResourceReleaseBindings_AuthzCheck(t *testing.T) {
+	// Use distinct owner.resourceName values so the per-item authz hierarchy
+	// assertion proves Resource is sourced from each binding, not a constant.
 	items := []openchoreov1alpha1.ResourceReleaseBinding{
-		*newBindingFixture("rb-1"),
-		*newBindingFixture("rb-2"),
+		*newBindingFixture("rb-1", "owner-r1"),
+		*newBindingFixture("rb-2", "owner-r2"),
 	}
 
 	t.Run("all allowed — per-item check request fields", func(t *testing.T) {
@@ -230,8 +233,8 @@ func TestListResourceReleaseBindings_AuthzCheck(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, result.Items, 2)
 		require.Len(t, pdp.Captured, 2)
-		testutil.RequireEvalRequest(t, pdp.Captured[0], "resourcereleasebinding:view", "resourcereleasebinding", "rb-1", projectHierarchy())
-		testutil.RequireEvalRequest(t, pdp.Captured[1], "resourcereleasebinding:view", "resourcereleasebinding", "rb-2", projectHierarchy())
+		testutil.RequireEvalRequest(t, pdp.Captured[0], "resourcereleasebinding:view", "resourcereleasebinding", "rb-1", projectHierarchy("owner-r1"))
+		testutil.RequireEvalRequest(t, pdp.Captured[1], "resourcereleasebinding:view", "resourcereleasebinding", "rb-2", projectHierarchy("owner-r2"))
 		// List propagates per-item environment to the authz check.
 		require.Equal(t, expectedEnvAttr, pdp.Captured[0].Context.Resource.Environment, "List authz should attach per-item environment to ABAC context")
 		require.Equal(t, expectedEnvAttr, pdp.Captured[1].Context.Resource.Environment, "List authz should attach per-item environment to ABAC context")
