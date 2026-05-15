@@ -274,7 +274,7 @@ func (t *Toolsets) RegisterEvaluateAuthz(s *mcp.Server, perms map[string]ToolPer
 		Name: name,
 		Description: "Evaluate one or more authorization requests and return allow/deny decisions. " +
 			"Used to debug \"why am I getting 403?\" — pass the action and resource the caller tried to " +
-			"perform; the response includes the matching binding chain when a decision is denied. " +
+			"perform; each response carries `decision` (true = allowed) and an optional `reason` string. " +
 			"Each request must include action, resource.type, and subject_context (use the caller's own " +
 			"identity to ask \"can I do X?\").",
 		InputSchema: createSchema(map[string]any{

@@ -89,7 +89,7 @@ func namespaceToolSpecs() []toolTestSpec {
 			expectedMethod: "GetSecretReference",
 			validateCall: func(t *testing.T, args []interface{}) {
 				if args[0] != testNamespaceName || args[1] != testSecretRefName {
-					t.Errorf("Expected (%s, ref-1), got (%v, %v)", testNamespaceName, args[0], args[1])
+					t.Errorf("Expected (%s, %s), got (%v, %v)", testNamespaceName, testSecretRefName, args[0], args[1])
 				}
 			},
 		},
