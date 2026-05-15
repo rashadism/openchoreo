@@ -129,7 +129,52 @@ func (t *Toolsets) RegisterGetSecretReference(s *mcp.Server, perms map[string]To
 	})
 }
 
-func (t *Toolsets) RegisterCreateSecretReference(s *mcp.Server, perms map[string]ToolPermission) {
+func (t *Toolsets) RegisterPEListSecretReferences(s *mcp.Server, perms map[string]ToolPermission) {
+	const name = "list_secret_references"
+	perms[name] = ToolPermission{ToolName: name, Action: authzcore.ActionViewSecretReference}
+	mcp.AddTool(s, &mcp.Tool{
+		Name: name,
+		Description: "List all secret references for an namespace. Secret references are " +
+			"credentials and sensitive configuration that can be used by components. Supports pagination via limit and cursor.",
+		InputSchema: createSchema(addPaginationProperties(map[string]any{
+			"namespace_name": defaultStringProperty(),
+		}), []string{"namespace_name"}),
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
+		NamespaceName string `json:"namespace_name"`
+		Limit         int    `json:"limit,omitempty"`
+		Cursor        string `json:"cursor,omitempty"`
+	}) (*mcp.CallToolResult, any, error) {
+		result, err := t.PEToolset.ListSecretReferences(
+			ctx, args.NamespaceName, ListOpts{Limit: args.Limit, Cursor: args.Cursor})
+		return handleToolResult(result, err)
+	})
+}
+
+func (t *Toolsets) RegisterPEGetSecretReference(s *mcp.Server, perms map[string]ToolPermission) {
+	const name = "get_secret_reference"
+	perms[name] = ToolPermission{ToolName: name, Action: authzcore.ActionViewSecretReference}
+	mcp.AddTool(s, &mcp.Tool{
+		Name: name,
+		Description: "Get a single secret reference by name. Returns the full spec " +
+			"(template, data sources, refresh interval, target plane). " +
+			"For actual sync status, query get_resource_events against the rendered ExternalSecret " +
+			"(group: external-secrets.io, version: v1, kind: ExternalSecret) on the release binding " +
+			"that consumes this SecretReference.",
+		InputSchema: createSchema(map[string]any{
+			"namespace_name": defaultStringProperty(),
+			"secret_reference_name": stringProperty(
+				"Name of the secret reference. Use list_secret_references to discover valid names."),
+		}, []string{"namespace_name", "secret_reference_name"}),
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args struct {
+		NamespaceName       string `json:"namespace_name"`
+		SecretReferenceName string `json:"secret_reference_name"`
+	}) (*mcp.CallToolResult, any, error) {
+		result, err := t.PEToolset.GetSecretReference(ctx, args.NamespaceName, args.SecretReferenceName)
+		return handleToolResult(result, err)
+	})
+}
+
+func (t *Toolsets) RegisterPECreateSecretReference(s *mcp.Server, perms map[string]ToolPermission) {
 	const name = "create_secret_reference"
 	perms[name] = ToolPermission{ToolName: name, Action: authzcore.ActionCreateSecretReference}
 	mcp.AddTool(s, &mcp.Tool{
@@ -168,12 +213,12 @@ func (t *Toolsets) RegisterCreateSecretReference(s *mcp.Server, perms map[string
 		if annotations := buildAnnotations(args.DisplayName, args.Description); len(annotations) > 0 {
 			createReq.Metadata.Annotations = &annotations
 		}
-		result, err := t.NamespaceToolset.CreateSecretReference(ctx, args.NamespaceName, createReq)
+		result, err := t.PEToolset.CreateSecretReference(ctx, args.NamespaceName, createReq)
 		return handleToolResult(result, err)
 	})
 }
 
-func (t *Toolsets) RegisterUpdateSecretReference(s *mcp.Server, perms map[string]ToolPermission) {
+func (t *Toolsets) RegisterPEUpdateSecretReference(s *mcp.Server, perms map[string]ToolPermission) {
 	const name = "update_secret_reference"
 	perms[name] = ToolPermission{ToolName: name, Action: authzcore.ActionUpdateSecretReference}
 	mcp.AddTool(s, &mcp.Tool{
@@ -212,12 +257,12 @@ func (t *Toolsets) RegisterUpdateSecretReference(s *mcp.Server, perms map[string
 			}
 			updateReq.Spec = &spec
 		}
-		result, err := t.NamespaceToolset.UpdateSecretReference(ctx, args.NamespaceName, updateReq)
+		result, err := t.PEToolset.UpdateSecretReference(ctx, args.NamespaceName, updateReq)
 		return handleToolResult(result, err)
 	})
 }
 
-func (t *Toolsets) RegisterDeleteSecretReference(s *mcp.Server, perms map[string]ToolPermission) {
+func (t *Toolsets) RegisterPEDeleteSecretReference(s *mcp.Server, perms map[string]ToolPermission) {
 	const name = "delete_secret_reference"
 	perms[name] = ToolPermission{ToolName: name, Action: authzcore.ActionDeleteSecretReference}
 	mcp.AddTool(s, &mcp.Tool{
@@ -233,7 +278,7 @@ func (t *Toolsets) RegisterDeleteSecretReference(s *mcp.Server, perms map[string
 		NamespaceName       string `json:"namespace_name"`
 		SecretReferenceName string `json:"secret_reference_name"`
 	}) (*mcp.CallToolResult, any, error) {
-		result, err := t.NamespaceToolset.DeleteSecretReference(ctx, args.NamespaceName, args.SecretReferenceName)
+		result, err := t.PEToolset.DeleteSecretReference(ctx, args.NamespaceName, args.SecretReferenceName)
 		return handleToolResult(result, err)
 	})
 }

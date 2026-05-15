@@ -263,12 +263,8 @@ type PEToolsetHandler interface {
 	// Authz diagnostics
 	EvaluateAuthz(ctx context.Context, requests []gen.EvaluateRequest) (any, error)
 	ListAuthzActions(ctx context.Context) (any, error)
-}
 
-// NamespaceToolsetHandler handles namespace operations
-type NamespaceToolsetHandler interface {
-	ListNamespaces(ctx context.Context, opts ListOpts) (any, error)
-	CreateNamespace(ctx context.Context, req *gen.CreateNamespaceJSONRequestBody) (any, error)
+	// SecretReference operations
 	ListSecretReferences(ctx context.Context, namespaceName string, opts ListOpts) (any, error)
 	GetSecretReference(ctx context.Context, namespaceName, secretReferenceName string) (any, error)
 	CreateSecretReference(
@@ -278,6 +274,14 @@ type NamespaceToolsetHandler interface {
 		ctx context.Context, namespaceName string, req *gen.UpdateSecretReferenceJSONRequestBody,
 	) (any, error)
 	DeleteSecretReference(ctx context.Context, namespaceName, secretReferenceName string) (any, error)
+}
+
+// NamespaceToolsetHandler handles namespace operations
+type NamespaceToolsetHandler interface {
+	ListNamespaces(ctx context.Context, opts ListOpts) (any, error)
+	CreateNamespace(ctx context.Context, req *gen.CreateNamespaceJSONRequestBody) (any, error)
+	ListSecretReferences(ctx context.Context, namespaceName string, opts ListOpts) (any, error)
+	GetSecretReference(ctx context.Context, namespaceName, secretReferenceName string) (any, error)
 }
 
 // ProjectToolsetHandler handles project operations

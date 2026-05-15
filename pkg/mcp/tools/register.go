@@ -63,9 +63,6 @@ func (t *Toolsets) namespaceToolRegistrations() []RegisterFunc {
 		t.RegisterCreateNamespace,
 		t.RegisterListSecretReferences,
 		t.RegisterGetSecretReference,
-		t.RegisterCreateSecretReference,
-		t.RegisterUpdateSecretReference,
-		t.RegisterDeleteSecretReference,
 	}
 }
 
@@ -245,6 +242,13 @@ func (t *Toolsets) peToolRegistrations() []RegisterFunc {
 		t.RegisterCreateAuthzRoleBinding,
 		t.RegisterUpdateAuthzRoleBinding,
 		t.RegisterDeleteAuthzRoleBinding,
+
+		// Secret references (list/get also registered by the namespace toolset)
+		t.RegisterPEListSecretReferences,
+		t.RegisterPEGetSecretReference,
+		t.RegisterPECreateSecretReference,
+		t.RegisterPEUpdateSecretReference,
+		t.RegisterPEDeleteSecretReference,
 
 		// Diagnostics
 		t.RegisterGetResourceTree,
