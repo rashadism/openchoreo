@@ -4,6 +4,7 @@
 package releasebinding
 
 import (
+	"encoding/json"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -1670,6 +1671,466 @@ var _ = Describe("ReleaseBinding Controller", func() {
 			)).To(Succeed(), "RenderedRelease should survive a render failure")
 			Expect(survivingRelease.UID).To(Equal(originalReleaseUID),
 				"RenderedRelease should be the same object, not recreated")
+		})
+	})
+
+	Context("when environment-level configs are supplied via the ReleaseBinding", func() {
+		const (
+			project  = "envcfg-proj"
+			compName = "envcfg-comp"
+			envName  = "envcfg-env"
+			dpName   = "envcfg-dp"
+			rbName   = "rb-envcfg"
+			crName   = "cr-envcfg"
+		)
+		req := reconcileRequest(rbName)
+		expectedReleaseName := compName + "-" + envName
+
+		// Template references parameters.replicas (numeric) and
+		// environmentConfigs.image (string). Because each CEL placeholder
+		// occupies its entire field, renderString returns the native CEL type:
+		// replicas comes through as a JSON number, image as a string.
+		templatedDeployment := &runtime.RawExtension{
+			Raw: []byte(`{` +
+				`"apiVersion":"apps/v1",` +
+				`"kind":"Deployment",` +
+				`"metadata":{"name":"envcfg-deployment"},` +
+				`"spec":{` +
+				`"replicas":"${parameters.replicas}",` +
+				`"selector":{"matchLabels":{"app":"envcfg"}},` +
+				`"template":{` +
+				`"metadata":{"labels":{"app":"envcfg"}},` +
+				`"spec":{"containers":[{"name":"app","image":"${environmentConfigs.image}"}]}` +
+				`}}}`,
+			),
+		}
+
+		AfterEach(func() {
+			forceDelete(rbName)
+			forceDeleteRelease(expectedReleaseName)
+			_ = k8sClient.Delete(ctx, &openchoreov1alpha1.ComponentRelease{
+				ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: crName},
+			})
+			_ = k8sClient.Delete(ctx, &openchoreov1alpha1.Environment{
+				ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: envName},
+			})
+			_ = k8sClient.Delete(ctx, &openchoreov1alpha1.DataPlane{
+				ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: dpName},
+			})
+			_ = k8sClient.Delete(ctx, &openchoreov1alpha1.Component{
+				ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: compName},
+			})
+			_ = k8sClient.Delete(ctx, &openchoreov1alpha1.Project{
+				ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: project},
+			})
+		})
+
+		It("propagates parameters and environmentConfigs into the rendered Deployment", func() {
+			r := testReconcilerWithPipeline()
+
+			By("Creating a ComponentRelease whose template references parameters.replicas and environmentConfigs.image")
+			cr := crFixture(crName, project, compName)
+			cr.Spec.ComponentType.Spec.Resources = []openchoreov1alpha1.ResourceTemplate{
+				{ID: "deployment", Template: templatedDeployment},
+			}
+			cr.Spec.ComponentType.Spec.Parameters = &openchoreov1alpha1.SchemaSection{
+				OpenAPIV3Schema: &runtime.RawExtension{
+					Raw: []byte(`{"type":"object","properties":{"replicas":{"type":"integer","default":1}}}`),
+				},
+			}
+			cr.Spec.ComponentType.Spec.EnvironmentConfigs = &openchoreov1alpha1.SchemaSection{
+				OpenAPIV3Schema: &runtime.RawExtension{
+					Raw: []byte(`{"type":"object","properties":{"image":{"type":"string","default":"nginx:latest"}}}`),
+				},
+			}
+			cr.Spec.ComponentProfile = &openchoreov1alpha1.ComponentProfile{
+				Parameters: &runtime.RawExtension{
+					Raw: []byte(`{"replicas":3}`),
+				},
+			}
+			Expect(k8sClient.Create(ctx, cr)).To(Succeed())
+
+			By("Creating the remaining dependencies")
+			Expect(k8sClient.Create(ctx, dpFixture(dpName))).To(Succeed())
+			Expect(k8sClient.Create(ctx, envFixture(envName, dpName))).To(Succeed())
+			Expect(k8sClient.Create(ctx, componentFixture(compName, project))).To(Succeed())
+			Expect(k8sClient.Create(ctx, projectFixture(project))).To(Succeed())
+
+			By("Creating the ReleaseBinding with environmentConfigs={image: nginx:1.27}")
+			rb := rbFixture(rbName, project, compName, envName, crName, true)
+			rb.Spec.ComponentTypeEnvironmentConfigs = &runtime.RawExtension{
+				Raw: []byte(`{"image":"nginx:1.27"}`),
+			}
+			Expect(k8sClient.Create(ctx, rb)).To(Succeed())
+
+			By("Reconciling — the Pipeline renders and creates the RenderedRelease")
+			result := mustReconcile(r, req)
+			Expect(result.Requeue).To(BeTrue())
+
+			By("Fetching the RenderedRelease and locating the rendered Deployment")
+			createdRelease := &openchoreov1alpha1.RenderedRelease{}
+			Expect(k8sClient.Get(ctx,
+				types.NamespacedName{Namespace: ns, Name: expectedReleaseName},
+				createdRelease,
+			)).To(Succeed())
+			Expect(createdRelease.Spec.Resources).NotTo(BeEmpty())
+
+			// The pipeline also injects auxiliary resources (e.g. a NetworkPolicy)
+			// alongside the Deployment, so look it up by kind rather than by index.
+			var rendered map[string]any
+			for _, res := range createdRelease.Spec.Resources {
+				if res.Object == nil {
+					continue
+				}
+				var obj map[string]any
+				Expect(json.Unmarshal(res.Object.Raw, &obj)).To(Succeed())
+				if obj["kind"] == kindDeployment {
+					rendered = obj
+					break
+				}
+			}
+			Expect(rendered).NotTo(BeNil(), "expected a rendered Deployment among the pipeline outputs")
+
+			By("Verifying parameters.replicas landed as the integer 3 on .spec.replicas")
+			spec, ok := rendered["spec"].(map[string]any)
+			Expect(ok).To(BeTrue(), "rendered Deployment should have a spec object")
+			Expect(spec["replicas"]).To(BeNumerically("==", 3),
+				"parameters.replicas should substitute as a native int, not a quoted string")
+
+			By("Verifying environmentConfigs.image landed verbatim on the container")
+			tmpl, ok := spec["template"].(map[string]any)
+			Expect(ok).To(BeTrue(), "rendered Deployment should have spec.template")
+			podSpec, ok := tmpl["spec"].(map[string]any)
+			Expect(ok).To(BeTrue(), "rendered Deployment should have spec.template.spec")
+			containersAny, ok := podSpec["containers"].([]any)
+			Expect(ok).To(BeTrue(), "rendered Deployment should have containers slice")
+			Expect(containersAny).To(HaveLen(1))
+			container, ok := containersAny[0].(map[string]any)
+			Expect(ok).To(BeTrue())
+			Expect(container["image"]).To(Equal("nginx:1.27"),
+				"environmentConfigs.image from the ReleaseBinding should land in the rendered container")
+		})
+	})
+
+	Context("when the ComponentType embeds a trait that creates an extra resource", func() {
+		const (
+			project  = "embedtrait-proj"
+			compName = "embedtrait-comp"
+			envName  = "embedtrait-env"
+			dpName   = "embedtrait-dp"
+			rbName   = "rb-embedtrait"
+			crName   = "cr-embedtrait"
+		)
+		req := reconcileRequest(rbName)
+		expectedReleaseName := compName + "-" + envName
+
+		AfterEach(func() {
+			forceDelete(rbName)
+			forceDeleteRelease(expectedReleaseName)
+			_ = k8sClient.Delete(ctx, &openchoreov1alpha1.ComponentRelease{
+				ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: crName},
+			})
+			_ = k8sClient.Delete(ctx, &openchoreov1alpha1.Environment{
+				ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: envName},
+			})
+			_ = k8sClient.Delete(ctx, &openchoreov1alpha1.DataPlane{
+				ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: dpName},
+			})
+			_ = k8sClient.Delete(ctx, &openchoreov1alpha1.Component{
+				ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: compName},
+			})
+			_ = k8sClient.Delete(ctx, &openchoreov1alpha1.Project{
+				ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: project},
+			})
+		})
+
+		It("renders the embedded trait's Creates[] resource alongside the workload Deployment", func() {
+			r := testReconcilerWithPipeline()
+
+			By("Creating a ComponentRelease whose ComponentType embeds an HPA trait")
+			cr := crFixture(crName, project, compName)
+			// Embed the trait instance on the ComponentType (PE-defined, the
+			// 'component-with-embedded-traits' sample shape).
+			cr.Spec.ComponentType.Spec.Traits = []openchoreov1alpha1.ComponentTypeTrait{
+				{
+					Kind:         openchoreov1alpha1.TraitRefKindTrait,
+					Name:         "hpa-trait",
+					InstanceName: "autoscaler",
+					Parameters: &runtime.RawExtension{
+						Raw: []byte(`{"minReplicas":2,"maxReplicas":5}`),
+					},
+				},
+			}
+			// Freeze the trait's spec on the ComponentRelease so the Pipeline
+			// can resolve hpa-trait's Creates[] templates.
+			cr.Spec.Traits = []openchoreov1alpha1.ComponentReleaseTrait{
+				{
+					Kind: openchoreov1alpha1.TraitRefKindTrait,
+					Name: "hpa-trait",
+					Spec: openchoreov1alpha1.TraitSpec{
+						Parameters: &openchoreov1alpha1.SchemaSection{
+							OpenAPIV3Schema: &runtime.RawExtension{
+								Raw: []byte(`{"type":"object","properties":{"minReplicas":{"type":"integer"},"maxReplicas":{"type":"integer"}}}`),
+							},
+						},
+						Creates: []openchoreov1alpha1.TraitCreate{
+							{
+								Template: &runtime.RawExtension{
+									Raw: []byte(`{` +
+										`"apiVersion":"autoscaling/v2",` +
+										`"kind":"HorizontalPodAutoscaler",` +
+										`"metadata":{"name":"embedtrait-hpa"},` +
+										`"spec":{` +
+										`"scaleTargetRef":{"apiVersion":"apps/v1","kind":"Deployment","name":"test-deployment"},` +
+										`"minReplicas":"${parameters.minReplicas}",` +
+										`"maxReplicas":"${parameters.maxReplicas}"` +
+										`}}`),
+								},
+							},
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, cr)).To(Succeed())
+
+			By("Creating the remaining dependencies")
+			Expect(k8sClient.Create(ctx, dpFixture(dpName))).To(Succeed())
+			Expect(k8sClient.Create(ctx, envFixture(envName, dpName))).To(Succeed())
+			Expect(k8sClient.Create(ctx, componentFixture(compName, project))).To(Succeed())
+			Expect(k8sClient.Create(ctx, projectFixture(project))).To(Succeed())
+
+			By("Creating the ReleaseBinding")
+			Expect(k8sClient.Create(ctx,
+				rbFixture(rbName, project, compName, envName, crName, true),
+			)).To(Succeed())
+
+			By("Reconciling — the Pipeline renders both the workload Deployment and the embedded trait's HPA")
+			result := mustReconcile(r, req)
+			Expect(result.Requeue).To(BeTrue())
+
+			By("Fetching the RenderedRelease and asserting both resources are present")
+			createdRelease := &openchoreov1alpha1.RenderedRelease{}
+			Expect(k8sClient.Get(ctx,
+				types.NamespacedName{Namespace: ns, Name: expectedReleaseName},
+				createdRelease,
+			)).To(Succeed())
+
+			var foundDeployment, foundHPA map[string]any
+			for _, res := range createdRelease.Spec.Resources {
+				if res.Object == nil {
+					continue
+				}
+				var obj map[string]any
+				Expect(json.Unmarshal(res.Object.Raw, &obj)).To(Succeed())
+				switch obj["kind"] {
+				case kindDeployment:
+					foundDeployment = obj
+				case "HorizontalPodAutoscaler":
+					foundHPA = obj
+				}
+			}
+			Expect(foundDeployment).NotTo(BeNil(), "workload Deployment should be rendered")
+			Expect(foundHPA).NotTo(BeNil(), "embedded trait's HPA should be rendered")
+
+			By("Verifying trait parameters substituted into the HPA spec")
+			hpaSpec, ok := foundHPA["spec"].(map[string]any)
+			Expect(ok).To(BeTrue(), "rendered HPA should have a spec object")
+			Expect(hpaSpec["minReplicas"]).To(BeNumerically("==", 2),
+				"trait parameters.minReplicas should substitute as a native int")
+			Expect(hpaSpec["maxReplicas"]).To(BeNumerically("==", 5),
+				"trait parameters.maxReplicas should substitute as a native int")
+		})
+	})
+
+	Context("when the Workload carries literal env vars and file configs", func() {
+		const (
+			project  = "configs-proj"
+			compName = "configs-comp"
+			envName  = "configs-env"
+			dpName   = "configs-dp"
+			rbName   = "rb-configs"
+			crName   = "cr-configs"
+		)
+		req := reconcileRequest(rbName)
+		expectedReleaseName := compName + "-" + envName
+
+		// Deployment template uses the ${configurations.*} CEL helpers from the
+		// component-with-configs sample: literal env vars become an envFrom
+		// configMapRef and literal files become container volumeMounts + pod
+		// volumes referencing a ConfigMap.
+		configsDeployment := &runtime.RawExtension{
+			Raw: []byte(`{` +
+				`"apiVersion":"apps/v1",` +
+				`"kind":"Deployment",` +
+				`"metadata":{"name":"configs-deployment"},` +
+				`"spec":{` +
+				`"selector":{"matchLabels":{"app":"configs"}},` +
+				`"template":{` +
+				`"metadata":{"labels":{"app":"configs"}},` +
+				`"spec":{` +
+				`"containers":[{` +
+				`"name":"app",` +
+				`"image":"nginx:latest",` +
+				`"envFrom":"${configurations.toContainerEnvFrom()}",` +
+				`"volumeMounts":"${configurations.toContainerVolumeMounts()}"` +
+				`}],` +
+				`"volumes":"${configurations.toVolumes()}"` +
+				`}}}}`),
+		}
+
+		// One ConfigMap per container-grouped env-var set.
+		envConfigTemplate := &runtime.RawExtension{
+			Raw: []byte(`{` +
+				`"apiVersion":"v1",` +
+				`"kind":"ConfigMap",` +
+				`"metadata":{"name":"${envConfig.resourceName}"}` +
+				`}`),
+		}
+
+		// One ConfigMap per literal file.
+		fileConfigTemplate := &runtime.RawExtension{
+			Raw: []byte(`{` +
+				`"apiVersion":"v1",` +
+				`"kind":"ConfigMap",` +
+				`"metadata":{"name":"${config.resourceName}"}` +
+				`}`),
+		}
+
+		AfterEach(func() {
+			forceDelete(rbName)
+			forceDeleteRelease(expectedReleaseName)
+			_ = k8sClient.Delete(ctx, &openchoreov1alpha1.ComponentRelease{
+				ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: crName},
+			})
+			_ = k8sClient.Delete(ctx, &openchoreov1alpha1.Environment{
+				ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: envName},
+			})
+			_ = k8sClient.Delete(ctx, &openchoreov1alpha1.DataPlane{
+				ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: dpName},
+			})
+			_ = k8sClient.Delete(ctx, &openchoreov1alpha1.Component{
+				ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: compName},
+			})
+			_ = k8sClient.Delete(ctx, &openchoreov1alpha1.Project{
+				ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: project},
+			})
+		})
+
+		It("injects env vars via envFrom and files via volumeMounts/volumes into the rendered Deployment", func() {
+			r := testReconcilerWithPipeline()
+
+			By("Creating a ComponentRelease whose template uses ${configurations.*} helpers and forEach ConfigMaps")
+			cr := crFixture(crName, project, compName)
+			cr.Spec.ComponentType.Spec.Resources = []openchoreov1alpha1.ResourceTemplate{
+				{ID: "deployment", Template: configsDeployment},
+				{
+					ID:       "env-config",
+					ForEach:  "${configurations.toConfigEnvsByContainer()}",
+					Var:      "envConfig",
+					Template: envConfigTemplate,
+				},
+				{
+					ID:       "file-config",
+					ForEach:  "${configurations.toConfigFileList()}",
+					Var:      "config",
+					Template: fileConfigTemplate,
+				},
+			}
+			// Workload carries one literal env var and one literal file —
+			// both go through the configs (non-secret) extraction path.
+			cr.Spec.Workload = openchoreov1alpha1.WorkloadTemplateSpec{
+				Container: openchoreov1alpha1.Container{
+					Image: "nginx:latest",
+					Env: []openchoreov1alpha1.EnvVar{
+						{Key: "LOG_LEVEL", Value: "info"},
+					},
+					Files: []openchoreov1alpha1.FileVar{
+						{Key: "application.toml", MountPath: "/conf", Value: "schema_generation:\n  enable: true\n"},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, cr)).To(Succeed())
+
+			By("Creating the remaining dependencies")
+			Expect(k8sClient.Create(ctx, dpFixture(dpName))).To(Succeed())
+			Expect(k8sClient.Create(ctx, envFixture(envName, dpName))).To(Succeed())
+			Expect(k8sClient.Create(ctx, componentFixture(compName, project))).To(Succeed())
+			Expect(k8sClient.Create(ctx, projectFixture(project))).To(Succeed())
+
+			By("Creating the ReleaseBinding")
+			Expect(k8sClient.Create(ctx,
+				rbFixture(rbName, project, compName, envName, crName, true),
+			)).To(Succeed())
+
+			By("Reconciling — the Pipeline renders the Deployment plus env-config and file-config ConfigMaps")
+			result := mustReconcile(r, req)
+			Expect(result.Requeue).To(BeTrue())
+
+			By("Fetching the RenderedRelease and partitioning resources by kind")
+			createdRelease := &openchoreov1alpha1.RenderedRelease{}
+			Expect(k8sClient.Get(ctx,
+				types.NamespacedName{Namespace: ns, Name: expectedReleaseName},
+				createdRelease,
+			)).To(Succeed())
+
+			var deployment map[string]any
+			var configMaps []map[string]any
+			for _, res := range createdRelease.Spec.Resources {
+				if res.Object == nil {
+					continue
+				}
+				var obj map[string]any
+				Expect(json.Unmarshal(res.Object.Raw, &obj)).To(Succeed())
+				switch obj["kind"] {
+				case kindDeployment:
+					deployment = obj
+				case "ConfigMap":
+					configMaps = append(configMaps, obj)
+				}
+			}
+			Expect(deployment).NotTo(BeNil(), "workload Deployment should be rendered")
+			Expect(configMaps).ToNot(BeEmpty(),
+				"at least one ConfigMap (env-config or file-config) should be rendered alongside the Deployment")
+
+			By("Locating the Deployment container spec")
+			depSpec, ok := deployment["spec"].(map[string]any)
+			Expect(ok).To(BeTrue())
+			tmpl, ok := depSpec["template"].(map[string]any)
+			Expect(ok).To(BeTrue())
+			podSpec, ok := tmpl["spec"].(map[string]any)
+			Expect(ok).To(BeTrue())
+			containers, ok := podSpec["containers"].([]any)
+			Expect(ok).To(BeTrue())
+			Expect(containers).To(HaveLen(1))
+			container, ok := containers[0].(map[string]any)
+			Expect(ok).To(BeTrue())
+
+			By("Verifying envFrom carries a configMapRef (env-var injection path)")
+			envFromAny, ok := container["envFrom"].([]any)
+			Expect(ok).To(BeTrue(), "container.envFrom should be a list, got %T", container["envFrom"])
+			Expect(envFromAny).NotTo(BeEmpty(), "container.envFrom should contain at least one configMapRef entry")
+			firstEnvFrom, ok := envFromAny[0].(map[string]any)
+			Expect(ok).To(BeTrue())
+			Expect(firstEnvFrom).To(HaveKey("configMapRef"),
+				"envFrom entry from a literal env var should be a configMapRef, not a secretRef")
+
+			By("Verifying volumeMounts carries the file's mount path (file-mount injection path)")
+			volMountsAny, ok := container["volumeMounts"].([]any)
+			Expect(ok).To(BeTrue(), "container.volumeMounts should be a list, got %T", container["volumeMounts"])
+			Expect(volMountsAny).NotTo(BeEmpty(), "container.volumeMounts should include the literal file's mount")
+			firstMount, ok := volMountsAny[0].(map[string]any)
+			Expect(ok).To(BeTrue())
+			Expect(firstMount["mountPath"]).To(Equal("/conf/application.toml"),
+				"mountPath should be derived from FileVar.MountPath + FileVar.Key")
+
+			By("Verifying volumes carries a ConfigMap-backed volume")
+			volumesAny, ok := podSpec["volumes"].([]any)
+			Expect(ok).To(BeTrue(), "spec.template.spec.volumes should be a list, got %T", podSpec["volumes"])
+			Expect(volumesAny).NotTo(BeEmpty(), "spec.template.spec.volumes should include the file-config ConfigMap volume")
+			firstVolume, ok := volumesAny[0].(map[string]any)
+			Expect(ok).To(BeTrue())
+			Expect(firstVolume).To(HaveKey("configMap"),
+				"a volume for a literal file should be backed by configMap, not secret")
 		})
 	})
 })
