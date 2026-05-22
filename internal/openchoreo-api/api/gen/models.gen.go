@@ -501,7 +501,10 @@ type AuthzCondition struct {
 type AuthzContext struct {
 	// Resource Resource-level attributes for condition evaluation
 	Resource *struct {
-		// Environment Target deployment environment (e.g. "dev", "staging", "prod")
+		// ComponentType ComponentType referenced by the Component as an authz identifier. Namespace-scoped ComponentTypes are namespace-prefixed (e.g. "acme/deployment/web-app"); cluster-scoped ClusterComponentTypes are unprefixed (e.g. "deployment/web-app").
+		ComponentType *string `json:"componentType,omitempty"`
+
+		// Environment Namespace-prefixed target deployment Environment name (e.g. "acme/dev").
 		Environment *string `json:"environment,omitempty"`
 	} `json:"resource,omitempty"`
 }
