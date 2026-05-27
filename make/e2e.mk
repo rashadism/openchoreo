@@ -45,6 +45,9 @@ ESO_VERSION            ?= 2.0.1
 KGATEWAY_VERSION       ?= v2.2.1
 OPENBAO_CHART_VERSION  ?= 0.25.6
 THUNDER_VERSION        ?= 0.28.0
+OBSERVABILITY_LOGS_OPENSEARCH_VERSION     ?= 0.4.1
+OBSERVABILITY_TRACES_OPENSEARCH_VERSION   ?= 0.4.1
+OBSERVABILITY_METRICS_PROMETHEUS_VERSION  ?= 0.6.1
 
 # Helm chart references: local chart dirs or OCI registry
 ifeq ($(E2E_HELM_SOURCE),oci)
@@ -292,10 +295,28 @@ _e2e.install-op:
 	$(call e2e_copy_gateway_certs,$(E2E_OP_NS))
 	@$(call log_info, Creating OpenSearch credentials)
 	@$(E2E_KUBECTL) create namespace $(E2E_OP_NS) --dry-run=client -o yaml | $(E2E_KUBECTL) apply -f -
+	@# observer-opensearch-credentials provides the basic-auth pair the
+	@# observer uses to talk to OpenSearch. The chart's
+	@# observer-opensearch-secret.yaml failsafe requires it before install
+	@# when observer.openSearchSecretName is unset (default chart value).
 	@$(E2E_KUBECTL) create secret generic observer-opensearch-credentials \
 		-n $(E2E_OP_NS) \
 		--from-literal=username="admin" \
 		--from-literal=password="ThisIsTheOpenSearchPassword1" \
+		--dry-run=client -o yaml | $(E2E_KUBECTL) apply -f -
+	@# observer-secret is consumed via envFrom by the observer deployment.
+	@# The chart's failsafe (templates/observer/observer-deployment.yaml:1-3)
+	@# rejects install when observer.secretName is unset, so it must exist
+	@# before the helm upgrade. OPENSEARCH_USERNAME/PASSWORD pair with the
+	@# admin credentials seeded above; UID_RESOLVER_OAUTH_CLIENT_SECRET
+	@# pairs with the `openchoreo-observer-resource-reader-client`
+	@# provisioned by thunder bootstrap
+	@# (install/k3d/common/values-thunder.yaml).
+	@$(E2E_KUBECTL) create secret generic observer-secret \
+		-n $(E2E_OP_NS) \
+		--from-literal=OPENSEARCH_USERNAME="admin" \
+		--from-literal=OPENSEARCH_PASSWORD="ThisIsTheOpenSearchPassword1" \
+		--from-literal=UID_RESOLVER_OAUTH_CLIENT_SECRET="openchoreo-observer-resource-reader-client-secret" \
 		--dry-run=client -o yaml | $(E2E_KUBECTL) apply -f -
 	@$(call log_info, Installing Observability Plane)
 	$(E2E_HELM) upgrade --install openchoreo-observability-plane $(E2E_OP_CHART) \
@@ -310,16 +331,34 @@ _e2e.install-op:
 		--from-literal=username="admin" \
 		--from-literal=password="ThisIsTheOpenSearchPassword1" \
 		--dry-run=client -o yaml | $(E2E_KUBECTL) apply -f -
+	@$(call log_info, Installing logs module without Fluent Bit so index templates are ready first)
 	$(E2E_HELM) upgrade --install observability-logs-opensearch \
 		oci://ghcr.io/openchoreo/helm-charts/observability-logs-opensearch \
-		--version 0.4.1 \
+		--version $(OBSERVABILITY_LOGS_OPENSEARCH_VERSION) \
 		--namespace $(E2E_OP_NS) \
 		--set openSearchSetup.openSearchSecretName="opensearch-admin-credentials" \
 		--set adapter.openSearchSecretName="opensearch-admin-credentials" \
-		--wait --timeout $(E2E_SETUP_TIMEOUT)
+		--set fluent-bit.enabled=false \
+		--wait --wait-for-jobs --timeout $(E2E_SETUP_TIMEOUT)
+	@$(call log_info, Enabling Fluent Bit after logs module setup)
+	$(E2E_HELM) upgrade --install observability-logs-opensearch \
+		oci://ghcr.io/openchoreo/helm-charts/observability-logs-opensearch \
+		--version $(OBSERVABILITY_LOGS_OPENSEARCH_VERSION) \
+		--namespace $(E2E_OP_NS) \
+		--set openSearchSetup.openSearchSecretName="opensearch-admin-credentials" \
+		--set adapter.openSearchSecretName="opensearch-admin-credentials" \
+		--set fluent-bit.enabled=true \
+		--wait --wait-for-jobs --timeout $(E2E_SETUP_TIMEOUT)
+	$(E2E_HELM) upgrade --install observability-traces-opensearch \
+		oci://ghcr.io/openchoreo/helm-charts/observability-tracing-opensearch \
+		--version $(OBSERVABILITY_TRACES_OPENSEARCH_VERSION) \
+		--namespace $(E2E_OP_NS) \
+		--set openSearch.enabled=false \
+		--set openSearchSetup.openSearchSecretName="opensearch-admin-credentials" \
+		--wait --wait-for-jobs --timeout $(E2E_SETUP_TIMEOUT)
 	$(E2E_HELM) upgrade --install observability-metrics-prometheus \
 		oci://ghcr.io/openchoreo/helm-charts/observability-metrics-prometheus \
-		--version 0.6.1 \
+		--version $(OBSERVABILITY_METRICS_PROMETHEUS_VERSION) \
 		--namespace $(E2E_OP_NS) \
 		--wait --timeout $(E2E_SETUP_TIMEOUT)
 	$(E2E_KUBECTL) wait -n $(E2E_OP_NS) \
@@ -360,11 +399,20 @@ _e2e.configure-wp:
 _e2e.configure-op:
 	@$(call log_info, Registering ObservabilityPlane)
 	$(call e2e_register_plane,$(E2E_OP_NS),$(E2E_K3D_DIR)/observabilityplane.yaml)
+	@$(call log_info, Registering ClusterObservabilityPlane)
+	$(call e2e_register_plane,$(E2E_OP_NS),$(E2E_K3D_DIR)/clusterobservabilityplane.yaml)
 
 .PHONY: _e2e.link-observability
 _e2e.link-observability:
 	@$(call log_info, Linking ObservabilityPlane to other planes)
+	@# The e2e setup uses two ClusterDataPlane CRs (`default` and
+	@# `e2e-shared` — the latter is what the per-suite Environment
+	@# fixtures point at). Patch both so the observability-alert-rule
+	@# trait's `${has(dataplane.observabilityPlaneRef)}` CEL guard
+	@# resolves true in either path.
 	$(E2E_KUBECTL) patch clusterdataplane default --type merge \
+		-p '{"spec":{"observabilityPlaneRef":{"kind":"ClusterObservabilityPlane","name":"default"}}}'
+	$(E2E_KUBECTL) patch clusterdataplane e2e-shared --type merge \
 		-p '{"spec":{"observabilityPlaneRef":{"kind":"ClusterObservabilityPlane","name":"default"}}}'
 	@if [ "$(E2E_WITH_BUILD)" = "true" ]; then \
 		$(E2E_KUBECTL) patch workflowplane default -n default --type merge \
