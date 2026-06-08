@@ -166,6 +166,43 @@ controllerManager:
   replicas: 1
 
   # @schema
+  # type: integer
+  # description: Seconds to sleep before SIGTERM during pod shutdown, giving kube-apiserver time to de-register the webhook endpoint; set 0 to disable
+  # minimum: 0
+  # default: 10
+  # @schema
+  preStopSleepSeconds: 10
+
+  # @schema
+  # type: object
+  # description: Rolling update strategy; maxUnavailable 0 ensures zero-downtime upgrades for the webhook server
+  # @schema
+  strategy:
+    rollingUpdate:
+      # @schema
+      # type: integer
+      # description: Maximum pods that can be unavailable during a rolling update
+      # minimum: 0
+      # default: 0
+      # @schema
+      maxUnavailable: 0
+      # @schema
+      # type: integer
+      # description: Maximum extra pods allowed during a rolling update
+      # minimum: 0
+      # default: 1
+      # @schema
+      maxSurge: 1
+
+  # @schema
+  # type: integer
+  # description: Seconds Kubernetes waits before force-killing the pod; must exceed preStopSleepSeconds plus webhook drain time
+  # minimum: 10
+  # default: 30
+  # @schema
+  terminationGracePeriodSeconds: 30
+
+  # @schema
   # type: object
   # description: Container image configuration
   # @schema

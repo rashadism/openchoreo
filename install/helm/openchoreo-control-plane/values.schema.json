@@ -2066,6 +2066,13 @@
           "title": "podSecurityContext",
           "type": "object"
         },
+        "preStopSleepSeconds": {
+          "default": 10,
+          "description": "Seconds to sleep before SIGTERM during pod shutdown, giving kube-apiserver time to de-register the webhook endpoint; set 0 to disable",
+          "minimum": 0,
+          "title": "preStopSleepSeconds",
+          "type": "integer"
+        },
         "priorityClass": {
           "additionalProperties": false,
           "description": "Priority class configuration for pod scheduling priority",
@@ -2211,6 +2218,46 @@
           "required": [],
           "title": "serviceAccount",
           "type": "object"
+        },
+        "strategy": {
+          "additionalProperties": false,
+          "description": "Rolling update strategy; maxUnavailable 0 ensures zero-downtime upgrades for the webhook server",
+          "properties": {
+            "rollingUpdate": {
+              "additionalProperties": false,
+              "properties": {
+                "maxSurge": {
+                  "default": 1,
+                  "description": "Maximum extra pods allowed during a rolling update",
+                  "minimum": 0,
+                  "title": "maxSurge",
+                  "type": "integer"
+                },
+                "maxUnavailable": {
+                  "default": 0,
+                  "description": "Maximum pods that can be unavailable during a rolling update",
+                  "minimum": 0,
+                  "title": "maxUnavailable",
+                  "type": "integer"
+                }
+              },
+              "required": [],
+              "title": "rollingUpdate",
+              "type": "object"
+            }
+          },
+          "required": [
+            "rollingUpdate"
+          ],
+          "title": "strategy",
+          "type": "object"
+        },
+        "terminationGracePeriodSeconds": {
+          "default": 30,
+          "description": "Seconds Kubernetes waits before force-killing the pod; must exceed preStopSleepSeconds plus webhook drain time",
+          "minimum": 10,
+          "title": "terminationGracePeriodSeconds",
+          "type": "integer"
         },
         "tolerations": {
           "default": [],
