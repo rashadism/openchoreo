@@ -700,6 +700,7 @@ exporters:
       endpoint: "https://host.k3d.internal:11085"
       tls:
         insecure_skip_verify: true
+        server_name_override: "opensearch.observability.openchoreo.localhost"
       headers:
         Host: "opensearch.observability.openchoreo.localhost"
       auth:
@@ -744,6 +745,7 @@ exporters:
       endpoint: "https://host.k3d.internal:11085"
       tls:
         insecure_skip_verify: true
+        server_name_override: "opensearch.observability.openchoreo.localhost"
       headers:
         Host: "opensearch.observability.openchoreo.localhost"
       auth:
