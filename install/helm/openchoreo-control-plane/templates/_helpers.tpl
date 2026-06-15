@@ -230,10 +230,10 @@ Validate that placeholder .invalid hostnames have been replaced with real domain
 */}}
 {{- define "openchoreo-control-plane.validateHostnames" -}}
 {{- $errors := list -}}
-{{- if and .Values.openchoreoApi.http.enabled (contains ".invalid" (join "," .Values.openchoreoApi.http.hostnames)) -}}
+{{- if and .Values.gateway.enabled .Values.openchoreoApi.enabled .Values.openchoreoApi.http.enabled (contains ".invalid" (join "," .Values.openchoreoApi.http.hostnames)) -}}
   {{- $errors = append $errors "openchoreoApi.http.hostnames contains placeholder domain (.invalid)" -}}
 {{- end -}}
-{{- if and .Values.backstage.enabled .Values.backstage.http.enabled (contains ".invalid" (join "," .Values.backstage.http.hostnames)) -}}
+{{- if and .Values.gateway.enabled .Values.backstage.enabled .Values.backstage.http.enabled (contains ".invalid" (join "," .Values.backstage.http.hostnames)) -}}
   {{- $errors = append $errors "backstage.http.hostnames contains placeholder domain (.invalid)" -}}
 {{- end -}}
 {{- if and .Values.backstage.enabled (contains ".invalid" .Values.backstage.baseUrl) -}}
