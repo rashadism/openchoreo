@@ -122,14 +122,28 @@ jobs:
         if: steps.mode.outputs.build_from_branch != 'true'
         run: docker pull "${QS_IMAGE}:${{ steps.mode.outputs.version }}"
 
-      - name: Start quick-start container
-        # Mirrors the documented `docker run` invocation (host network + docker
-        # socket), detached with a TTY (-dit) so the image's own entrypoint runs:
-        # it configures docker-socket group access for the non-root `openchoreo`
-        # user and drops into a login shell that stays alive. The install/validate/
-        # deploy steps then drive it via `docker exec -u openchoreo`, exactly as a
-        # user typing commands inside the container would. OPENCHOREO_VERSION is
-        # surfaced to those login shells via the entrypoint.
+      # Vendor deps so the read-only /helm mount below is complete.
+      - name: Vendor local chart dependencies
+        if: steps.mode.outputs.build_from_branch == 'true'
+        run: |
+          helm repo add argo https://argoproj.github.io/argo-helm
+          helm dependency build install/helm/openchoreo-workflow-plane
+
+      # Branch leg: install from the PR's own charts (/helm + DEV_MODE), not published.
+      - name: Start quick-start container (branch charts)
+        if: steps.mode.outputs.build_from_branch == 'true'
+        run: |
+          docker run -dit \
+            --name "${QS_CONTAINER}" \
+            --network=host \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "${{ github.workspace }}/install/helm:/helm:ro" \
+            -e DEV_MODE=true \
+            -e OPENCHOREO_VERSION="${{ steps.mode.outputs.version }}" \
+            "${QS_IMAGE}:${{ steps.mode.outputs.version }}"
+
+      - name: Start quick-start container (published)
+        if: steps.mode.outputs.build_from_branch != 'true'
         run: |
           docker run -dit \
             --name "${QS_CONTAINER}" \
