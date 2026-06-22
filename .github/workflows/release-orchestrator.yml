@@ -466,6 +466,8 @@ jobs:
       ref: ${{ needs.resolve-target.outputs.target }}
       helm_chart_version: ${{ needs.resolve-target.outputs.helm-chart-version }}
       backstage_image_tag: ${{ needs.resolve-target.outputs.backstage-image-tag }}
+    secrets:
+      E2E_GITHUB_PAT: ${{ secrets.E2E_GITHUB_PAT }}
 
   # ----------------------------------------------------------------
   # Record e2e pass: stamp the gated commit with a release-e2e-gate
