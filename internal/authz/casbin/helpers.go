@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/interpreter"
@@ -593,8 +594,15 @@ func computePolicyDiff(oldPolicies, newPolicies [][]string) (added, removed [][]
 	return added, removed
 }
 
+// celProgramCache memoizes compiled CEL programs by expression string. cel.Program is immutable and
+// safe for concurrent Eval; policy expressions are a small, stable set, so no eviction is needed.
+var celProgramCache sync.Map // map[string]cel.Program
+
 // compileCEL compiles a CEL expression and returns a ready-to-evaluate Program.
 func compileCEL(expr string) (cel.Program, error) {
+	if p, ok := celProgramCache.Load(expr); ok {
+		return p.(cel.Program), nil
+	}
 	env, err := authzcore.GetCELEnv()
 	if err != nil {
 		return nil, fmt.Errorf("CEL environment unavailable: %w", err)
@@ -607,6 +615,7 @@ func compileCEL(expr string) (cel.Program, error) {
 	if err != nil {
 		return nil, fmt.Errorf("program construction error: %w", err)
 	}
+	celProgramCache.Store(expr, prg)
 	return prg, nil
 }
 
