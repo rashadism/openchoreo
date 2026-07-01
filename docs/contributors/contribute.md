@@ -170,7 +170,9 @@ To run the tests, you can use the following command:
 ```sh
 make test
 ```
-This will run all the unit tests in the project.
+This runs both the Go tests and the Python agent tests (`agents/*`). To run
+them separately, use `make go.test` or `make python.test`. Running the Python
+tests requires [uv](https://docs.astral.sh/uv/).
 
 ### Code Quality and Generation
 
