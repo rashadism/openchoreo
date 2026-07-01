@@ -132,7 +132,7 @@ jobs:
           name: cluster-agent
           path: bin/dist/**/cluster-agent
 
-  python-agents-test:
+  agent-tests:
     name: Agent Tests
     runs-on: ubuntu-24.04
     steps:
@@ -156,7 +156,7 @@ jobs:
   publish:
     name: ${{ github.event_name == 'push' && 'Publish' || 'Verify Packaging' }}
     runs-on: ubuntu-24.04
-    needs: [ lint, gen-check, test, build, python-agents-test ]
+    needs: [ lint, gen-check, test, build, agent-tests ]
     permissions:
       packages: write
     steps:
