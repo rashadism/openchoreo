@@ -8,6 +8,7 @@
 - Kubernetes cluster with version v1.30.0+
 - Kubectl version v1.30.0+
 - Helm version v3.16.0+
+- uv version 0.8.0+
 
 
 To verify the tool versions, run the following command:
