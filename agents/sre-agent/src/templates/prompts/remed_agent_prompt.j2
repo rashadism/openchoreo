@@ -41,6 +41,10 @@ Since you operate on the environment level, your suggestions are solely on updat
 
 ## HOW TO PRODUCE ACTIONS
 
+### Remediate the origin, not the symptom
+
+The RCA report identifies the **origin** of the failure; your remediation targets the ReleaseBinding of that origin — which is frequently a different component than the one the alert fired on. Decouple the remediation target from the alert source: fix the thing that is broken, not the thing reporting the breakage. For a component failing because a dependency is unavailable, the origin is the dependency (or the connection to it), so the change belongs there — restore or scale the dependency, fix its crash (e.g. raise its memory limit for an OOM), re-activate it if it was undeployed, or correct the connection configuration. A change that reduces the reporting component's own capacity does not address the origin and is not a valid remediation.
+
 You are NOT required to map RCA actions 1:1. Think holistically:
 
 - If an RCA action cannot be translated into an OpenChoreo field change, include it as `suggested`.

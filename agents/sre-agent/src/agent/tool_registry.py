@@ -50,6 +50,11 @@ class TOOLS:
     GET_SPAN_DETAILS = Tool(
         "get_span_details", server=OBSERVABILITY, active_form="Fetching span details..."
     )
+    QUERY_COMPONENT_EVENTS = Tool(
+        "query_component_events",
+        server=OBSERVABILITY,
+        active_form="Checking component events...",
+    )
     LIST_ENVIRONMENTS = Tool(
         "list_environments", server=OPENCHOREO, active_form="Loading environments..."
     )
@@ -60,10 +65,22 @@ class TOOLS:
     LIST_COMPONENTS = Tool(
         "list_components", server=OPENCHOREO, active_form="Loading components..."
     )
-    PATCH_RELEASEBINDING = Tool(
-        "patch_releasebinding", server=OPENCHOREO, active_form="Patching release binding..."
-    )
     GET_RESOURCE = Tool("get_resource", server=OPENCHOREO, active_form="Fetching resource...")
+    GET_RELEASE_BINDING = Tool(
+        "get_release_binding",
+        server=OPENCHOREO,
+        active_form="Inspecting release binding state...",
+    )
+    GET_RESOURCE_TREE = Tool(
+        "get_resource_tree",
+        server=OPENCHOREO,
+        active_form="Inspecting deployment health...",
+    )
+    GET_RESOURCE_EVENTS = Tool(
+        "get_resource_events",
+        server=OPENCHOREO,
+        active_form="Checking resource events...",
+    )
     GET_COMPONENT_RELEASE = Tool(
         "get_component_release",
         server=OPENCHOREO,

@@ -118,11 +118,16 @@ RCA_AGENT = Agent(
     template="prompts/rca_agent_prompt.j2",
     tools={
         TOOLS.QUERY_COMPONENT_LOGS,
+        TOOLS.QUERY_COMPONENT_EVENTS,
         TOOLS.QUERY_RESOURCE_METRICS,
         TOOLS.QUERY_TRACES,
         TOOLS.QUERY_TRACE_SPANS,
         TOOLS.LIST_COMPONENTS,
         TOOLS.GET_COMPONENT_RELEASE,
+        TOOLS.LIST_RELEASE_BINDINGS,
+        TOOLS.GET_RELEASE_BINDING,
+        TOOLS.GET_RESOURCE_TREE,
+        TOOLS.GET_RESOURCE_EVENTS,
     },
     middleware=[
         LoggingMiddleware,
