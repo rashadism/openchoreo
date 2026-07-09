@@ -36,11 +36,12 @@ from src.auth.jwt import (
 )
 
 
-def _request(headers=None, path_params=None, body=None):
+def _request(headers=None, path_params=None, body=None, query_params=None):
     return SimpleNamespace(
         headers=headers or {},
         state=SimpleNamespace(),
         path_params=path_params or {},
+        query_params=query_params or {},
         json=AsyncMock(return_value=body or {}),
     )
 
@@ -172,7 +173,7 @@ async def test_authorization_checker_allows(monkeypatch):
     checker = AuthorizationChecker(action="rcareport:view", resource_type="rcareport")
     subject = SubjectContext(type="user", entitlementClaim="sub", entitlementValues=["u1"])
     result = await checker(
-        _request({"Authorization": "Bearer t"}, body={"projectUid": "p"}), subject
+        _request({"Authorization": "Bearer t"}, body={"project": "p"}), subject
     )
     assert result is subject
 
@@ -190,7 +191,31 @@ async def test_authorization_checker_denies(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_report_checker_extracts_project_from_path(monkeypatch):
+async def test_chat_checker_extracts_project_from_body(monkeypatch):
+    captured = {}
+
+    async def fake_eval(request, token):
+        captured["hierarchy"] = request.resource.hierarchy
+        return Decision(decision=True)
+
+    client = MagicMock()
+    client.evaluate = AsyncMock(side_effect=fake_eval)
+    monkeypatch.setattr(deps, "get_authz_client", lambda: client)
+    checker = AuthorizationChecker(action="rcareport:view", resource_type="rcareport")
+    subject = SubjectContext(type="user", entitlementClaim="sub", entitlementValues=["u1"])
+    await checker(
+        _request(
+            {"Authorization": "Bearer t"},
+            body={"namespace": "ns", "project": "payment"},
+        ),
+        subject,
+    )
+    assert captured["hierarchy"].namespace == "ns"
+    assert captured["hierarchy"].project == "payment"
+
+
+@pytest.mark.asyncio
+async def test_report_checker_extracts_project_from_query(monkeypatch):
     captured = {}
 
     async def fake_eval(request, token):
@@ -203,9 +228,14 @@ async def test_report_checker_extracts_project_from_path(monkeypatch):
     checker = ReportAuthorizationChecker(action="rcareport:view", resource_type="rcareport")
     subject = SubjectContext(type="user", entitlementClaim="sub", entitlementValues=["u1"])
     await checker(
-        _request({"Authorization": "Bearer t"}, path_params={"project_id": "proj-9"}), subject
+        _request(
+            {"Authorization": "Bearer t"},
+            query_params={"namespace": "ns", "project": "payment"},
+        ),
+        subject,
     )
-    assert captured["hierarchy"].project == "proj-9"
+    assert captured["hierarchy"].namespace == "ns"
+    assert captured["hierarchy"].project == "payment"
 
 
 # --------------------------------------------------------- authz client

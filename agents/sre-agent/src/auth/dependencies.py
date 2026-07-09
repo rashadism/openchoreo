@@ -217,16 +217,20 @@ class AuthorizationChecker:
     async def _extract_hierarchy(self, request: Request) -> ResourceHierarchy:
         body = await extract_request_body(request)
         return ResourceHierarchy(
-            project=body.get("projectUid"),
-            component=body.get("componentUid"),
+            namespace=body.get("namespace"),
+            project=body.get("project"),
+            component=body.get("component"),
         )
 
 
 class ReportAuthorizationChecker(AuthorizationChecker):
     async def _extract_hierarchy(self, request: Request) -> ResourceHierarchy:
-        project = request.path_params.get("project_id")
+        # The reports-list route carries namespace/project as query params. The
+        # get/update-by-id routes carry only report_id, so their hierarchy stays
+        # unscoped until the report's project name is persisted.
         return ResourceHierarchy(
-            project=str(project) if project else None,
+            namespace=request.query_params.get("namespace"),
+            project=request.query_params.get("project"),
         )
 
 
