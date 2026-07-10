@@ -66,6 +66,16 @@ class TOOLS:
         "list_components", server=OPENCHOREO, active_form="Loading components..."
     )
     GET_RESOURCE = Tool("get_resource", server=OPENCHOREO, active_form="Fetching resource...")
+    LIST_RESOURCE_RELEASE_BINDINGS = Tool(
+        "list_resource_release_bindings",
+        server=OPENCHOREO,
+        active_form="Loading resource bindings...",
+    )
+    GET_RESOURCE_RELEASE_BINDING = Tool(
+        "get_resource_release_binding",
+        server=OPENCHOREO,
+        active_form="Inspecting resource binding state...",
+    )
     GET_RELEASE_BINDING = Tool(
         "get_release_binding",
         server=OPENCHOREO,
