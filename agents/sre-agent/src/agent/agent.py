@@ -325,6 +325,22 @@ async def run_analysis(
                 logger.debug("RCA tool calls: %s", summary)
             logger.info("RCA completed: usage=%s", usage_callback.usage_metadata)
 
+            # Log the conclusion so the outcome is observable from logs without
+            # querying the report backend.
+            _res = rca_report.result
+            if isinstance(_res, RootCauseIdentified):
+                _components = sorted(
+                    {f.component for rc in _res.root_causes for f in rc.supporting_findings}
+                )
+                logger.info(
+                    "RCA outcome: root_cause=%r | implicated_components=%s | recommendations=%s",
+                    _res.root_causes[0].summary,
+                    _components,
+                    [a.description for a in _res.recommendations.recommended_actions],
+                )
+            else:
+                logger.info("RCA outcome: no_root_cause | reason=%s", _res.outcome)
+
             report_data = rca_report.model_dump()
 
             if settings.remed_agent and isinstance(rca_report.result, RootCauseIdentified):
