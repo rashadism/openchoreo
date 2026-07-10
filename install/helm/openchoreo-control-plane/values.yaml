@@ -1223,6 +1223,8 @@ openchoreoApi:
                 - "namespace:view"
                 - "componentrelease:view"
                 - "releasebinding:view"
+                - "resource:view"
+                - "resourcereleasebinding:view"
                 - "workflowrun:view"
                 - "environment:view"
                 - "workload:view"
