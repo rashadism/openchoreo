@@ -4,7 +4,7 @@
 from enum import StrEnum
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Discriminator, Field
+from pydantic import BaseModel, Discriminator, Field, field_validator
 
 
 class ConfidenceLevel(StrEnum):
@@ -18,10 +18,13 @@ class ConfidenceLevel(StrEnum):
 class LogLevel(StrEnum):
     """Log severity levels"""
 
-    ERROR = "ERROR"
-    WARN = "WARN"
-    INFO = "INFO"
+    TRACE = "TRACE"
     DEBUG = "DEBUG"
+    INFO = "INFO"
+    WARN = "WARN"
+    ERROR = "ERROR"
+    FATAL = "FATAL"
+    CRITICAL = "CRITICAL"
     UNDEFINED = "UNDEFINED"
 
 
@@ -80,6 +83,18 @@ class LogLine(BaseModel):
     timestamp: str = Field(..., description="ISO 8601 timestamp when the log was emitted")
     level: LogLevel = Field(..., description="Log severity level")
     log: str = Field(..., description="The log message content")
+
+    @field_validator("level", mode="before")
+    @classmethod
+    def _coerce_level(cls, v: object) -> object:
+        # Real telemetry carries levels beyond the enum (e.g. postgres FATAL/PANIC,
+        # NOTICE). Never let an unrecognised level fail the whole structured report:
+        # normalise common aliases and fall back to UNDEFINED.
+        if not isinstance(v, str):
+            return v
+        u = v.strip().upper()
+        u = {"WARNING": "WARN", "PANIC": "FATAL", "CRIT": "CRITICAL"}.get(u, u)
+        return u if u in {m.value for m in LogLevel} else LogLevel.UNDEFINED.value
 
 
 class LogEvidence(BaseModel):
