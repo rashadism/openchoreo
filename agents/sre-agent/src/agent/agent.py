@@ -152,7 +152,14 @@ RCA_AGENT = Agent(
 
 REMED_AGENT = Agent(
     template="prompts/remed_agent_prompt.j2",
-    tools=set(),
+    tools={
+        TOOLS.GET_RELEASE_BINDING,
+        TOOLS.GET_RESOURCE_TREE,
+        TOOLS.GET_RESOURCE_EVENTS,
+        TOOLS.GET_RESOURCE,
+        TOOLS.LIST_RESOURCE_RELEASE_BINDINGS,
+        TOOLS.GET_RESOURCE_RELEASE_BINDING,
+    },
     tool_factories=ALL_TOOL_FACTORIES,
     middleware=[
         LoggingMiddleware,

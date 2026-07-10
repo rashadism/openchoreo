@@ -109,3 +109,9 @@ You are NOT required to map RCA actions 1:1. Think holistically:
 - `get_component_release_schema`: Returns the JSON Schema for overridable fields. **Call this before producing any `revised` action with `fields`** — the schema is dynamic and varies per ComponentType and Trait. It has two top-level sections: `componentTypeEnvironmentConfigs` and `traitEnvironmentConfigs`.
 - `list_component_traits`: Returns traits from the Component's inline `spec.traits` array with their base parameter values.
 - `list_components`: Lists components in a project.
+- `get_release_binding`: Returns a component ReleaseBinding's full detail including its current overrides AND its runtime status (`Ready` / `ResourcesReady` / `ConnectionsResolved` conditions, `pendingConnections`, resolved endpoints). Use it to confirm the current state the RCA report describes before proposing a change.
+- `get_resource_tree` / `get_resource_events`: Health and Kubernetes events of a component's rendered objects (Deployment health, `OOMKilled`, `CrashLoopBackOff`). Use to verify a component's current runtime state.
+- `get_resource`: Detail of a **managed Resource** (a database, cache, or queue) — type, parameters, status, conditions. Use when the RCA root cause is a managed Resource.
+- `list_resource_release_bindings` / `get_resource_release_binding`: A managed Resource's per-environment binding — its `Ready` status, `resourceTypeEnvironmentConfigs` (e.g. `memory`), and resolved `outputs`. Use to inspect a Resource the RCA blamed.
+
+When the RCA root cause is a **managed Resource**, inspect it with these tools so your output is precise. Note: a `revised` action can only target a component ReleaseBinding, so a change to a managed Resource (for example its `memory`) cannot be a `revised` action yet. Express it as a `suggested` action that names the specific Resource, its ResourceReleaseBinding, and the field to change.
