@@ -118,6 +118,7 @@ func setupControlPlaneControllers(
 	k8sClientMgr *kubernetesClient.KubeMultiClientManager,
 	clusterGatewayURL string,
 	gwTLS gatewayClient.TLSConfig,
+	maxConcurrentReconciles int,
 ) error {
 	// Create gateway client for plane lifecycle notifications
 	var gwClient *gatewayClient.Client
@@ -194,7 +195,12 @@ func setupControlPlaneControllers(
 		&resourcerelease.Reconciler{Client: c, Scheme: s},
 		&resourcereleasebinding.Reconciler{Client: c, Scheme: s},
 		&releasebinding.Reconciler{Client: c, Scheme: s, Pipeline: componentpipeline.NewPipeline()},
-		&renderedrelease.Reconciler{Client: c, PlaneClientProvider: planeClientProvider, Scheme: s},
+		&renderedrelease.Reconciler{
+			Client:                  c,
+			PlaneClientProvider:     planeClientProvider,
+			Scheme:                  s,
+			MaxConcurrentReconciles: maxConcurrentReconciles,
+		},
 		&workflow.Reconciler{Client: c, Scheme: s},
 		&clusterworkflow.Reconciler{Client: c, Scheme: s},
 		&workflowrun.Reconciler{
@@ -277,6 +283,7 @@ func main() {
 	var clusterGatewayClientKey string
 	var clusterGatewayInsecure bool
 	var deploymentPlane string
+	var maxConcurrentReconciles int
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
@@ -306,6 +313,9 @@ func main() {
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
 	flag.StringVar(&deploymentPlane, "deployment-plane", deploymentPlaneControlPlane,
 		"The deployment plane this manager should serve. Supported values: controlplane, observabilityplane")
+	flag.IntVar(&maxConcurrentReconciles, "max-concurrent-reconciles", 0,
+		"Max concurrent reconciles for the renderedrelease and releasebinding controllers. "+
+			"0 uses the controller-runtime default (1).")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -419,7 +429,7 @@ func main() {
 			ClientCertFile:     clusterGatewayClientCert,
 			ClientKeyFile:      clusterGatewayClientKey,
 			InsecureSkipVerify: clusterGatewayInsecure,
-		})
+		}, maxConcurrentReconciles)
 		if err != nil {
 			setupLog.Error(err, "unable to setup control plane controllers")
 			os.Exit(1)

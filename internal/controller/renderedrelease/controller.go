@@ -18,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	crcontroller "sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	openchoreov1alpha1 "github.com/openchoreo/openchoreo/api/v1alpha1"
@@ -50,6 +51,9 @@ type Reconciler struct {
 	client.Client
 	PlaneClientProvider kubernetesClient.PlaneClientProvider
 	Scheme              *runtime.Scheme
+
+	// MaxConcurrentReconciles bounds parallel reconciles; 0 means the default (1).
+	MaxConcurrentReconciles int
 }
 
 // TODO: Optimize to apply resource only if spec has changed
@@ -645,5 +649,6 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&openchoreov1alpha1.RenderedRelease{}).
 		Named("renderedrelease").
+		WithOptions(crcontroller.Options{MaxConcurrentReconciles: r.MaxConcurrentReconciles}).
 		Complete(r)
 }
