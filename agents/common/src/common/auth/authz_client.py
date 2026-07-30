@@ -5,13 +5,13 @@ import logging
 
 import httpx
 
-from common.auth.authz_models import Decision, EvaluateRequest
-from src.auth.authz_errors import (
+from common.auth.authz_errors import (
     AuthzForbidden,
     AuthzServiceUnavailable,
     AuthzUnauthorized,
 )
-from src.logging_config import request_id_context
+from common.auth.authz_models import Decision, EvaluateRequest
+from common.logging_config import request_id_context
 
 logger = logging.getLogger(__name__)
 
