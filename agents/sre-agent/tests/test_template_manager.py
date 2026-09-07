@@ -89,8 +89,10 @@ def test_remed_prompt_scopes_resource_binding_selection():
         "prompts/remed_agent_prompt.j2",
         {"tools": [], "scope": _make_scope("staging")},
     )
-    assert "`resource_name`" in rendered
-    assert "staging" in rendered
+    assert (
+        "Call with `namespace_name` and the exact `resource_name` from the ComponentRelease dependency. "
+        "Select the summary whose `environment` is `staging`."
+    ) in rendered
 
 
 def test_remed_prompt_separates_schema_source_by_target_kind():
