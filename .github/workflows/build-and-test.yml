@@ -171,7 +171,8 @@ jobs:
 
   publish:
     name: ${{ github.event_name == 'push' && 'Publish' || 'Verify Packaging' }}
-    runs-on: ubuntu-24.04
+    if: github.event_name != 'push' || vars.PUBLISH_ENABLED != 'false'
+    runs-on: ${{ vars.PUBLISH_RUNNER || 'ubuntu-24.04' }}
     needs: [ lint, gen-check, test, build, agent-tests ]
     permissions:
       contents: read
