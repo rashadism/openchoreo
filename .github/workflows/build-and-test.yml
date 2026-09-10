@@ -21,9 +21,10 @@ env:
   IMAGE_REPO_PREFIX: ${{ vars.IMAGE_REPO_PREFIX || 'ghcr.io/openchoreo' }}
   HELM_OCI_REGISTRY: ${{ vars.HELM_OCI_REGISTRY || 'oci://ghcr.io/openchoreo/helm-charts' }}
   PUBLISH_LATEST: ${{ vars.PUBLISH_LATEST || 'true' }}
+  HELM_PUBLISH_ENABLED: ${{ vars.HELM_PUBLISH_ENABLED || 'true' }}
   DOCKER_PROVENANCE: ${{ vars.DOCKER_PROVENANCE || 'false' }}
   DOCKER_SBOM: ${{ vars.DOCKER_SBOM || 'false' }}
-  IMAGE_PLATFORMS: ${{ github.event_name == 'push' && 'linux/amd64 linux/arm64' || 'linux/amd64' }}
+  IMAGE_PLATFORMS: ${{ vars.IMAGE_PLATFORMS || (github.event_name == 'push' && 'linux/amd64 linux/arm64' || 'linux/amd64') }}
   CLI_EXTRA_PLATFORMS: ${{ github.event_name == 'push' && 'darwin/amd64 darwin/arm64 windows/amd64 windows/arm64' || '' }}
 
 jobs:
@@ -174,7 +175,7 @@ jobs:
 
   publish:
     name: ${{ github.event_name == 'push' && 'Publish' || 'Verify Packaging' }}
-    runs-on: ubuntu-24.04
+    runs-on: ${{ vars.PUBLISH_RUNNER || 'ubuntu-24.04' }}
     needs: [ lint, gen-check, test, build, agent-tests ]
     permissions:
       contents: read
@@ -293,11 +294,13 @@ jobs:
           fi
 
           # Package and push Helm charts
-          echo "Packaging and pushing Helm charts with SHA ${{ env.GIT_SHA_SHORT }}..."
-          make helm-push TAG=${{ env.GIT_SHA_SHORT }} HELM_CHART_VERSION=0.0.0-${{ env.GIT_SHA_SHORT }}
+          if [[ "${HELM_PUBLISH_ENABLED}" == "true" ]]; then
+            echo "Packaging and pushing Helm charts with SHA ${{ env.GIT_SHA_SHORT }}..."
+            make helm-push TAG=${{ env.GIT_SHA_SHORT }} HELM_CHART_VERSION=0.0.0-${{ env.GIT_SHA_SHORT }}
 
-          if [[ "${GITHUB_REF}" == "refs/heads/main" && "${PUBLISH_LATEST}" == "true" ]]; then
-            make helm-push TAG=latest-dev HELM_CHART_VERSION=0.0.0-latest-dev
+            if [[ "${GITHUB_REF}" == "refs/heads/main" && "${PUBLISH_LATEST}" == "true" ]]; then
+              make helm-push TAG=latest-dev HELM_CHART_VERSION=0.0.0-latest-dev
+            fi
           fi
 
       - name: Package helm charts for PR verification
