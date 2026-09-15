@@ -76,6 +76,13 @@ class Agent:
             tools = [t for t in all_tools if t.name in self.tools]
             logger.debug("Filtered to %d MCP tools: %s", len(tools), [t.name for t in tools])
 
+            missing = self.tools - {t.name for t in tools}
+            if missing:
+                logger.warning(
+                    "Requested MCP tools not found in the server catalog: %s",
+                    sorted(missing),
+                )
+
         logger.debug("Total tools: %d — %s", len(tools), [t.name for t in tools])
 
         template_context = {
@@ -112,6 +119,7 @@ RCA_AGENT = Agent(
     template="prompts/rca_agent_prompt.j2",
     tools={
         TOOLS.QUERY_COMPONENT_LOGS,
+        TOOLS.QUERY_COMPONENT_EVENTS,
         TOOLS.QUERY_RESOURCE_METRICS,
         TOOLS.QUERY_TRACES,
         TOOLS.QUERY_TRACE_SPANS,
@@ -119,6 +127,7 @@ RCA_AGENT = Agent(
         TOOLS.LIST_RELEASE_BINDINGS,
         TOOLS.GET_RELEASE_BINDING,
         TOOLS.GET_COMPONENT_RELEASE,
+        TOOLS.GET_RESOURCE,
         TOOLS.LIST_RESOURCE_RELEASE_BINDINGS,
         TOOLS.GET_RESOURCE_RELEASE_BINDING,
     },
