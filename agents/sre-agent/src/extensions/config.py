@@ -1,19 +1,6 @@
 # Copyright 2026 The OpenChoreo Authors
 # SPDX-License-Identifier: Apache-2.0
 
-"""Operator-supplied MCP servers and skills, mounted per agent.
-
-Each agent reads its own directory, so the directory is the assignment:
-
-    <root>/<agent>/mcp.json
-    <root>/<agent>/skills/<name>/SKILL.md
-
-``mcp.json`` is the standard ``{"mcpServers": {...}}`` document, so a server
-block can be pasted from a vendor's documentation unchanged. Secrets are
-referenced as ``${VAR}`` inside header values and resolved from the
-environment, which is the same convention those documents already use.
-"""
-
 import json
 import logging
 import os
@@ -28,8 +15,6 @@ logger = logging.getLogger(__name__)
 
 _ENV_REF = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 
-# stdio would need the server's binary present in the image, so the mounted
-# config only describes servers reachable over HTTP.
 _TRANSPORTS = {
     "http": "streamable_http",
     "streamable_http": "streamable_http",
@@ -41,7 +26,7 @@ _FRONTMATTER = re.compile(r"\A---\n(.*?)\n---\n?(.*)\Z", re.DOTALL)
 
 
 class ExtensionConfigError(Exception):
-    """Raised for a malformed extension directory."""
+    pass
 
 
 @dataclass(frozen=True)
@@ -107,7 +92,6 @@ def _parse_server(name: str, spec: dict[str, Any]) -> ExternalServer:
     if headers:
         if not isinstance(headers, dict):
             raise ExtensionConfigError(f"{where} has non-object 'headers'")
-        # Expanded late so the resolved secret is never written back to disk.
         connection["headers"] = _expand(headers, where=where)
     return ExternalServer(name=name, connection=connection)
 
@@ -130,9 +114,6 @@ def _load_skill(directory: Path) -> Skill:
     where = f"skill {directory.name!r}"
     unexpected = sorted(p.name for p in directory.iterdir() if p.name != "SKILL.md")
     if unexpected:
-        # Supporting files are only reachable through a filesystem tool this
-        # agent deliberately does not have, so a skill that ships them would
-        # advertise instructions it cannot follow.
         raise ExtensionConfigError(
             f"{where} contains {', '.join(unexpected)}: only a single SKILL.md is supported"
         )
@@ -170,13 +151,6 @@ def _load_skills(path: Path) -> tuple[Skill, ...]:
 
 
 def load_extensions(root: str | Path, agent_name: str) -> Extensions:
-    """Read the extensions mounted for one agent.
-
-    An absent directory means the operator configured nothing, which is the
-    normal case and not an error. Anything present but malformed is, since
-    silently ignoring it would leave the agent quietly less capable than its
-    configuration claims.
-    """
     directory = Path(root) / agent_name
     if not directory.is_dir():
         return Extensions()

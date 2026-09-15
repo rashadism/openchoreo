@@ -3,11 +3,14 @@
 
 import logging
 
+from collections.abc import Sequence
+
 import httpx
 from langchain_core.tools import BaseTool
 from langchain_mcp_adapters.client import MultiServerMCPClient, StreamableHttpConnection
 
 from src.config import settings
+from src.extensions import ExternalServer
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +29,7 @@ def _httpx_client_factory(
 
 
 class MCPClient:
-    def __init__(self, auth: httpx.Auth) -> None:
+    def __init__(self, auth: httpx.Auth, external: Sequence[ExternalServer] = ()) -> None:
         obs_connection: StreamableHttpConnection = {
             "transport": "streamable_http",
             "url": settings.observer_mcp_url,
@@ -46,7 +49,32 @@ class MCPClient:
                 "openchoreo": oc_connection,
             }
         )
+        self._external_names = [server.name for server in external]
+        self._external = (
+            MultiServerMCPClient(
+                {server.name: server.connection for server in external},
+                tool_name_prefix=True,
+            )
+            if external
+            else None
+        )
         logger.debug("Initialized MCP client with servers: observability, openchoreo")
+
+
+    async def get_external_tools(self) -> list[BaseTool]:
+        if self._external is None:
+            return []
+
+        tools: list[BaseTool] = []
+        for name in self._external_names:
+            try:
+                loaded = await self._external.get_tools(server_name=name)
+            except Exception as e:
+                logger.error("Skipping MCP server %s: %s", name, e, exc_info=True)
+                continue
+            logger.info("Loaded %d tools from MCP server %s", len(loaded), name)
+            tools.extend(loaded)
+        return tools
 
     async def get_tools(self) -> list[BaseTool]:
         try:

@@ -33,6 +33,7 @@ from src.agent.tool_registry import (
 from src.auth import get_oauth2_auth
 from src.clients import MCPClient, get_model, get_report_backend
 from src.config import settings
+from src.extensions import create_load_skill_tool, load_extensions
 from src.helpers import AlertScope
 from src.logging_config import request_id_context
 from src.models import ChatResponse, RCAReport
@@ -47,6 +48,7 @@ class Agent:
     def __init__(
         self,
         *,
+        name: str,
         template: str,
         tools: set[str],
         middleware: list[type],
@@ -54,6 +56,7 @@ class Agent:
         recursion_limit: int,
         use_summarization: bool = False,
     ):
+        self.name = name
         self.template = template
         self.tools = tools
         self.response_format = response_format
@@ -68,20 +71,29 @@ class Agent:
         usage_callback: BaseCallbackHandler | None = None,
         context: dict[str, Any] | None = None,
     ) -> tuple[Runnable, LoggingMiddleware | None]:
+        extensions = load_extensions(settings.extensions_dir, self.name)
+
         tools: list[BaseTool] = []
+        external_tools: list[BaseTool] = []
 
-        if self.tools:
-            mcp_client = MCPClient(auth=auth)
-            all_tools = await mcp_client.get_tools()
-            tools = [t for t in all_tools if t.name in self.tools]
-            logger.debug("Filtered to %d MCP tools: %s", len(tools), [t.name for t in tools])
+        if self.tools or extensions.servers:
+            mcp_client = MCPClient(auth=auth, external=extensions.servers)
+            if self.tools:
+                all_tools = await mcp_client.get_tools()
+                tools = [t for t in all_tools if t.name in self.tools]
+                logger.debug("Filtered to %d MCP tools: %s", len(tools), [t.name for t in tools])
 
-            missing = self.tools - {t.name for t in tools}
-            if missing:
-                logger.warning(
-                    "Requested MCP tools not found in the server catalog: %s",
-                    sorted(missing),
-                )
+                missing = self.tools - {t.name for t in tools}
+                if missing:
+                    logger.warning(
+                        "Requested MCP tools not found in the server catalog: %s",
+                        sorted(missing),
+                    )
+            if extensions.servers:
+                external_tools = await mcp_client.get_external_tools()
+
+        skill_tools = [create_load_skill_tool(extensions.skills)] if extensions.skills else []
+        tools = tools + external_tools + skill_tools
 
         logger.debug("Total tools: %d — %s", len(tools), [t.name for t in tools])
 
@@ -89,6 +101,8 @@ class Agent:
             "tools": tools,
             "observability_tools": [t for t in tools if t.name in OBSERVABILITY_TOOLS],
             "openchoreo_tools": [t for t in tools if t.name in OPENCHOREO_TOOLS],
+            "external_tools": external_tools,
+            "skills": extensions.skills,
         }
         if context:
             template_context.update(context)
@@ -116,6 +130,7 @@ class Agent:
 
 
 RCA_AGENT = Agent(
+    name="rca",
     template="prompts/rca_agent_prompt.j2",
     tools={
         TOOLS.QUERY_COMPONENT_LOGS,
@@ -143,6 +158,7 @@ RCA_AGENT = Agent(
 )
 
 REMED_AGENT = Agent(
+    name="remediation",
     template="prompts/remed_agent_prompt.j2",
     tools={
         TOOLS.LIST_COMPONENTS,
@@ -165,6 +181,7 @@ REMED_AGENT = Agent(
 )
 
 CHAT_AGENT = Agent(
+    name="chat",
     template="prompts/chat_agent_prompt.j2",
     tools={
         TOOLS.QUERY_COMPONENT_LOGS,

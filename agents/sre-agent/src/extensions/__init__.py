@@ -8,11 +8,14 @@ from src.extensions.config import (
     Skill,
     load_extensions,
 )
+from src.extensions.skills import LOAD_SKILL_TOOL, create_load_skill_tool
 
 __all__ = [
+    "LOAD_SKILL_TOOL",
     "ExtensionConfigError",
     "Extensions",
     "ExternalServer",
     "Skill",
+    "create_load_skill_tool",
     "load_extensions",
 ]
