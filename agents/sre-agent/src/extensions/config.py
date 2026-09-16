@@ -106,7 +106,7 @@ def _load_skills(path: Path) -> tuple[Skill, ...]:
         return ()
 
     skills = []
-    for directory in sorted(p for p in path.iterdir() if p.is_dir()):
+    for directory in sorted(p for p in path.iterdir() if p.is_dir() and not p.name.startswith(".")):
         try:
             skills.append(_read_skill(directory))
         except ExtensionConfigError as e:
@@ -115,7 +115,11 @@ def _load_skills(path: Path) -> tuple[Skill, ...]:
 
 
 def _read_skill(directory: Path) -> Skill:
-    unexpected = sorted(p.name for p in directory.iterdir() if p.name != "SKILL.md")
+    unexpected = sorted(
+        p.name
+        for p in directory.iterdir()
+        if p.name != "SKILL.md" and not p.name.startswith(".")
+    )
     if unexpected:
         raise ExtensionConfigError(
             f"contains {', '.join(unexpected)}: only a single SKILL.md file is supported as of now"

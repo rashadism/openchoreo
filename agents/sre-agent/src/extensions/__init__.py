@@ -8,7 +8,7 @@ from src.extensions.config import (
     Skill,
     load_extensions,
 )
-from src.extensions.runtime import apply_extensions
+from src.extensions.runtime import apply_extensions, read_extensions
 from src.extensions.skills import LOAD_SKILL_TOOL, create_load_skill_tool
 
 __all__ = [
@@ -20,4 +20,5 @@ __all__ = [
     "apply_extensions",
     "create_load_skill_tool",
     "load_extensions",
+    "read_extensions",
 ]

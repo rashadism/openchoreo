@@ -1,6 +1,7 @@
 # Copyright 2026 The OpenChoreo Authors
 # SPDX-License-Identifier: Apache-2.0
 
+import asyncio
 import logging
 from dataclasses import dataclass, field
 from typing import Any
@@ -9,10 +10,20 @@ from langchain_core.tools import BaseTool
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
 from src.config import settings
-from src.extensions.config import ExternalServer, Skill, load_extensions
+from src.extensions.config import (
+    ExtensionConfigError,
+    Extensions,
+    ExternalServer,
+    Skill,
+    load_extensions,
+)
 from src.extensions.skills import create_load_skill_tool
 
 logger = logging.getLogger(__name__)
+
+# Discovery happens while the analysis slot is already held, so it is bounded
+# well below the adapter's own read timeout.
+_DISCOVERY_TIMEOUT_SECONDS = 10
 
 
 @dataclass(frozen=True)
@@ -48,7 +59,16 @@ async def _load_external_tools(servers: tuple[ExternalServer, ...]) -> list[Base
     tools: list[BaseTool] = []
     for server in servers:
         try:
-            loaded = await client.get_tools(server_name=server.name)
+            loaded = await asyncio.wait_for(
+                client.get_tools(server_name=server.name), _DISCOVERY_TIMEOUT_SECONDS
+            )
+        except TimeoutError:
+            logger.error(
+                "Skipping MCP server %s: did not respond within %ds",
+                server.name,
+                _DISCOVERY_TIMEOUT_SECONDS,
+            )
+            continue
         except Exception as e:
             logger.error("Skipping MCP server %s: %s", server.name, _root_cause(e))
             logger.debug("MCP server %s failed", server.name, exc_info=True)
@@ -66,8 +86,16 @@ async def _load_external_tools(servers: tuple[ExternalServer, ...]) -> list[Base
     return tools
 
 
+def read_extensions(agent_name: str) -> Extensions:
+    try:
+        return load_extensions(settings.extensions_dir, agent_name)
+    except (ExtensionConfigError, OSError) as e:
+        logger.error("Ignoring extensions for %s: %s", agent_name, e)
+        return Extensions()
+
+
 async def apply_extensions(agent_name: str) -> LoadedExtensions:
-    extensions = load_extensions(settings.extensions_dir, agent_name)
+    extensions = read_extensions(agent_name)
 
     external_tools = await _load_external_tools(extensions.servers)
     tools = list(external_tools)

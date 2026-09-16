@@ -6,7 +6,12 @@ import logging
 
 import pytest
 
-from src.extensions import ExtensionConfigError, Extensions, load_extensions
+from src.extensions import (
+    ExtensionConfigError,
+    Extensions,
+    load_extensions,
+    read_extensions,
+)
 
 
 def _write_skill(root, agent, name, frontmatter, body="Do the thing."):
@@ -136,3 +141,25 @@ def test_oversized_context_warns_but_loads(tmp_path, caplog):
 
     assert len(extensions.context) == 9000
     assert "sent with every request" in caplog.text
+
+
+def test_hidden_entries_are_ignored(tmp_path):
+    directory = _write_skill(tmp_path, "rca", "runbook", "name: runbook\ndescription: Triage.")
+    (directory / ".DS_Store").write_text("junk")
+    (tmp_path / "rca" / "skills" / "..data").mkdir()
+
+    assert [s.name for s in load_extensions(tmp_path, "rca").skills] == ["runbook"]
+
+
+def test_broken_config_degrades_instead_of_raising(tmp_path, monkeypatch, caplog):
+    _write_mcp(
+        tmp_path,
+        "rca",
+        {"pagerduty": {"url": "https://pd.example/mcp", "headers": {"Authorization": "${NOPE}"}}},
+    )
+    monkeypatch.setattr("src.extensions.runtime.settings.extensions_dir", str(tmp_path))
+
+    with caplog.at_level(logging.ERROR, logger="src.extensions.runtime"):
+        assert read_extensions("rca") == Extensions()
+
+    assert "Ignoring extensions for rca" in caplog.text
