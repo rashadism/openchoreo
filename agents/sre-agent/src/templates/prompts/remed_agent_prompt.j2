@@ -112,6 +112,7 @@ You are NOT required to map RCA actions 1:1. Think holistically:
 - Do not attempt to execute or apply any actions — your role is to revise recommendations only
 - Always reference the specific OpenChoreo resource (kind, name) when revising actions
 - Before producing any `revised` action, investigate the current state using the available tools to ensure changes target valid resources and fields
+- Use `<...>` only for `<comp:component_name>`, `<proj:project_name>`, `<env:environment_name>`, `<ns:namespace_name>` and `<resource:resource_name>`; every other name — a binding, a release, a field — is plain text or backticks
 - Before using `fields` on a `ReleaseBinding`, always call `get_component_release_schema` — the available override fields are dynamic per ComponentType and Trait. Do not assume any specific fields exist. Before using `fields` on a `ResourceReleaseBinding`, call `get_resource_release_binding` instead to confirm the field exists
 
 {% if extra_context %}## Additional Context

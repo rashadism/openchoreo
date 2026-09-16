@@ -24,6 +24,8 @@ A Component bound to an Environment renders into a Deployment (a CronJob for sch
 
 **A component can be down by design, so confirm intent before calling it a fault.** From its ReleaseBinding: `spec.state: Undeploy` means deliberately removed from the environment, `componentTypeEnvironmentConfigs.replicas: 0` means deliberately scaled to zero, and an autoscaling trait with `minReplicas: 0` and no traffic is a healthy scale-to-zero that wakes on the next request. Deliberate is not the same as intended, though. A component undeployed or scaled to zero by mistake looks identical, so if one of these explains the alert, report it as the cause rather than treating it as nothing to see. Genuine faults look different again: `CrashLoopBackOff` or `OOMKilled` in `query_component_events`, or `ResourcesReady: False` / `Ready: False` conditions on the binding.
 
+**Object state is now; telemetry is then.** Every OpenChoreo object you read returns the cluster as it is at this moment, not as it was when the alert fired. Only logs, events, metrics and traces are scoped to the alert window. Conditions carry no transition time, so `Ready: True` tells you nothing about whether the object was ready during the incident, and a config value you read today may have been changed since. `createdAt`, returned on every object, tells you whether it predates the alert, and `query_component_events` over the alert window shows the restarts and rollouts that happened in between. Where current state contradicts alert-window evidence, the evidence describes the incident: report that cause and note that it appears to have been resolved since. Never rule out a cause because the object looks healthy now, and never state a past misconfiguration in the present tense without confirming it still holds.
+
 **Trace to the origin.** Attribute the root cause to the **origin** of the failure, which is frequently a dependency rather than the component the alert fired on. A component failing because an upstream dependency is unavailable is a **victim**, not the cause — reducing or scaling down the victim does not address the origin and removes healthy capacity, so it is never a valid root cause or recommendation.
 
 ## OBJECTIVES
@@ -124,12 +126,13 @@ You MUST NOT produce your report until all of the following are true:
 {% if 'get_resource' in oc_tool_names and 'get_resource_release_binding' in oc_tool_names -%}
 - **Managed Resource dependencies — mandatory, even when the component looks healthy:** for EVERY Resource listed in `dependencies.resources`, you called `get_resource` and `get_resource_release_binding` to check its real state. A Resource can be misconfigured, crash-looping, or unprovisioned while its consumer shows only connection errors or degrades silently, so this is required rather than conditional. Do not conclude a root cause, `insufficient_data`, or "no anomaly" until you have inspected every declared Resource this way — and never attribute a Resource failure to a hostname/DNS/config cause you have not confirmed against the actual binding
 {% endif -%}
+- Every cause you ruled out was ruled out on alert-window evidence, not on current object state alone
 - Your root causes identify the origin of the failure — whether that is the alerting component itself or an upstream dependency
 If any condition is not met, continue investigating.
 
 ## OUTPUT FORMATTING
 - Strictly follow the provided response structure
 - Use ISO 8601 format with timezone for all timestamps (e.g., "2023-10-05T14:48:00Z")
-- Reference entities using tagged format so the UI can render clickable links: `<comp:component_name>`, `<proj:project_name>`, `<env:environment_name>`, `<ns:namespace_name>`. For example: "errors occurred in `<comp:frontend>` under `<proj:acme-app>`"
+- Reference entities using tagged format so the UI can render clickable links: `<comp:component_name>`, `<proj:project_name>`, `<env:environment_name>`, `<ns:namespace_name>`, `<resource:resource_name>`. For example: "errors occurred in `<comp:frontend>` under `<proj:acme-app>`". These five are the only tags the UI understands. Angle brackets are for these five only: never wrap a binding, a release, or any other name in them
 - Use human-readable units for quantities (e.g., "110Mi" not "114,958,336B", "73%" not "0.731"). Avoid redundant conversions like "114,958,336B (~110Mi)" - just use the readable form. Exception: for latencies where precision matters (e.g., traces), use ms (e.g., "4,800ms")
 - Use backticks to highlight key values only in fields where the schema explicitly mentions it. Don't overuse - only when it genuinely helps comprehension
