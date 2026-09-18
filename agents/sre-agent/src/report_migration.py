@@ -5,7 +5,7 @@ import logging
 from typing import Any
 
 import httpx
-from sqlalchemy import Table, or_, select, text
+from sqlalchemy import Table, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 from src.auth import get_oauth2_auth
@@ -43,11 +43,17 @@ async def _add_missing_columns(engine: AsyncEngine, conn: AsyncConnection, table
         )
         existing = {row[0] for row in result.fetchall()}
 
+    # Postgres deployments can run more than one replica, so two pods may read
+    # the same column list and race to add a column. IF NOT EXISTS makes the
+    # loser a no-op rather than a startup failure.
+    if_not_exists = "" if engine.dialect.name == "sqlite" else " IF NOT EXISTS"
+
     for column in table.columns:
         if column.name in existing:
             continue
         column_type = column.type.compile(dialect=engine.dialect)
-        await conn.execute(text(f"ALTER TABLE {table.name} ADD COLUMN {column.name} {column_type}"))
+        clause = f"ALTER TABLE {table.name} ADD COLUMN{if_not_exists} {column.name} {column_type}"
+        await conn.execute(text(clause))
         logger.info("Added missing column '%s' to %s", column.name, table.name)
 
 
@@ -75,7 +81,10 @@ async def _name_legacy_rows(engine: AsyncEngine, table: Table) -> None:
             result = await conn.execute(
                 table.update()
                 .where(table.c.project_uid == project_uid, *unnamed)
-                .values(namespace=namespace, project=project)
+                .values(
+                    namespace=func.coalesce(table.c.namespace, namespace),
+                    project=func.coalesce(table.c.project, project),
+                )
             )
             named += result.rowcount
     logger.info("Named namespace/project on %d legacy RCA report(s)", named)
@@ -101,6 +110,7 @@ async def _list_projects(auth: httpx.Auth, namespace: str) -> list[tuple[str, st
 
 async def _list_all(path: str, auth: httpx.Auth) -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
+    seen: set[str] = set()
     cursor: str | None = None
     while True:
         params = {"limit": str(_PAGE_SIZE)}
@@ -111,3 +121,8 @@ async def _list_all(path: str, auth: httpx.Auth) -> list[dict[str, Any]]:
         cursor = (body.get("pagination") or {}).get("nextCursor")
         if not cursor:
             return items
+        # A repeated cursor means the server is making no progress; raise so the
+        # caller logs it instead of looping until the process is killed.
+        if cursor in seen:
+            raise RuntimeError(f"pagination cursor repeated for {path}")
+        seen.add(cursor)

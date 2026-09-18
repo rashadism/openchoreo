@@ -10,7 +10,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from src.clients.backend.sql_backend import metadata, rca_reports
-from src.report_migration import _project_names, migrate_rca_reports
+from src.report_migration import _list_all, _project_names, migrate_rca_reports
 
 
 @pytest_asyncio.fixture
@@ -104,6 +104,33 @@ async def test_leaves_rows_for_a_deleted_project_alone(engine):
 
 
 @pytest.mark.asyncio
+async def test_only_fills_the_half_of_a_scope_that_is_missing(engine):
+    await _insert(engine, "half-named", "uid-1")
+    async with engine.begin() as conn:
+        await conn.execute(
+            text(
+                "UPDATE rca_reports SET namespace = 'recorded-at-write-time' "
+                "WHERE report_id = 'half-named'"
+            )
+        )
+    get_mock = AsyncMock(
+        side_effect=[
+            _namespace_page("team-a"),
+            _project_page(("greeter", "uid-1")),
+        ]
+    )
+
+    with (
+        patch("src.report_migration.get", get_mock),
+        patch("src.report_migration.get_oauth2_auth", return_value=object()),
+    ):
+        await migrate_rca_reports(engine, rca_reports)
+
+    # A value the row already carries is left alone; only the NULL half is filled.
+    assert await _names(engine, "half-named") == ("recorded-at-write-time", "greeter")
+
+
+@pytest.mark.asyncio
 async def test_does_not_touch_the_control_plane_when_every_row_is_named(engine):
     await _insert(engine, "current", "uid-1")
     async with engine.begin() as conn:
@@ -185,3 +212,16 @@ async def test_project_names_pages_and_stops_once_uids_are_found():
         "/namespaces/team-a/projects",
     ]
     assert get_mock.call_args_list[1].args[2] == {"limit": "100", "cursor": "next"}
+
+
+@pytest.mark.asyncio
+async def test_stops_paging_when_the_control_plane_repeats_a_cursor():
+    get_mock = AsyncMock(return_value=_namespace_page("team-a", cursor="stuck"))
+
+    with (
+        patch("src.report_migration.get", get_mock),
+        pytest.raises(RuntimeError, match="pagination cursor repeated"),
+    ):
+        await _list_all("/namespaces", object())
+
+    assert get_mock.await_count == 2

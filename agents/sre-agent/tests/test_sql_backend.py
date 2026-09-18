@@ -8,6 +8,7 @@ the separate connections that ``initialize`` / ``get`` / ``list`` open.
 """
 
 from datetime import UTC, datetime
+from unittest.mock import AsyncMock, patch
 
 import pytest
 import pytest_asyncio
@@ -61,7 +62,15 @@ async def _legacy_backend(tmp_path, rows: list[dict[str, str]]) -> SQLReportBack
                 row,
             )
     backend = SQLReportBackend(engine)
-    await backend.initialize()
+    # initialize() reaches the report migration, whose naming pass talks to the
+    # control plane. Keep it off the network here rather than relying on the
+    # ambient environment having no OAuth credentials; the naming pass itself is
+    # covered in test_report_migration.py.
+    with (
+        patch("src.report_migration.get_oauth2_auth", side_effect=RuntimeError("no credentials")),
+        patch("src.report_migration.get", AsyncMock()),
+    ):
+        await backend.initialize()
     return backend
 
 
