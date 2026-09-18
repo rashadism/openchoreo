@@ -126,7 +126,6 @@ async def test_only_fills_the_half_of_a_scope_that_is_missing(engine):
     ):
         await migrate_rca_reports(engine, rca_reports)
 
-    # A value the row already carries is left alone; only the NULL half is filled.
     assert await _names(engine, "half-named") == ("recorded-at-write-time", "greeter")
 
 
@@ -205,7 +204,6 @@ async def test_project_names_pages_and_stops_once_uids_are_found():
         names = await _project_names({"uid-1"})
 
     assert names == {"uid-1": ("team-a", "greeter")}
-    # team-b is never enumerated.
     assert [call.args[0] for call in get_mock.call_args_list] == [
         "/namespaces",
         "/namespaces",

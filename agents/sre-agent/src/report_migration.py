@@ -31,9 +31,7 @@ async def _add_missing_columns(engine: AsyncEngine, conn: AsyncConnection, table
         result = await conn.execute(text(f"PRAGMA table_info({table.name})"))
         existing = {row[1] for row in result.fetchall()}
     else:
-        # to_regclass resolves the table the way the ALTER TABLE below will, so a
-        # search_path whose first schema is not the table's cannot make us try to
-        # re-add columns that already exist.
+        # Read through the same name resolution the ALTER TABLE below uses.
         result = await conn.execute(
             text(
                 "SELECT attname FROM pg_catalog.pg_attribute "
@@ -43,9 +41,7 @@ async def _add_missing_columns(engine: AsyncEngine, conn: AsyncConnection, table
         )
         existing = {row[0] for row in result.fetchall()}
 
-    # Postgres deployments can run more than one replica, so two pods may read
-    # the same column list and race to add a column. IF NOT EXISTS makes the
-    # loser a no-op rather than a startup failure.
+    # Several replicas can boot at once; the loser of a column race must not fail.
     if_not_exists = "" if engine.dialect.name == "sqlite" else " IF NOT EXISTS"
 
     for column in table.columns:
@@ -121,8 +117,6 @@ async def _list_all(path: str, auth: httpx.Auth) -> list[dict[str, Any]]:
         cursor = (body.get("pagination") or {}).get("nextCursor")
         if not cursor:
             return items
-        # A repeated cursor means the server is making no progress; raise so the
-        # caller logs it instead of looping until the process is killed.
         if cursor in seen:
             raise RuntimeError(f"pagination cursor repeated for {path}")
         seen.add(cursor)
