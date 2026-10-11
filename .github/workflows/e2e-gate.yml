@@ -41,6 +41,16 @@ on:
         required: false
         type: string
         default: ""
+      image_repo_prefix:
+        description: "Image registry prefix override; empty uses the Makefile default"
+        required: false
+        type: string
+        default: ""
+      helm_oci_registry:
+        description: "Helm OCI registry override; empty uses the Makefile default"
+        required: false
+        type: string
+        default: ""
       run_tier1:
         description: "Run the tier1 leg"
         required: false
@@ -85,6 +95,16 @@ on:
         default: "0.0.0-latest-dev"
       backstage_image_tag:
         description: "Backstage (openchoreo-ui) image tag for the UI leg, e.g. the backstage-plugins commit's 8-char short SHA or 'latest-dev'; empty uses the chart's AppVersion default"
+        required: false
+        type: string
+        default: ""
+      image_repo_prefix:
+        description: "Image registry prefix override; empty uses the Makefile default"
+        required: false
+        type: string
+        default: ""
+      helm_oci_registry:
+        description: "Helm OCI registry override; empty uses the Makefile default"
         required: false
         type: string
         default: ""
@@ -208,11 +228,15 @@ jobs:
 
       - name: Run e2e tests (tier 1)
         run: |
+          IMAGE_REPO_PREFIX="${{ inputs.image_repo_prefix }}"
+          HELM_OCI_REGISTRY="${{ inputs.helm_oci_registry }}"
           make e2e \
             E2E_HELM_SOURCE=oci \
             HELM_CHART_VERSION="${HELM_CHART_VERSION}" \
             E2E_SETUP_TIMEOUT=10m \
-            E2E_LABEL_FILTER='tier1'
+            E2E_LABEL_FILTER='tier1' \
+            ${IMAGE_REPO_PREFIX:+IMAGE_REPO_PREFIX="$IMAGE_REPO_PREFIX"} \
+            ${HELM_OCI_REGISTRY:+HELM_OCI_REGISTRY="$HELM_OCI_REGISTRY"}
 
       - name: Upload diagnostics
         if: failure()
@@ -272,11 +296,15 @@ jobs:
 
       - name: Run e2e tests (tier 2)
         run: |
+          IMAGE_REPO_PREFIX="${{ inputs.image_repo_prefix }}"
+          HELM_OCI_REGISTRY="${{ inputs.helm_oci_registry }}"
           make e2e \
             E2E_HELM_SOURCE=oci \
             HELM_CHART_VERSION="${HELM_CHART_VERSION}" \
             E2E_SETUP_TIMEOUT=10m \
-            E2E_LABEL_FILTER='tier2'
+            E2E_LABEL_FILTER='tier2' \
+            ${IMAGE_REPO_PREFIX:+IMAGE_REPO_PREFIX="$IMAGE_REPO_PREFIX"} \
+            ${HELM_OCI_REGISTRY:+HELM_OCI_REGISTRY="$HELM_OCI_REGISTRY"}
 
       - name: Upload diagnostics
         if: failure()
@@ -343,12 +371,16 @@ jobs:
         env:
           E2E_GITHUB_PAT: ${{ secrets.E2E_GITHUB_PAT }}
         run: |
+          IMAGE_REPO_PREFIX="${{ inputs.image_repo_prefix }}"
+          HELM_OCI_REGISTRY="${{ inputs.helm_oci_registry }}"
           make e2e.multi \
             E2E_HELM_SOURCE=oci \
             HELM_CHART_VERSION="${HELM_CHART_VERSION}" \
             E2E_SETUP_TIMEOUT=20m \
             E2E_TEST_TIMEOUT=60m \
-            E2E_LABEL_FILTER='tier3'
+            E2E_LABEL_FILTER='tier3' \
+            ${IMAGE_REPO_PREFIX:+IMAGE_REPO_PREFIX="$IMAGE_REPO_PREFIX"} \
+            ${HELM_OCI_REGISTRY:+HELM_OCI_REGISTRY="$HELM_OCI_REGISTRY"}
 
       - name: Upload diagnostics
         if: failure()
@@ -477,6 +509,8 @@ jobs:
       - name: Install OpenChoreo e2e cluster
         if: steps.ui-suite.outputs.present == 'true'
         run: |
+          IMAGE_REPO_PREFIX="${{ inputs.image_repo_prefix }}"
+          HELM_OCI_REGISTRY="${{ inputs.helm_oci_registry }}"
           make e2e.setup \
             E2E_HELM_SOURCE=oci \
             HELM_CHART_VERSION="${HELM_CHART_VERSION}" \
@@ -484,7 +518,9 @@ jobs:
             E2E_WITH_OBSERVABILITY="${E2E_WITH_OBSERVABILITY}" \
             E2E_WITH_UI="${E2E_WITH_UI}" \
             E2E_BACKSTAGE_IMAGE_TAG="${E2E_BACKSTAGE_IMAGE_TAG}" \
-            E2E_SETUP_TIMEOUT=10m
+            E2E_SETUP_TIMEOUT=10m \
+            ${IMAGE_REPO_PREFIX:+IMAGE_REPO_PREFIX="$IMAGE_REPO_PREFIX"} \
+            ${HELM_OCI_REGISTRY:+HELM_OCI_REGISTRY="$HELM_OCI_REGISTRY"}
 
       - name: Run UI e2e tests
         if: steps.ui-suite.outputs.present == 'true'
@@ -621,13 +657,17 @@ jobs:
       - name: Install OpenChoreo e2e cluster with Dex
         if: steps.ui-suite.outputs.present == 'true'
         run: |
+          IMAGE_REPO_PREFIX="${{ inputs.image_repo_prefix }}"
+          HELM_OCI_REGISTRY="${{ inputs.helm_oci_registry }}"
           make e2e.setup \
             E2E_HELM_SOURCE=oci \
             HELM_CHART_VERSION="${HELM_CHART_VERSION}" \
             E2E_WITH_UI="${E2E_WITH_UI}" \
             E2E_WITH_EXT_IDP="${E2E_WITH_EXT_IDP}" \
             E2E_BACKSTAGE_IMAGE_TAG="${E2E_BACKSTAGE_IMAGE_TAG}" \
-            E2E_SETUP_TIMEOUT=10m
+            E2E_SETUP_TIMEOUT=10m \
+            ${IMAGE_REPO_PREFIX:+IMAGE_REPO_PREFIX="$IMAGE_REPO_PREFIX"} \
+            ${HELM_OCI_REGISTRY:+HELM_OCI_REGISTRY="$HELM_OCI_REGISTRY"}
 
       - name: Run ext-idp Playwright tests
         if: steps.ui-suite.outputs.present == 'true'
