@@ -9,14 +9,10 @@ from langchain_core.language_models import BaseChatModel
 from src.config import settings
 
 
-def _requires_responses_api(model_name: str) -> bool:
-    # gpt-5.x-mini / gpt-5.x-nano / o-series-mini reject ``reasoning_effort``
-    # on /v1/chat/completions when function tools are bound and require
-    # /v1/responses instead. langchain-openai routes to the responses
-    # endpoint when ``use_responses_api=True``. Match on the model segment
-    # after the optional ``provider:`` prefix.
-    base = model_name.split(":", 1)[-1].lower()
-    return base.endswith("-mini") or base.endswith("-nano")
+def _is_openai_model(model_name: str) -> bool:
+    # init_chat_model defaults a bare (no "provider:" prefix) model name to OpenAI.
+    provider = model_name.split(":", 1)[0].lower() if ":" in model_name else "openai"
+    return provider == "openai"
 
 
 def get_model(
@@ -41,9 +37,14 @@ def get_model(
     # ping) can override without touching configuration.
     if settings.portal_assistant_reasoning_effort and "reasoning_effort" not in kwargs:
         kwargs["reasoning_effort"] = settings.portal_assistant_reasoning_effort
-        if (
-            _requires_responses_api(model_name)
-            and "use_responses_api" not in kwargs
-        ):
-            kwargs["use_responses_api"] = True
+    # OpenAI's reasoning models reject function tools on /v1/chat/completions,
+    # requiring /v1/responses instead. Only safe to force when talking
+    # directly to OpenAI; with a base_url override we don't know the real
+    # backend (e.g. ai-gateway-agentgateway can route elsewhere), so leave it.
+    if (
+        not settings.portal_assistant_llm_base_url
+        and _is_openai_model(model_name)
+        and "use_responses_api" not in kwargs
+    ):
+        kwargs["use_responses_api"] = True
     return init_chat_model(model=model_name, api_key=api_key, **kwargs)
