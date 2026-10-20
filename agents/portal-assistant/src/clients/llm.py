@@ -10,7 +10,6 @@ from src.config import settings
 
 
 def _is_openai_model(model_name: str) -> bool:
-    # init_chat_model defaults a bare (no "provider:" prefix) model name to OpenAI.
     provider = model_name.split(":", 1)[0].lower() if ":" in model_name else "openai"
     return provider == "openai"
 
@@ -37,10 +36,7 @@ def get_model(
     # ping) can override without touching configuration.
     if settings.portal_assistant_reasoning_effort and "reasoning_effort" not in kwargs:
         kwargs["reasoning_effort"] = settings.portal_assistant_reasoning_effort
-    # OpenAI's reasoning models reject function tools on /v1/chat/completions,
-    # requiring /v1/responses instead. Only safe to force when talking
-    # directly to OpenAI; with a base_url override we don't know the real
-    # backend (e.g. ai-gateway-agentgateway can route elsewhere), so leave it.
+    # Force /v1/responses for direct OpenAI traffic only; a base_url override may point elsewhere.
     if (
         not settings.portal_assistant_llm_base_url
         and _is_openai_model(model_name)
