@@ -1,6 +1,7 @@
 # Copyright 2026 The OpenChoreo Authors
 # SPDX-License-Identifier: Apache-2.0
 
+import os
 from functools import lru_cache
 from typing import Any
 
@@ -13,6 +14,16 @@ from src.config import settings
 def _is_openai_model(model_name: str) -> bool:
     provider = model_name.split(":", 1)[0].lower() if ":" in model_name else "openai"
     return provider == "openai"
+
+
+def _has_base_url_override(kwargs: dict[str, Any]) -> bool:
+    # ChatOpenAI itself falls back to OPENAI_API_BASE/OPENAI_BASE_URL when no
+    # base_url kwarg is given, so those env vars can route elsewhere too.
+    return bool(
+        kwargs.get("base_url")
+        or os.environ.get("OPENAI_API_BASE")
+        or os.environ.get("OPENAI_BASE_URL")
+    )
 
 
 @lru_cache
@@ -29,7 +40,7 @@ def get_model(
         kwargs["base_url"] = settings.finops_agent_llm_base_url
     # Force /v1/responses for direct OpenAI traffic only; a base_url override may point elsewhere.
     if (
-        not settings.finops_agent_llm_base_url
+        not _has_base_url_override(kwargs)
         and _is_openai_model(model_name)
         and "use_responses_api" not in kwargs
     ):
