@@ -636,7 +636,7 @@ _e2e.install-op:
 		--from-literal=password="ThisIsTheOpenSearchPassword1" \
 		--dry-run=client -o yaml | $(E2E_KUBECTL) apply -f -
 	$(E2E_HELM) upgrade --install observability-logs-opensearch \
-		oci://ghcr.io/openchoreo/helm-charts/observability-logs-opensearch \
+		$(HELM_OCI_REGISTRY)/observability-logs-opensearch \
 		--version $(OBSERVABILITY_LOGS_OPENSEARCH_VERSION) \
 		--namespace $(E2E_OP_NS) \
 		--set openSearchSetup.openSearchSecretName="opensearch-admin-credentials" \
@@ -645,14 +645,14 @@ _e2e.install-op:
 		--set auditLogs.enabled=true \
 		--wait --wait-for-jobs --timeout $(E2E_SETUP_TIMEOUT)
 	$(E2E_HELM) upgrade --install observability-traces-opensearch \
-		oci://ghcr.io/openchoreo/helm-charts/observability-tracing-opensearch \
+		$(HELM_OCI_REGISTRY)/observability-tracing-opensearch \
 		--version $(OBSERVABILITY_TRACES_OPENSEARCH_VERSION) \
 		--namespace $(E2E_OP_NS) \
 		--set openSearch.enabled=false \
 		--set openSearchSetup.openSearchSecretName="opensearch-admin-credentials" \
 		--wait --wait-for-jobs --timeout $(E2E_SETUP_TIMEOUT)
 	$(E2E_HELM) upgrade --install observability-metrics-prometheus \
-		oci://ghcr.io/openchoreo/helm-charts/observability-metrics-prometheus \
+		$(HELM_OCI_REGISTRY)/observability-metrics-prometheus \
 		--version $(OBSERVABILITY_METRICS_PROMETHEUS_VERSION) \
 		--namespace $(E2E_OP_NS) \
 		--wait --timeout $(E2E_SETUP_TIMEOUT)
@@ -1081,7 +1081,7 @@ _e2e.mc.install-op:
 	@# TLS-passthrough port like the OpenSearch module needed.
 	@$(call log_info, Installing logs module \(OpenObserve\))
 	$(E2E_MC_OP_HELM) upgrade --install observability-logs-openobserve \
-		oci://ghcr.io/openchoreo/helm-charts/observability-logs-openobserve \
+		$(HELM_OCI_REGISTRY)/observability-logs-openobserve \
 		--version $(OBSERVABILITY_LOGS_OPENOBSERVE_VERSION) \
 		--namespace $(E2E_OP_NS) \
 		--values $(E2E_MC_K3D_DIR)/values-op-modules.yaml \
@@ -1106,7 +1106,7 @@ _e2e.mc.install-op:
 	@# attach to; this also drops the opensearch-operator install entirely.
 	@# Multi-cluster receiver mode — per observability-tracing-opensearch README
 	$(E2E_MC_OP_HELM) upgrade --install observability-traces-opensearch \
-		oci://ghcr.io/openchoreo/helm-charts/observability-tracing-opensearch \
+		$(HELM_OCI_REGISTRY)/observability-tracing-opensearch \
 		--version $(OBSERVABILITY_TRACES_OPENSEARCH_VERSION) \
 		--namespace $(E2E_OP_NS) \
 		--values $(E2E_MC_K3D_DIR)/values-op-modules.yaml \
@@ -1117,7 +1117,7 @@ _e2e.mc.install-op:
 	$(call e2e_mc_op_settle,metrics module install)
 	@# Multi-cluster receiver mode — per observability-metrics-prometheus README
 	$(E2E_MC_OP_HELM) upgrade --install observability-metrics-prometheus \
-		oci://ghcr.io/openchoreo/helm-charts/observability-metrics-prometheus \
+		$(HELM_OCI_REGISTRY)/observability-metrics-prometheus \
 		--version $(OBSERVABILITY_METRICS_PROMETHEUS_VERSION) \
 		--namespace $(E2E_OP_NS) \
 		--values $(E2E_MC_K3D_DIR)/values-op-modules.yaml \
@@ -1152,7 +1152,7 @@ _e2e.mc.install-fluent-bit:
 	@# passthrough is needed since OpenObserve talks plain HTTP.
 	@$(call log_info, Installing Fluent Bit in DP cluster)
 	$(E2E_MC_DP_HELM) upgrade --install observability-logs-openobserve \
-		oci://ghcr.io/openchoreo/helm-charts/observability-logs-openobserve \
+		$(HELM_OCI_REGISTRY)/observability-logs-openobserve \
 		--version $(OBSERVABILITY_LOGS_OPENOBSERVE_VERSION) \
 		--namespace $(E2E_OP_NS) \
 		--set openobserve-standalone.enabled=false \
@@ -1167,7 +1167,7 @@ _e2e.mc.install-fluent-bit:
 		--wait --timeout $(E2E_SETUP_TIMEOUT)
 	@$(call log_info, Installing Fluent Bit in WP cluster)
 	$(E2E_MC_WP_HELM) upgrade --install observability-logs-openobserve \
-		oci://ghcr.io/openchoreo/helm-charts/observability-logs-openobserve \
+		$(HELM_OCI_REGISTRY)/observability-logs-openobserve \
 		--version $(OBSERVABILITY_LOGS_OPENOBSERVE_VERSION) \
 		--namespace $(E2E_OP_NS) \
 		--set openobserve-standalone.enabled=false \
@@ -1185,7 +1185,7 @@ _e2e.mc.install-fluent-bit:
 	@# via remote write on host.k3d.internal:31080 (OP kgateway HTTP port).
 	@$(call log_info, Installing metrics exporter in DP cluster)
 	$(E2E_MC_DP_HELM) upgrade --install observability-metrics-prometheus \
-		oci://ghcr.io/openchoreo/helm-charts/observability-metrics-prometheus \
+		$(HELM_OCI_REGISTRY)/observability-metrics-prometheus \
 		--version $(OBSERVABILITY_METRICS_PROMETHEUS_VERSION) \
 		--namespace $(E2E_OP_NS) \
 		--set global.installationMode="multiClusterExporter" \
@@ -1196,7 +1196,7 @@ _e2e.mc.install-fluent-bit:
 	$(call e2e_wait_metrics_prometheus,$(E2E_MC_DP_KUBECTL),$(E2E_OP_NS),prom-agent-openchoreo-prometheus-agent)
 	@$(call log_info, Installing metrics exporter in WP cluster)
 	$(E2E_MC_WP_HELM) upgrade --install observability-metrics-prometheus \
-		oci://ghcr.io/openchoreo/helm-charts/observability-metrics-prometheus \
+		$(HELM_OCI_REGISTRY)/observability-metrics-prometheus \
 		--version $(OBSERVABILITY_METRICS_PROMETHEUS_VERSION) \
 		--namespace $(E2E_OP_NS) \
 		--set global.installationMode="multiClusterExporter" \
@@ -1210,7 +1210,7 @@ _e2e.mc.install-fluent-bit:
 	@# via host.k3d.internal:31080 (OP kgateway HTTP port in e2e).
 	@$(call log_info, Installing tracing exporter in DP cluster)
 	$(E2E_MC_DP_HELM) upgrade --install observability-traces-opensearch \
-		oci://ghcr.io/openchoreo/helm-charts/observability-tracing-opensearch \
+		$(HELM_OCI_REGISTRY)/observability-tracing-opensearch \
 		--version $(OBSERVABILITY_TRACES_OPENSEARCH_VERSION) \
 		--namespace $(E2E_OP_NS) \
 		--set global.installationMode="multiClusterExporter" \
@@ -1224,7 +1224,7 @@ _e2e.mc.install-fluent-bit:
 		--wait --timeout $(E2E_SETUP_TIMEOUT)
 	@$(call log_info, Installing tracing exporter in WP cluster)
 	$(E2E_MC_WP_HELM) upgrade --install observability-traces-opensearch \
-		oci://ghcr.io/openchoreo/helm-charts/observability-tracing-opensearch \
+		$(HELM_OCI_REGISTRY)/observability-tracing-opensearch \
 		--version $(OBSERVABILITY_TRACES_OPENSEARCH_VERSION) \
 		--namespace $(E2E_OP_NS) \
 		--set global.installationMode="multiClusterExporter" \
