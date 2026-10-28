@@ -117,7 +117,8 @@ OBSERVABILITY_METRICS_PROMETHEUS_VERSION  ?= 0.0.0-latest-dev
 # logs use the OpenObserve community module there instead of OpenSearch.
 OBSERVABILITY_LOGS_OPENOBSERVE_VERSION    ?= 0.0.0-latest-dev
 
-E2E_IMAGE_REGISTRY ?= ghcr.io
+OCI_REGISTRY_HOST ?= ghcr.io
+E2E_IMAGE_REGISTRY ?= $(OCI_REGISTRY_HOST)
 E2E_IMAGE_REGISTRY_VALUES := --set-string global.imageRegistry=$(E2E_IMAGE_REGISTRY)
 
 # Helm chart references: local chart dirs or OCI registry
