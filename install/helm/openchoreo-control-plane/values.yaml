@@ -177,6 +177,13 @@ features:
     # @schema
     remoteKeyPrefix: "secret"
 
+    # @schema
+    # enum: ["/", "-", "_", ".", "+", "=", "@"]
+    # description: Separator that joins the segments of every key written to the external secret store, including the segments of a nested remoteKeyPrefix. "/" gives path-style keys <prefix>/<namespace>/<type>/<name> for OpenBao, Vault and AWS Secrets Manager. "-" is the only separator Azure Key Vault allows and works with every store. "_" works with GCP Secret Manager, AWS Secrets Manager, OpenBao and Vault, and ".", "+", "=" and "@" work with AWS Secrets Manager, OpenBao and Vault. With "-" or ".", two different secrets can map to the same key, since those characters can also appear in namespace and secret names. This is an install-time setting, since changing it after secrets exist does not move existing entries.
+    # default: "/"
+    # @schema
+    remoteKeySeparator: "/"
+
 # @schema
 # type: object
 # description: Controller Manager configuration - the main controller for OpenChoreo CRDs
@@ -1268,6 +1275,7 @@ openchoreoApi:
               system: true
               actions:
                 - "component:view"
+                - "releaseline:view"
                 - "componenttype:view"
                 - "resource:view"
                 - "resourcerelease:view"
@@ -1312,6 +1320,7 @@ openchoreoApi:
               system: true
               actions:
                 - "component:view"
+                - "releaseline:view"
                 - "project:view"
                 - "namespace:view"
                 - "componentrelease:view"
@@ -1348,6 +1357,7 @@ openchoreoApi:
                 - "project:view"
                 - "namespace:view"
                 - "environment:view"
+                - "releaseline:view"
 
             # Admin role with full permissions to all resources
             - name: admin
@@ -1416,6 +1426,10 @@ openchoreoApi:
                 - "component:delete"
                 - "component:exec"
                 - "component:connect"
+                - "releaseline:view"
+                - "releaseline:create"
+                - "releaseline:update"
+                - "releaseline:delete"
                 - "componentrelease:view"
                 - "componentrelease:create"
                 - "releasebinding:view"
@@ -1487,6 +1501,7 @@ openchoreoApi:
                 - "workflow:view"
                 - "project:view"
                 - "component:view"
+                - "releaseline:view"
                 - "componentrelease:view"
                 - "componentrelease:create"
                 - "releasebinding:view"
@@ -1537,6 +1552,10 @@ openchoreoApi:
                 - "component:delete"
                 - "component:exec"
                 - "component:connect"
+                - "releaseline:view"
+                - "releaseline:create"
+                - "releaseline:update"
+                - "releaseline:delete"
                 - "componentrelease:view"
                 - "componentrelease:create"
                 - "releasebinding:view"
@@ -4482,6 +4501,7 @@ portalAssistant:
   replicas: 1
 
   llm:
+    # Secret holding PORTAL_ASSISTANT_LLM_API_KEY. Not needed when auth is azure.
     secretName: ""
     modelName: ""
     # Optional OpenAI-compatible base URL. Set to route LLM calls through the
@@ -4489,6 +4509,41 @@ portalAssistant:
     # instead of the provider directly; the provider key is then managed at the
     # gateway and the secret's PORTAL_ASSISTANT_LLM_API_KEY may be a placeholder.
     baseUrl: ""
+    # @schema
+    # description: How the Portal Assistant authenticates to the LLM endpoint. api_key sends PORTAL_ASSISTANT_LLM_API_KEY from secretName. azure sends a Microsoft Entra ID token from DefaultAzureCredential instead, for an Azure OpenAI or Azure AI Foundry endpoint set in baseUrl (e.g., https://<resource>.openai.azure.com/openai/v1/), and secretName is optional. On AKS, use workload identity - the azure.workload.identity/client-id annotation in serviceAccount.annotations and the azure.workload.identity/use label in podLabels. Set modelName to the deployment name, and name the deployment after its model (e.g., gpt-5-mini). The Portal Assistant needs a model name LangChain recognizes, so other deployment names fail, even when prefixed as openai:<deployment>.
+    # enum: [api_key, azure]
+    # default: api_key
+    # @schema
+    auth: api_key
+    # @schema
+    # type: string
+    # description: Microsoft Entra ID scope of the LLM token when auth is azure. Empty uses https://cognitiveservices.azure.com/.default, the scope of Azure OpenAI and Azure AI Foundry.
+    # default: ""
+    # @schema
+    tokenScope: ""
+
+  # @schema
+  # type: object
+  # description: Service account configuration for the Portal Assistant
+  # @schema
+  serviceAccount:
+    # @schema
+    # type: object
+    # description: Annotations to add to the Portal Assistant service account, for example azure.workload.identity/client-id or eks.amazonaws.com/role-arn
+    # additionalProperties:
+    #   type: string
+    # default: {}
+    # @schema
+    annotations: {}
+
+  # @schema
+  # type: object
+  # description: Labels to add to Portal Assistant pods, for example azure.workload.identity/use to opt the pod into Azure Workload Identity token projection
+  # additionalProperties:
+  #   type: string
+  # default: {}
+  # @schema
+  podLabels: {}
 
   config:
     openchoreoApiUrl: "http://openchoreo-api.openchoreo-control-plane.svc.cluster.local:8080"
